@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "784183849835",
+    "project_id": "modestyrent---app-f8849",
+    "storage_bucket": "modestyrent---app-f8849.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:784183849835:android:2e3418ac7c86b93660d22e",
+        "android_client_info": {
+          "package_name": "com.example.modestyrent_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDgirPHZDF36ihHFjh-jOQD-zg21nCmTrA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
