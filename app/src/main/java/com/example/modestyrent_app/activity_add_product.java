@@ -10,25 +10,20 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
-import androidx.activity.result.ActivityResult;
-import androidx.activity.result.ActivityResultCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.textfield.TextInputEditText;
-import com.google.firebase.Timestamp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.firestore.DocumentReference;
-import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
@@ -38,47 +33,45 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
-/**
- * ActivityAddProduct
- * - pick multiple images from gallery
- * - upload images to Firebase Storage
- * - store product metadata in Firestore under users/{uid}/products/{productId}
- */
 public class activity_add_product extends AppCompatActivity {
 
     private Button btnSelectImage, btnSave;
-    private TextInputEditText etItemName, spinnerSize, etPrice, etDescription;
+    private TextInputEditText etItemName, etPrice, spinnerSize, etDescription;
     private ChipGroup chipGroupStatus, chipGroupColor, chipGroupCategory;
 
-    private final List<Uri> imageUriList = new ArrayList<>();
-    private final List<String> uploadedImageUrls = new ArrayList<>();
+    // selected URIs (no persist)
+    private final ArrayList<Uri> selectedImageUris = new ArrayList<>();
 
+    private ActivityResultLauncher<Intent> pickImagesLauncher;
+
+    // Firebase
     private FirebaseAuth mAuth;
-    private FirebaseFirestore firestore;
-    private StorageReference storageRef;
+    private FirebaseStorage storage;
+    private DatabaseReference realtimeDb;
 
     private ProgressDialog progressDialog;
 
-    // ActivityResultLauncher to handle gallery intent
-    private ActivityResultLauncher<Intent> galleryLauncher;
+    private static final int MAX_IMAGES = 8;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_add_product); // ensure this matches your XML filename
+        setContentView(R.layout.activity_add_product);
 
-        // init firebase
+        // Firebase
         mAuth = FirebaseAuth.getInstance();
-        firestore = FirebaseFirestore.getInstance();
-        storageRef = FirebaseStorage.getInstance().getReference();
+        storage = FirebaseStorage.getInstance();
+        realtimeDb = FirebaseDatabase.getInstance().getReference();
 
-        // UI
+        // UI refs
         btnSelectImage = findViewById(R.id.btnSelectImage);
         btnSave = findViewById(R.id.btnSave);
         etItemName = findViewById(R.id.etItemName);
-        spinnerSize = findViewById(R.id.spinnerSize);
         etPrice = findViewById(R.id.etPrice);
+        spinnerSize = findViewById(R.id.spinnerSize);
         etDescription = findViewById(R.id.etDescription);
 
         chipGroupStatus = findViewById(R.id.chipGroupStatus);
@@ -88,246 +81,233 @@ public class activity_add_product extends AppCompatActivity {
         progressDialog = new ProgressDialog(this);
         progressDialog.setCancelable(false);
 
-        // register gallery launcher
-        galleryLauncher = registerForActivityResult(
+        // Prepare ActivityResultLauncher to pick images (ACTION_GET_CONTENT)
+        pickImagesLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
-                new ActivityResultCallback<ActivityResult>() {
-                    @Override
-                    public void onActivityResult(ActivityResult result) {
-                        if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                            Intent data = result.getData();
-                            // multiple selection
-                            if (data.getClipData() != null) {
-                                ClipData clipData = data.getClipData();
-                                int count = clipData.getItemCount();
-                                imageUriList.clear();
-                                for (int i = 0; i < count; i++) {
-                                    Uri imageUri = clipData.getItemAt(i).getUri();
-                                    imageUriList.add(imageUri);
-                                }
-                                Toast.makeText(activity_add_product.this, count + " images selected", Toast.LENGTH_SHORT).show();
-                            } else {
-                                // single selection
-                                Uri imageUri = data.getData();
-                                imageUriList.clear();
-                                if (imageUri != null) {
-                                    imageUriList.add(imageUri);
-                                    Toast.makeText(activity_add_product.this, "1 image selected", Toast.LENGTH_SHORT).show();
-                                }
-                            }
-                        }
+                result -> {
+                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                        handlePickedImages(result.getData());
                     }
                 }
         );
 
-        btnSelectImage.setOnClickListener(v -> openGalleryToSelectImages());
+        btnSelectImage.setOnClickListener(v -> openImagePicker());
 
-        btnSave.setOnClickListener(v -> {
-            try {
-                saveProduct();
-            } catch (Exception e) {
-                e.printStackTrace();
-                Toast.makeText(activity_add_product.this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            }
-        });
+        btnSave.setOnClickListener(v -> saveProduct());
     }
 
-    private void openGalleryToSelectImages() {
-        Intent intent = new Intent();
+    /**
+     * Open picker using ACTION_GET_CONTENT (no persistable URI permissions).
+     */
+    private void openImagePicker() {
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("image/*");
         intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-        intent.setAction(Intent.ACTION_GET_CONTENT); // uses SAF - no READ_EXTERNAL_STORAGE needed on some devices
-        galleryLauncher.launch(Intent.createChooser(intent, "Select images"));
+        // Do NOT add PERSISTABLE flags since we won't call takePersistableUriPermission
+        pickImagesLauncher.launch(Intent.createChooser(intent, "Select images"));
     }
 
+    /**
+     * Collect selected URIs from intent. No persistence requested.
+     */
+    private void handlePickedImages(Intent data) {
+        selectedImageUris.clear();
+        if (data == null) {
+            Toast.makeText(this, "No images selected", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        ClipData clip = data.getClipData();
+        if (clip != null) {
+            int count = Math.min(clip.getItemCount(), MAX_IMAGES);
+            for (int i = 0; i < count; i++) {
+                ClipData.Item item = clip.getItemAt(i);
+                if (item == null) continue;
+                Uri uri = item.getUri();
+                if (uri == null) continue;
+                selectedImageUris.add(uri);
+            }
+        } else {
+            Uri uri = data.getData();
+            if (uri != null) {
+                selectedImageUris.add(uri);
+            }
+        }
+
+        if (selectedImageUris.isEmpty()) {
+            Toast.makeText(this, "No images selected", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, selectedImageUris.size() + " image(s) selected", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /**
+     * Validate inputs, upload images to Storage, then write a product object to Realtime Database.
+     */
     private void saveProduct() {
-        // Validate
         String name = etItemName.getText() != null ? etItemName.getText().toString().trim() : "";
-        String size = spinnerSize.getText() != null ? spinnerSize.getText().toString().trim() : "";
         String priceStr = etPrice.getText() != null ? etPrice.getText().toString().trim() : "";
-        String description = etDescription.getText() != null ? etDescription.getText().toString().trim() : "";
+        String size = spinnerSize.getText() != null ? spinnerSize.getText().toString().trim() : "";
+        String desc = etDescription.getText() != null ? etDescription.getText().toString().trim() : "";
 
         if (TextUtils.isEmpty(name)) {
-            etItemName.setError("Please enter item name");
-            etItemName.requestFocus();
+            etItemName.setError("Enter item name");
             return;
         }
         if (TextUtils.isEmpty(priceStr)) {
-            etPrice.setError("Please enter price");
-            etPrice.requestFocus();
+            etPrice.setError("Enter price");
             return;
         }
+
         double price;
         try {
             price = Double.parseDouble(priceStr);
-        } catch (NumberFormatException nfe) {
-            etPrice.setError("Enter valid price");
-            etPrice.requestFocus();
-            return;
-        }
-        if (imageUriList.isEmpty()) {
-            Toast.makeText(this, "Please select at least one image", Toast.LENGTH_SHORT).show();
+            if (price < 0) throw new NumberFormatException();
+        } catch (NumberFormatException e) {
+            etPrice.setError("Invalid price");
             return;
         }
 
         // status
         int checkedStatusId = chipGroupStatus.getCheckedChipId();
-        String status = "Available";
+        String status = "available";
         if (checkedStatusId != -1) {
-            Chip chipStatus = findViewById(checkedStatusId);
-            if (chipStatus != null) status = chipStatus.getText().toString();
+            Chip c = findViewById(checkedStatusId);
+            if (c != null) status = c.getText().toString().toLowerCase();
         }
 
-        // colors (multi-select)
+        // colors (multi)
         List<String> colors = new ArrayList<>();
         for (int i = 0; i < chipGroupColor.getChildCount(); i++) {
-            View child = chipGroupColor.getChildAt(i);
-            if (child instanceof Chip) {
-                Chip c = (Chip) child;
-                if (c.isChecked()) colors.add(c.getText().toString());
+            View v = chipGroupColor.getChildAt(i);
+            if (v instanceof Chip) {
+                Chip chip = (Chip) v;
+                if (chip.isChecked()) colors.add(chip.getText().toString());
             }
         }
 
-        // category (single select)
-        int checkedCatId = chipGroupCategory.getCheckedChipId();
-        String category = "";
-        if (checkedCatId != -1) {
-            Chip chipCat = findViewById(checkedCatId);
-            if (chipCat != null) category = chipCat.getText().toString();
+        // category single
+        int checkedCategoryId = chipGroupCategory.getCheckedChipId();
+        String category = "Other";
+        if (checkedCategoryId != -1) {
+            Chip c = findViewById(checkedCategoryId);
+            if (c != null) category = c.getText().toString();
         }
 
-        // get current user
         FirebaseUser user = mAuth.getCurrentUser();
         if (user == null) {
-            Toast.makeText(this, "User not signed in", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Please sign in first.", Toast.LENGTH_SHORT).show();
             return;
         }
-        String uid = user.getUid();
-
-        // prepare product document id
-        String productId = UUID.randomUUID().toString();
 
         progressDialog.setMessage("Uploading images...");
         progressDialog.show();
 
-        // upload images sequentially and collect URLs
-        uploadedImageUrls.clear();
-        uploadImageAtIndex(0, uid, productId, name, size, price, status, colors, category, description);
+        if (selectedImageUris.isEmpty()) {
+            // create product with empty imageUrls
+            createProductInRealtimeDb(user.getUid(), name, price, size, status, colors, category, desc, new ArrayList<>());
+        } else {
+            uploadImagesThenSave(user.getUid(), name, price, size, status, colors, category, desc);
+        }
     }
 
-    private void uploadImageAtIndex(int index,
-                                    String uid,
-                                    String productId,
-                                    String name,
-                                    String size,
-                                    double price,
-                                    String status,
-                                    List<String> colors,
-                                    String category,
-                                    String description) {
+    /**
+     * Upload images to Firebase Storage and gather their download URLs.
+     */
+    private void uploadImagesThenSave(String uid,
+                                      String name,
+                                      double price,
+                                      String size,
+                                      String status,
+                                      List<String> colors,
+                                      String category,
+                                      String desc) {
 
-        if (index >= imageUriList.size()) {
-            // all uploaded -> save Firestore doc
-            saveProductToFirestore(uid, productId, name, size, price, status, colors, category, description, uploadedImageUrls);
-            return;
+        StorageReference rootRef = storage.getReference();
+        List<Task<Uri>> urlTasks = new ArrayList<>();
+
+        Executor executor = Executors.newSingleThreadExecutor();
+
+        for (Uri uri : selectedImageUris) {
+            String filename = UUID.randomUUID().toString();
+            StorageReference fileRef = rootRef.child("products").child(uid).child(filename);
+
+            UploadTask uploadTask = fileRef.putFile(uri);
+            // chain to get download url
+            Task<Uri> urlTask = uploadTask.continueWithTask(task -> {
+                if (!task.isSuccessful()) {
+                    throw task.getException() != null ? task.getException() : new Exception("Upload failed");
+                }
+                return fileRef.getDownloadUrl();
+            });
+
+            urlTasks.add(urlTask);
         }
 
-        Uri fileUri = imageUriList.get(index);
-        // storage path: users/{uid}/products/{productId}/img_{index}_{random}.jpg
-        String fileName = "img_" + index + "_" + UUID.randomUUID().toString();
-        StorageReference imgRef = storageRef.child("users/" + uid + "/products/" + productId + "/" + fileName);
-
-        UploadTask uploadTask = imgRef.putFile(fileUri);
-        uploadTask
-                .addOnSuccessListener(taskSnapshot -> imgRef.getDownloadUrl().addOnSuccessListener(uri -> {
-                    uploadedImageUrls.add(uri.toString());
-                    // continue with next
-                    uploadImageAtIndex(index + 1, uid, productId, name, size, price, status, colors, category, description);
-                }).addOnFailureListener(e -> {
-                    progressDialog.dismiss();
-                    Toast.makeText(activity_add_product.this, "Failed to get download URL: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                }))
+        // Wait for all to succeed
+        Tasks.whenAllSuccess(urlTasks)
+                .addOnSuccessListener(objects -> {
+                    List<String> downloadUrls = new ArrayList<>();
+                    for (Object obj : objects) {
+                        if (obj instanceof Uri) downloadUrls.add(((Uri) obj).toString());
+                        else if (obj != null) downloadUrls.add(obj.toString());
+                    }
+                    // write to Realtime DB
+                    createProductInRealtimeDb(uid, name, price, size, status, colors, category, desc, downloadUrls);
+                })
                 .addOnFailureListener(e -> {
                     progressDialog.dismiss();
-                    Toast.makeText(activity_add_product.this, "Image upload failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(activity_add_product.this, "Upload failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 });
     }
 
-    private void saveProductToFirestore(String uid,
-                                        String productId,
-                                        String name,
-                                        String size,
-                                        double price,
-                                        String status,
-                                        List<String> colors,
-                                        String category,
-                                        String description,
-                                        List<String> imageUrls) {
+    /**
+     * Create product node under "products" in Realtime Database.
+     */
+    private void createProductInRealtimeDb(String uid,
+                                           String name,
+                                           double price,
+                                           String size,
+                                           String status,
+                                           List<String> colors,
+                                           String category,
+                                           String desc,
+                                           List<String> imageUrls) {
 
-        progressDialog.setMessage("Saving product data...");
+        progressDialog.setMessage("Saving product...");
+
+        DatabaseReference productsRef = realtimeDb.child("products");
+        String productId = productsRef.push().getKey(); // generate id
+
+        if (productId == null) {
+            progressDialog.dismiss();
+            Toast.makeText(this, "Failed to generate product id", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         Map<String, Object> product = new HashMap<>();
         product.put("id", productId);
         product.put("userId", uid);
         product.put("name", name);
-        product.put("size", size);
         product.put("price", price);
+        product.put("size", size);
         product.put("status", status);
         product.put("colors", colors);
         product.put("category", category);
-        product.put("description", description);
+        product.put("description", desc);
         product.put("imageUrls", imageUrls);
-        product.put("createdAt", Timestamp.now());
+        product.put("createdAt", System.currentTimeMillis());
 
-        // Save under users/{uid}/products/{productId}
-        DocumentReference docRef = firestore.collection("users").document(uid)
-                .collection("products").document(productId);
-
-        docRef.set(product)
-                .addOnCompleteListener(task -> {
+        productsRef.child(productId)
+                .setValue(product)
+                .addOnSuccessListener(aVoid -> {
                     progressDialog.dismiss();
-                    if (task.isSuccessful()) {
-                        Toast.makeText(activity_add_product.this, "Product added successfully", Toast.LENGTH_SHORT).show();
-                        clearForm();
-                    } else {
-                        Toast.makeText(activity_add_product.this, "Failed to save product", Toast.LENGTH_LONG).show();
-                    }
+                    Toast.makeText(activity_add_product.this, "Product added.", Toast.LENGTH_SHORT).show();
+                    finish();
                 })
                 .addOnFailureListener(e -> {
                     progressDialog.dismiss();
-                    Toast.makeText(activity_add_product.this, "Error saving product: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(activity_add_product.this, "Failed to save product: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 });
-    }
-
-    private void clearForm() {
-        etItemName.setText("");
-        spinnerSize.setText("");
-        etPrice.setText("");
-        etDescription.setText("");
-        chipGroupStatus.clearCheck();
-        // set default status Available (if there's a chip with that text)
-        for (int i = 0; i < chipGroupStatus.getChildCount(); i++) {
-            View child = chipGroupStatus.getChildAt(i);
-            if (child instanceof Chip) {
-                Chip c = (Chip) child;
-                if ("Available".equalsIgnoreCase(c.getText().toString())) {
-                    c.setChecked(true);
-                    break;
-                }
-            }
-        }
-
-        for (int i = 0; i < chipGroupColor.getChildCount(); i++) {
-            View child = chipGroupColor.getChildAt(i);
-            if (child instanceof Chip) ((Chip) child).setChecked(false);
-        }
-
-        for (int i = 0; i < chipGroupCategory.getChildCount(); i++) {
-            View child = chipGroupCategory.getChildAt(i);
-            if (child instanceof Chip) ((Chip) child).setChecked(false);
-        }
-        // reset selected images
-        imageUriList.clear();
-        uploadedImageUrls.clear();
     }
 }

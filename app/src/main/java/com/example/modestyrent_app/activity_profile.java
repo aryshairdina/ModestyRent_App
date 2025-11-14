@@ -20,7 +20,7 @@ import com.google.firebase.database.ValueEventListener;
 
 public class activity_profile extends AppCompatActivity {
 
-    private MaterialButton signOutButton, btnEditProfile;
+    private MaterialButton signOutButton, btnEditProfile, btnMyListings;
     private FirebaseAuth mAuth;
     private DatabaseReference userRef;
 
@@ -82,6 +82,12 @@ public class activity_profile extends AppCompatActivity {
         // ✅ Edit Profile button
         btnEditProfile.setOnClickListener(v -> {
             Intent intent = new Intent(activity_profile.this, activity_edit_profile.class);
+            startActivity(intent);
+        });
+
+        // ✅ Edit Profile button
+        btnMyListings.setOnClickListener(v -> {
+            Intent intent = new Intent(activity_profile.this, activity_mylisting.class);
             startActivity(intent);
         });
 

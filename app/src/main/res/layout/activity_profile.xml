@@ -200,6 +200,8 @@
             android:orientation="vertical"
             android:gravity="center_horizontal">
 
+
+
             <!-- Outlined style using stroke (neutral border on white) -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnEditProfile"
@@ -208,6 +210,34 @@
                 android:layout_height="56dp"
                 android:layout_marginTop="6dp"
                 android:text="Edit Profile"
+                android:textAllCaps="false"
+                android:textColor="@color/neutral"
+                app:strokeColor="@color/neutral"
+                app:strokeWidth="1.5dp"
+                app:cornerRadius="12dp"
+                app:iconGravity="textStart" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnMyRentals"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="6dp"
+                android:text="My Rentals"
+                android:textAllCaps="false"
+                android:textColor="@color/neutral"
+                app:strokeColor="@color/neutral"
+                app:strokeWidth="1.5dp"
+                app:cornerRadius="12dp"
+                app:iconGravity="textStart" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBookingRequest"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="6dp"
+                android:text="Booking Requests"
                 android:textAllCaps="false"
                 android:textColor="@color/neutral"
                 app:strokeColor="@color/neutral"
@@ -229,19 +259,7 @@
                 app:cornerRadius="12dp"
                 app:iconGravity="textStart" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnMyRentals"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginTop="6dp"
-                android:text="My Rentals"
-                android:textAllCaps="false"
-                android:textColor="@color/neutral"
-                app:strokeColor="@color/neutral"
-                app:strokeWidth="1.5dp"
-                app:cornerRadius="12dp"
-                app:iconGravity="textStart" />
+
 
 
             <!-- Logout uses primary color to stand out -->

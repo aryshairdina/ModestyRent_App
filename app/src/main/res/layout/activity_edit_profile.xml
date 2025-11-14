@@ -25,7 +25,8 @@
             android:id="@+id/backIcon"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:src="@drawable/ic_arrow_back" />
+            android:src="@drawable/ic_arrow_back"
+            android:padding="6dp" />
 
         <TextView
             android:id="@+id/topTitle"
