@@ -173,7 +173,7 @@ public class activity_add_product extends AppCompatActivity {
         String status = "available";
         if (checkedStatusId != -1) {
             Chip c = findViewById(checkedStatusId);
-            if (c != null) status = c.getText().toString().toLowerCase();
+            if (c != null) status = c.getText().toString().toUpperCase();
         }
 
         // colors (multi)

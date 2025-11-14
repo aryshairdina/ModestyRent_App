@@ -17,6 +17,12 @@
         android:theme="@style/Theme.ModestyRentApp"
         tools:targetApi="31">
         <activity
+            android:name=".activity_listing_details"
+            android:exported="false" />
+        <activity
+            android:name=".activity_chat"
+            android:exported="false" />
+        <activity
             android:name=".activity_mylisting"
             android:exported="false" />
         <activity

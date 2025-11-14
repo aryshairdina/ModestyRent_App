@@ -2,6 +2,8 @@ package com.example.modestyrent_app;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -10,6 +12,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
@@ -50,8 +53,27 @@ public class activity_profile extends AppCompatActivity {
         // Initialize views
         signOutButton = findViewById(R.id.signOutButton);
         btnEditProfile = findViewById(R.id.btnEditProfile);
+        btnMyListings = findViewById(R.id.btnMyListings);
         fullNameText = findViewById(R.id.fullName);
         initialsText = findViewById(R.id.initialsText);
+
+        // ===== Bottom Navigation Setup =====
+        BottomNavigationView bottomNav = findViewById(R.id.bottomNavigation);
+        if (bottomNav == null) {
+            Toast.makeText(this, "BottomNavigationView not found (check layout id)", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        // Set default selected item (profile)
+        Menu menu = bottomNav.getMenu();
+        MenuItem profileItem = menu.findItem(R.id.nav_profile);
+        if (profileItem != null) {
+            bottomNav.setSelectedItemId(R.id.nav_profile);
+        }
+
+        // Handle navigation item selection
+        bottomNav.setOnItemSelectedListener(item -> handleNavItemSelected(item));
+        // ===== End Bottom Nav Setup =====
 
         // ✅ Realtime auto-refresh listener for fullName
         userListener = new ValueEventListener() {
@@ -85,7 +107,7 @@ public class activity_profile extends AppCompatActivity {
             startActivity(intent);
         });
 
-        // ✅ Edit Profile button
+        // ✅ My Listings button
         btnMyListings.setOnClickListener(v -> {
             Intent intent = new Intent(activity_profile.this, activity_mylisting.class);
             startActivity(intent);
@@ -102,6 +124,51 @@ public class activity_profile extends AppCompatActivity {
             startActivity(intent);
             finish();
         });
+    }
+
+    /**
+     * Handle bottom navigation selections
+     */
+    private boolean handleNavItemSelected(@NonNull MenuItem item) {
+        int id = item.getItemId();
+
+        if (id == R.id.nav_home) {
+            // Navigate to Home page
+            Intent intentHome = new Intent(activity_profile.this, activity_homepage.class);
+            // avoid creating multiple activities if already in stack (optional)
+            intentHome.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            startActivity(intentHome);
+            return true;
+        }
+
+        if (id == R.id.nav_add_item) {
+            // Go to Add Product page
+            Intent intent = new Intent(activity_profile.this, activity_add_product.class);
+            startActivity(intent);
+            return true;
+        }
+
+        if (id == R.id.nav_profile) {
+            // Already on Profile
+            return true;
+        }
+
+        if (id == R.id.nav_live) {
+            // Placeholder behaviour (adjust when live page ready)
+            // For now, navigate to profile (or change to activity_live when available)
+            Intent intent = new Intent(activity_profile.this, activity_profile.class);
+            startActivity(intent);
+            return true;
+        }
+
+        if (id == R.id.nav_chat) {
+            // Placeholder behaviour (adjust when chat page ready)
+            Intent intent = new Intent(activity_profile.this, activity_profile.class);
+            startActivity(intent);
+            return true;
+        }
+
+        return true;
     }
 
     @Override
