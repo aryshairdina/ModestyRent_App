@@ -218,6 +218,20 @@
                 app:iconGravity="textStart" />
 
             <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnMyLikes"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="6dp"
+                android:text="My Likes"
+                android:textAllCaps="false"
+                android:textColor="@color/neutral"
+                app:strokeColor="@color/neutral"
+                app:strokeWidth="1.5dp"
+                app:cornerRadius="12dp"
+                app:iconGravity="textStart" />
+
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnMyRentals"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="match_parent"

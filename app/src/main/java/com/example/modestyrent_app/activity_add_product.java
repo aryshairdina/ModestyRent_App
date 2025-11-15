@@ -170,10 +170,10 @@ public class activity_add_product extends AppCompatActivity {
 
         // status
         int checkedStatusId = chipGroupStatus.getCheckedChipId();
-        String status = "available";
+        String status = "Available";
         if (checkedStatusId != -1) {
             Chip c = findViewById(checkedStatusId);
-            if (c != null) status = c.getText().toString().toUpperCase();
+            if (c != null) status = c.getText().toString().toLowerCase();
         }
 
         // colors (multi)

@@ -9,6 +9,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -27,12 +28,14 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * activity_homepage - shows welcome text + product grid (only products with status == "available")
  * Keeps your original welcomeText & Firebase Auth logic and bottom navigation behavior.
- * Added: onResume refresh so newly-added products appear automatically.
+ * Added: onResume refresh so newly-added products appear automatically and love/like button functionality.
  */
 public class activity_homepage extends AppCompatActivity {
 
@@ -302,19 +305,56 @@ public class activity_homepage extends AppCompatActivity {
         });
     }
 
-    // ---------------- Inner Adapter (defensive) ----------------
+    // ---------------- Inner Adapter (with love button support) ----------------
     private static class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
         private final Context ctx;
         private List<Product> list;
 
+        // Firebase helpers
+        private final FirebaseAuth auth = FirebaseAuth.getInstance();
+        private final DatabaseReference usersRootRef = FirebaseDatabase.getInstance().getReference("users");
+        private final DatabaseReference globalRootRef = FirebaseDatabase.getInstance().getReference();
+        private String uid;
+
+        // cache of liked product ids for quick UI state
+        private final Set<String> likedIds = new HashSet<>();
+
         ProductAdapter(Context ctx, List<Product> list) {
             this.ctx = ctx;
             this.list = list != null ? list : new ArrayList<>();
+
+            FirebaseUser u = auth.getCurrentUser();
+            if (u != null) {
+                uid = u.getUid();
+                loadUserLikes();
+            } else {
+                uid = null;
+            }
         }
 
         void setList(List<Product> list) {
             this.list = list != null ? list : new ArrayList<>();
             notifyDataSetChanged();
+        }
+
+        private void loadUserLikes() {
+            if (uid == null) return;
+            DatabaseReference likesRef = usersRootRef.child(uid).child("likes");
+            likesRef.get().addOnCompleteListener(task -> {
+                if (task.isSuccessful() && task.getResult() != null) {
+                    likedIds.clear();
+                    DataSnapshot snap = task.getResult();
+                    for (DataSnapshot child : snap.getChildren()) {
+                        likedIds.add(child.getKey());
+                    }
+                    // refresh UI on main thread
+                    try {
+                        ((android.app.Activity) ctx).runOnUiThread(this::notifyDataSetChanged);
+                    } catch (Exception ignored) {
+                        notifyDataSetChanged();
+                    }
+                }
+            });
         }
 
         @NonNull
@@ -355,6 +395,19 @@ public class activity_homepage extends AppCompatActivity {
                 }
             }
 
+            // Set love icon state (requires product_card to have ImageButton with id btnLove)
+            boolean isLiked = p.getId() != null && likedIds.contains(p.getId());
+            if (holder.btnLove != null) {
+                holder.btnLove.setImageResource(isLiked ? R.drawable.ic_favorite : R.drawable.ic_favorite_border);
+                holder.btnLove.setOnClickListener(v -> {
+                    if (auth.getCurrentUser() == null) {
+                        Toast.makeText(ctx, "Please sign in to like products", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    toggleLike(p);
+                });
+            }
+
             // Click -> ProductDetailActivity
             holder.itemView.setOnClickListener(v -> {
                 Context c = v.getContext();
@@ -373,9 +426,73 @@ public class activity_homepage extends AppCompatActivity {
             return list != null ? list.size() : 0;
         }
 
+        /**
+         * Toggle like/unlike in Realtime DB for current user.
+         * Write under users/{uid}/likes/{productId} = payload (timestamp, productId, name, price, image)
+         * Also write inverse under likes/{productId}/{uid} = true (optional)
+         */
+        private void toggleLike(Product product) {
+            if (uid == null || product == null || product.getId() == null) return;
+
+            String pid = product.getId();
+            DatabaseReference likeRef = usersRootRef.child(uid).child("likes").child(pid);
+            DatabaseReference inverseRef = globalRootRef.child("likes").child(pid).child(uid);
+
+            if (likedIds.contains(pid)) {
+                // remove like
+                likeRef.removeValue().addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        likedIds.remove(pid);
+                        notifyChangedForProduct(pid);
+                        Toast.makeText(ctx, "Removed from My Likes", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(ctx, "Failed to remove like", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                inverseRef.removeValue();
+            } else {
+                // add like (store small snapshot)
+                java.util.Map<String, Object> payload = new java.util.HashMap<>();
+                payload.put("addedAt", System.currentTimeMillis());
+                payload.put("productId", pid);
+                payload.put("name", product.getName() != null ? product.getName() : "");
+                payload.put("price", product.getPrice());
+                String image0 = (product.getImageUrls() != null && !product.getImageUrls().isEmpty()) ? product.getImageUrls().get(0) : "";
+                payload.put("image", image0);
+
+                likeRef.setValue(payload).addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        likedIds.add(pid);
+                        notifyChangedForProduct(pid);
+                        Toast.makeText(ctx, "Added to My Likes", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(ctx, "Failed to add like", Toast.LENGTH_SHORT).show();
+                    }
+                });
+
+                inverseRef.setValue(true);
+            }
+        }
+
+        private void notifyChangedForProduct(String productId) {
+            for (int i = 0; i < list.size(); i++) {
+                Product p = list.get(i);
+                if (p != null && productId.equals(p.getId())) {
+                    final int idx = i;
+                    try {
+                        ((android.app.Activity) ctx).runOnUiThread(() -> notifyItemChanged(idx));
+                    } catch (Exception ignored) {
+                        notifyItemChanged(idx);
+                    }
+                    break;
+                }
+            }
+        }
+
         static class VH extends RecyclerView.ViewHolder {
             ImageView imgProduct;
             TextView tvTitle, tvPrice, tvPerDay;
+            ImageButton btnLove;
 
             VH(@NonNull View itemView) {
                 super(itemView);
@@ -384,6 +501,7 @@ public class activity_homepage extends AppCompatActivity {
                 try { tvTitle = itemView.findViewById(R.id.tvTitle); } catch (Exception e) { tvTitle = null; }
                 try { tvPrice = itemView.findViewById(R.id.tvPrice); } catch (Exception e) { tvPrice = null; }
                 try { tvPerDay = itemView.findViewById(R.id.tvPerDay); } catch (Exception e) { tvPerDay = null; }
+                try { btnLove = itemView.findViewById(R.id.btnLove); } catch (Exception e) { btnLove = null; }
             }
         }
     }
