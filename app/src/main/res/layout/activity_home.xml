@@ -153,15 +153,6 @@
             android:textStyle="bold"
             android:textColor="@color/neutral"
             android:textSize="16sp" />
-
-        <TextView
-            android:id="@+id/seeAll"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="See All"
-            android:textColor="@color/primary"
-            android:textStyle="bold"
-            android:textSize="14sp" />
     </LinearLayout>
 
     <!-- ========== Product Grid ========== -->
@@ -173,7 +164,7 @@
         android:padding="8dp"
         android:clipToPadding="false"
         android:scrollbars="none"
-        tools:listitem="@layout/item_product" />
+        tools:listitem="@layout/product_card" />
 
     <!-- ========== Bottom Navigation ========== -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
@@ -184,6 +175,6 @@
         app:menu="@menu/menu_home_bottom"
         app:itemIconTint="@color/neutral"
         app:itemTextColor="@color/neutral"
-        app:labelVisibilityMode="unlabeled"/>
+        app:labelVisibilityMode="unlabeled" />
 
 </LinearLayout>
