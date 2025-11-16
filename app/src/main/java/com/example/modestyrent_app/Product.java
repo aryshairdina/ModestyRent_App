@@ -13,6 +13,8 @@ public class Product {
     private double price;
     private ArrayList<String> colors;
     private ArrayList<String> imageUrls;
+    private long createdAt;
+    private long updated_at;
 
     // No-arg constructor required for Firebase mapping
     public Product() {}
@@ -28,6 +30,8 @@ public class Product {
     public double getPrice() { return price; }
     public ArrayList<String> getColors() { return colors; }
     public ArrayList<String> getImageUrls() { return imageUrls; }
+    public long getCreatedAt() { return createdAt; }
+    public long getUpdated_at() { return updated_at; }
 
     // Setters (required)
     public void setId(String id) { this.id = id; }
@@ -40,4 +44,6 @@ public class Product {
     public void setPrice(double price) { this.price = price; }
     public void setColors(ArrayList<String> colors) { this.colors = colors; }
     public void setImageUrls(ArrayList<String> imageUrls) { this.imageUrls = imageUrls; }
+    public void setCreatedAt(long createdAt) { this.createdAt = createdAt; }
+    public void setUpdated_at(long updated_at) { this.updated_at = updated_at; }
 }

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Selected dot: centered small circle -->
+    <item android:state_selected="true">
+        <inset android:insetLeft="0dp" android:insetTop="0dp" android:insetRight="0dp" android:insetBottom="0dp">
+            <shape android:shape="oval">
+                <size android:width="8dp" android:height="8dp" />
+                <solid android:color="@color/primary" />
+            </shape>
+        </inset>
+    </item>
+
+    <!-- Unselected dot: centered small circle -->
+    <item>
+        <inset android:insetLeft="0dp" android:insetTop="0dp" android:insetRight="0dp" android:insetBottom="0dp">
+            <shape android:shape="oval">
+                <size android:width="8dp" android:height="8dp" />
+                <solid android:color="@color/secondary" />
+            </shape>
+        </inset>
+    </item>
+</selector>

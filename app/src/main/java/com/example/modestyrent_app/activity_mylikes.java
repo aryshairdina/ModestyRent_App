@@ -45,9 +45,14 @@ public class activity_mylikes extends AppCompatActivity {
         setContentView(R.layout.activity_mylikes);
 
         recycler = findViewById(R.id.recyclerMyLikes);
+        ImageView backIcon = findViewById(R.id.backIcon);
         recycler.setLayoutManager(new GridLayoutManager(this, 2));
         adapter = new MyLikesAdapter(this, likedProducts);
         recycler.setAdapter(adapter);
+
+
+        backIcon.setOnClickListener(v -> finish());
+
 
         mAuth = FirebaseAuth.getInstance();
         FirebaseUser u = mAuth.getCurrentUser();

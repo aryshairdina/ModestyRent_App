@@ -269,7 +269,7 @@ public class activity_home extends AppCompatActivity {
         @NonNull
         @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View v = LayoutInflater.from(ctx).inflate(R.layout.product_card, parent, false);
+            View v = LayoutInflater.from(ctx).inflate(R.layout.product_card_home, parent, false);
             return new VH(v);
         }
 

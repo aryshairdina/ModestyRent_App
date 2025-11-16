@@ -28,19 +28,6 @@
                 android:background="@color/secondary"
                 android:contentDescription="product image" />
 
-            <!-- Love button (top-right) -->
-            <ImageButton
-                android:id="@+id/btnLove"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_margin="8dp"
-                android:background="@drawable/heart_button_bg"
-                android:scaleType="centerInside"
-                android:adjustViewBounds="true"
-                android:layout_gravity="top|end"
-                android:src="@drawable/ic_favorite_border"
-                android:contentDescription="like button"
-                android:padding="6dp" />
         </FrameLayout>
 
         <!-- Bottom product info -->

@@ -170,11 +170,22 @@ public class activity_add_product extends AppCompatActivity {
 
         // status
         int checkedStatusId = chipGroupStatus.getCheckedChipId();
-        String status = "Available";
+        String status = "Available"; // default
+
         if (checkedStatusId != -1) {
             Chip c = findViewById(checkedStatusId);
-            if (c != null) status = c.getText().toString().toLowerCase();
+            if (c != null) {
+                String s = c.getText().toString().trim().toLowerCase();
+
+                // Convert to Proper Case manually
+                if (s.equals("available")) {
+                    status = "Available";
+                } else if (s.equals("unavailable")) {
+                    status = "Unavailable";
+                }
+            }
         }
+
 
         // colors (multi)
         List<String> colors = new ArrayList<>();
