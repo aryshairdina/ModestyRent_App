@@ -210,6 +210,15 @@ public class activity_homepage extends AppCompatActivity {
             return;
         }
 
+        // get currently signed-in user's uid so we can exclude their products
+        String currentUid = null;
+        try {
+            FirebaseUser cu = mAuth.getCurrentUser();
+            if (cu != null) currentUid = cu.getUid();
+        } catch (Exception ignored) {}
+
+        final String finalCurrentUid = currentUid;
+
         productsRef.get().addOnCompleteListener(task -> {
             if (!task.isSuccessful() || task.getResult() == null) {
                 Toast.makeText(activity_homepage.this, "Failed loading products: " + (task.getException() != null ? task.getException().getMessage() : "unknown"), Toast.LENGTH_LONG).show();
@@ -229,6 +238,28 @@ public class activity_homepage extends AppCompatActivity {
                         // Ensure id is set
                         if (p.getId() == null || p.getId().isEmpty()) {
                             p.setId(child.getKey());
+                        }
+
+                        // Defensive: read owner/userId from common DB keys if model not filled
+                        String ownerId = p.getUserId();
+                        if ((ownerId == null || ownerId.isEmpty())) {
+                            if (child.child("userId").exists()) {
+                                Object v = child.child("userId").getValue();
+                                ownerId = v != null ? String.valueOf(v) : null;
+                            } else if (child.child("userid").exists()) {
+                                Object v = child.child("userid").getValue();
+                                ownerId = v != null ? String.valueOf(v) : null;
+                            } else if (child.child("userUID").exists()) {
+                                Object v = child.child("userUID").getValue();
+                                ownerId = v != null ? String.valueOf(v) : null;
+                            }
+                            if (ownerId != null) p.setUserId(ownerId);
+                        }
+
+                        // If ownerId matches current user, skip this product (do not show)
+                        if (finalCurrentUid != null && ownerId != null && finalCurrentUid.equals(ownerId)) {
+                            // skip products created by current user
+                            continue;
                         }
 
                         // Read status if missing
@@ -287,6 +318,7 @@ public class activity_homepage extends AppCompatActivity {
                             }
                         }
 
+                        // Add product (it passed all filters)
                         products.add(p);
 
                     } catch (Exception ex) {
@@ -304,6 +336,7 @@ public class activity_homepage extends AppCompatActivity {
             Toast.makeText(activity_homepage.this, "Error loading products: " + e.getMessage(), Toast.LENGTH_LONG).show();
         });
     }
+
 
     // ---------------- Inner Adapter (with love button support) ----------------
     private static class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
