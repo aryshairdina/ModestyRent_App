@@ -1,5 +1,6 @@
 package com.example.modestyrent_app;
 
+// Updated Booking model class with deposit and booking number
 public class Booking {
     private String bookingId, bookingNumber, productId, ownerId, renterId, productName, renterName, renterPhone;
     private String deliveryAddress, deliveryOption, paymentMethod, status;
@@ -10,6 +11,9 @@ public class Booking {
     // Getters and setters
     public String getBookingId() { return bookingId; }
     public void setBookingId(String bookingId) { this.bookingId = bookingId; }
+
+    public String getBookingNumber() { return bookingNumber; }
+    public void setBookingNumber(String bookingNumber) { this.bookingNumber = bookingNumber; }
 
     public String getProductId() { return productId; }
     public void setProductId(String productId) { this.productId = productId; }
@@ -64,7 +68,4 @@ public class Booking {
 
     public double getTotalAmount() { return totalAmount; }
     public void setTotalAmount(double totalAmount) { this.totalAmount = totalAmount; }
-
-    public String getBookingNumber() { return bookingNumber; }
-    public void setBookingNumber(String bookingNumber) { this.bookingNumber = bookingNumber; }
 }

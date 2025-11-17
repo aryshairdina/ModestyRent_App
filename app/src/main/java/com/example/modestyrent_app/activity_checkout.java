@@ -2,6 +2,7 @@ package com.example.modestyrent_app;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.*;
 import androidx.annotation.NonNull;
@@ -207,6 +208,20 @@ public class activity_checkout extends AppCompatActivity {
         return "MR" + timestamp + randomDigits;
     }
 
+    private void updateProductStatusToUnavailable() {
+        if (productId != null) {
+            productsRef.child(productId).child("status").setValue("Unavailable")
+                    .addOnSuccessListener(aVoid -> {
+                        // Product status updated successfully
+                        Log.d("Checkout", "Product status updated to Unavailable for product: " + productId);
+                    })
+                    .addOnFailureListener(e -> {
+                        // Handle the error but don't block the booking process
+                        Log.e("Checkout", "Failed to update product status: " + e.getMessage());
+                    });
+        }
+    }
+
     private void confirmBooking() {
         // Validate input fields
         String fullName = etFullName.getText().toString().trim();
@@ -275,15 +290,27 @@ public class activity_checkout extends AppCompatActivity {
         booking.setStatus("pending");
         booking.setBookingDate(System.currentTimeMillis());
 
-        // Save to Firebase
+        // Save to Firebase and update product status
         bookingsRef.child(bookingId).setValue(booking)
                 .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(activity_checkout.this, "Booking confirmed successfully!", Toast.LENGTH_SHORT).show();
+                    // Update product status to "Unavailable" in Realtime Database
+                    updateProductStatusToUnavailable();
 
-                    // Navigate to booking confirmation page
-                    Intent intent = new Intent(activity_checkout.this, activity_booking.class);
-                    intent.putExtra("bookingId", bookingId);
-                    startActivity(intent);
+                    // Check payment method and navigate accordingly
+                    if (paymentMethod.equals("QR Banking")) {
+                        // Navigate to dummy payment page
+                        Intent intent = new Intent(activity_checkout.this, activity_dummy_payment.class);
+                        intent.putExtra("bookingId", bookingId);
+                        intent.putExtra("bookingNumber", bookingNumber);
+                        intent.putExtra("paymentMethod", paymentMethod);
+                        intent.putExtra("totalAmount", subtotalAmount);
+                        startActivity(intent);
+                    } else {
+                        // COD - directly go to booking confirmation
+                        Intent intent = new Intent(activity_checkout.this, activity_booking.class);
+                        intent.putExtra("bookingId", bookingId);
+                        startActivity(intent);
+                    }
                     finish();
                 })
                 .addOnFailureListener(e -> {

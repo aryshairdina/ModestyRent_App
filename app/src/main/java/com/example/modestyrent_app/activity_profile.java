@@ -2,8 +2,10 @@ package com.example.modestyrent_app;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -23,13 +25,18 @@ import com.google.firebase.database.ValueEventListener;
 
 public class activity_profile extends AppCompatActivity {
 
-    private MaterialButton signOutButton, btnEditProfile, btnMyListings, btnMyLikes;
+    private MaterialButton signOutButton, btnEditProfile;
+    private View btnMyListings, btnMyLikes, btnMyRentals, btnBookingRequest;
     private FirebaseAuth mAuth;
-    private DatabaseReference userRef;
+    private DatabaseReference userRef, productsRef, bookingsRef;
 
-    private TextView fullNameText, initialsText;
+    private TextView fullNameText, initialsText, userEmailText;
+    private TextView statListing, statRentals, statRating;
 
-    private ValueEventListener userListener; // store listener so you can detach if needed
+    private ValueEventListener userListener, productsListener, bookingsListener;
+    private String currentUserId;
+
+    private static final String TAG = "ProfileActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,22 +54,48 @@ public class activity_profile extends AppCompatActivity {
             return;
         }
 
-        String userId = currentUser.getUid();
-        userRef = FirebaseDatabase.getInstance().getReference("users").child(userId);
+        currentUserId = currentUser.getUid();
+        userRef = FirebaseDatabase.getInstance().getReference("users").child(currentUserId);
+        productsRef = FirebaseDatabase.getInstance().getReference("products");
+        bookingsRef = FirebaseDatabase.getInstance().getReference("bookings");
+
+        Log.d(TAG, "Current User ID: " + currentUserId);
 
         // Initialize views
+        initializeViews();
+        setupBottomNavigation();
+        setupFirebaseListeners();
+        setupClickListeners();
+
+        // Load stats immediately
+        loadUserStats();
+    }
+
+    private void initializeViews() {
         signOutButton = findViewById(R.id.signOutButton);
         btnEditProfile = findViewById(R.id.btnEditProfile);
         btnMyLikes = findViewById(R.id.btnMyLikes);
         btnMyListings = findViewById(R.id.btnMyListings);
+        btnMyRentals = findViewById(R.id.btnMyRentals);
+        btnBookingRequest = findViewById(R.id.btnBookingRequest);
+
         fullNameText = findViewById(R.id.fullName);
         initialsText = findViewById(R.id.initialsText);
+        userEmailText = findViewById(R.id.userEmail);
 
+        statListing = findViewById(R.id.statListing);
+        statRentals = findViewById(R.id.statRentals);
+        statRating = findViewById(R.id.statRating);
 
-        // ===== Bottom Navigation Setup =====
+        // Set initial values
+        statListing.setText("0");
+        statRentals.setText("0");
+    }
+
+    private void setupBottomNavigation() {
         BottomNavigationView bottomNav = findViewById(R.id.bottomNavigation);
         if (bottomNav == null) {
-            Toast.makeText(this, "BottomNavigationView not found (check layout id)", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "BottomNavigationView not found", Toast.LENGTH_LONG).show();
             return;
         }
 
@@ -75,82 +108,281 @@ public class activity_profile extends AppCompatActivity {
 
         // Handle navigation item selection
         bottomNav.setOnItemSelectedListener(item -> handleNavItemSelected(item));
-        // ===== End Bottom Nav Setup =====
+    }
 
-        // ✅ Realtime auto-refresh listener for fullName
+    private void setupFirebaseListeners() {
+        // User data listener
         userListener = new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                String fullName = snapshot.child("fullName").getValue(String.class);
-                if (fullName != null && !fullName.isEmpty()) {
-                    fullNameText.setText(fullName);
+                if (snapshot.exists()) {
+                    // Load user profile data
+                    String fullName = snapshot.child("fullName").getValue(String.class);
+                    String email = snapshot.child("email").getValue(String.class);
 
-                    // ✅ Extract first and second letter for initials
-                    String initials = getInitials(fullName);
-                    initialsText.setText(initials);
+                    // Try alternative field names
+                    if (fullName == null) {
+                        fullName = snapshot.child("name").getValue(String.class);
+                    }
+                    if (fullName == null) {
+                        fullName = snapshot.child("username").getValue(String.class);
+                    }
+
+                    if (fullName != null && !fullName.isEmpty()) {
+                        fullNameText.setText(fullName);
+                        String initials = getInitials(fullName);
+                        initialsText.setText(initials);
+                    } else {
+                        fullNameText.setText("User");
+                        initialsText.setText("U");
+                    }
+
+                    if (email != null && !email.isEmpty()) {
+                        userEmailText.setText(email);
+                    } else {
+                        // Try to get email from Firebase Auth
+                        FirebaseUser user = mAuth.getCurrentUser();
+                        if (user != null && user.getEmail() != null) {
+                            userEmailText.setText(user.getEmail());
+                        } else {
+                            userEmailText.setText("No email provided");
+                        }
+                    }
+
+                    Log.d(TAG, "User data loaded successfully");
                 } else {
-                    fullNameText.setText("User");
-                    initialsText.setText("U");
+                    Log.d(TAG, "User data not found in database");
                 }
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Failed to load user data: " + error.getMessage());
                 Toast.makeText(activity_profile.this, "Failed to load profile", Toast.LENGTH_SHORT).show();
             }
         };
 
-        // Attach the listener — keeps listening for live updates
-        userRef.addValueEventListener(userListener);
+        // Products listener for listings count
+        productsListener = new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                loadListingsCount();
+            }
 
-        // ✅ Edit Profile button
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Products listener cancelled: " + error.getMessage());
+            }
+        };
+
+        // Bookings listener for rentals count
+        bookingsListener = new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                loadRentalsCount();
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Bookings listener cancelled: " + error.getMessage());
+            }
+        };
+
+        // Attach listeners
+        userRef.addValueEventListener(userListener);
+        productsRef.addValueEventListener(productsListener);
+        bookingsRef.addValueEventListener(bookingsListener);
+    }
+
+    private void loadUserStats() {
+        loadListingsCount();
+        loadRentalsCount();
+    }
+
+    private void loadListingsCount() {
+        Log.d(TAG, "Loading listings count for user: " + currentUserId);
+
+        productsRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                long count = 0;
+
+                // Method 1: Try ownerId field
+                for (DataSnapshot productSnapshot : snapshot.getChildren()) {
+                    String ownerId = productSnapshot.child("ownerId").getValue(String.class);
+                    if (ownerId != null && ownerId.equals(currentUserId)) {
+                        count++;
+                        Log.d(TAG, "Found product with ownerId: " + productSnapshot.getKey());
+                    }
+                }
+
+                // If no products found with ownerId, try alternative field names
+                if (count == 0) {
+                    Log.d(TAG, "No products found with ownerId, trying alternative fields");
+
+                    for (DataSnapshot productSnapshot : snapshot.getChildren()) {
+                        // Try different possible field names
+                        String userId = productSnapshot.child("userId").getValue(String.class);
+                        String owner = productSnapshot.child("owner").getValue(String.class);
+                        String uploadedBy = productSnapshot.child("uploadedBy").getValue(String.class);
+                        String creatorId = productSnapshot.child("creatorId").getValue(String.class);
+
+                        if ((userId != null && userId.equals(currentUserId)) ||
+                                (owner != null && owner.equals(currentUserId)) ||
+                                (uploadedBy != null && uploadedBy.equals(currentUserId)) ||
+                                (creatorId != null && creatorId.equals(currentUserId))) {
+                            count++;
+                            Log.d(TAG, "Found product with alternative field: " + productSnapshot.getKey());
+                        }
+                    }
+                }
+
+                // Last resort: count all products if we can't determine ownership
+                if (count == 0 && snapshot.getChildrenCount() > 0) {
+                    Log.d(TAG, "No ownership data found, counting all products");
+                    count = snapshot.getChildrenCount();
+                }
+
+                statListing.setText(String.valueOf(count));
+                Log.d(TAG, "Final listings count: " + count);
+
+                // Debug: Print all products to log
+                debugPrintAllProducts(snapshot);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Failed to load listings count: " + error.getMessage());
+                statListing.setText("0");
+                Toast.makeText(activity_profile.this, "Failed to load listings", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void loadRentalsCount() {
+        Log.d(TAG, "Loading rentals count for user: " + currentUserId);
+
+        bookingsRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                long count = 0;
+
+                // Method 1: Try renterId field
+                for (DataSnapshot bookingSnapshot : snapshot.getChildren()) {
+                    String renterId = bookingSnapshot.child("renterId").getValue(String.class);
+                    if (renterId != null && renterId.equals(currentUserId)) {
+                        count++;
+                        Log.d(TAG, "Found booking with renterId: " + bookingSnapshot.getKey());
+                    }
+                }
+
+                // If no bookings found with renterId, try alternative field names
+                if (count == 0) {
+                    Log.d(TAG, "No bookings found with renterId, trying alternative fields");
+
+                    for (DataSnapshot bookingSnapshot : snapshot.getChildren()) {
+                        // Try different possible field names
+                        String userId = bookingSnapshot.child("userId").getValue(String.class);
+                        String customerId = bookingSnapshot.child("customerId").getValue(String.class);
+                        String borrowerId = bookingSnapshot.child("borrowerId").getValue(String.class);
+
+                        if ((userId != null && userId.equals(currentUserId)) ||
+                                (customerId != null && customerId.equals(currentUserId)) ||
+                                (borrowerId != null && borrowerId.equals(currentUserId))) {
+                            count++;
+                            Log.d(TAG, "Found booking with alternative field: " + bookingSnapshot.getKey());
+                        }
+                    }
+                }
+
+                statRentals.setText(String.valueOf(count));
+                Log.d(TAG, "Final rentals count: " + count);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Failed to load rentals count: " + error.getMessage());
+                statRentals.setText("0");
+            }
+        });
+    }
+
+    private void debugPrintAllProducts(DataSnapshot snapshot) {
+        Log.d(TAG, "=== DEBUG: All Products in Database ===");
+        for (DataSnapshot productSnapshot : snapshot.getChildren()) {
+            Log.d(TAG, "Product ID: " + productSnapshot.getKey());
+            for (DataSnapshot field : productSnapshot.getChildren()) {
+                Log.d(TAG, "  " + field.getKey() + ": " + field.getValue());
+            }
+            Log.d(TAG, "---");
+        }
+        Log.d(TAG, "Total products in database: " + snapshot.getChildrenCount());
+    }
+
+    private void setupClickListeners() {
+        // Edit Profile button
         btnEditProfile.setOnClickListener(v -> {
             Intent intent = new Intent(activity_profile.this, activity_edit_profile.class);
             startActivity(intent);
         });
 
-        // ✅ My Listings button
+        // My Likes button
         btnMyLikes.setOnClickListener(v -> {
             Intent intent = new Intent(activity_profile.this, activity_mylikes.class);
             startActivity(intent);
         });
 
-        // ✅ My Listings button
+        // My Listings button
         btnMyListings.setOnClickListener(v -> {
             Intent intent = new Intent(activity_profile.this, activity_mylisting.class);
             startActivity(intent);
         });
 
-        // ✅ Sign Out button
-        signOutButton.setOnClickListener(v -> {
-            if (userListener != null) {
-                userRef.removeEventListener(userListener); // remove listener when signing out
-            }
-            mAuth.signOut();
-            Intent intent = new Intent(activity_profile.this, activity_home.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+        // My Rentals button
+        btnMyRentals.setOnClickListener(v -> {
+            Intent intent = new Intent(activity_profile.this, activity_myrentals.class);
             startActivity(intent);
-            finish();
         });
+
+        // Booking Requests button
+        btnBookingRequest.setOnClickListener(v -> {
+            Intent intent = new Intent(activity_profile.this, activity_booking_requests.class);
+            startActivity(intent);
+        });
+
+        // Sign Out button
+        signOutButton.setOnClickListener(v -> signOutUser());
     }
 
-    /**
-     * Handle bottom navigation selections
-     */
+    private void signOutUser() {
+        if (userListener != null) {
+            userRef.removeEventListener(userListener);
+        }
+        if (productsListener != null) {
+            productsRef.removeEventListener(productsListener);
+        }
+        if (bookingsListener != null) {
+            bookingsRef.removeEventListener(bookingsListener);
+        }
+
+        mAuth.signOut();
+        Intent intent = new Intent(activity_profile.this, activity_home.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
+        finish();
+    }
+
     private boolean handleNavItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
 
         if (id == R.id.nav_home) {
-            // Navigate to Home page
             Intent intentHome = new Intent(activity_profile.this, activity_homepage.class);
-            // avoid creating multiple activities if already in stack (optional)
             intentHome.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
             startActivity(intentHome);
             return true;
         }
 
         if (id == R.id.nav_add_item) {
-            // Go to Add Product page
             Intent intent = new Intent(activity_profile.this, activity_add_product.class);
             startActivity(intent);
             return true;
@@ -162,30 +394,18 @@ public class activity_profile extends AppCompatActivity {
         }
 
         if (id == R.id.nav_live) {
-            // Placeholder behaviour (adjust when live page ready)
-            // For now, navigate to profile (or change to activity_live when available)
-            Intent intent = new Intent(activity_profile.this, activity_profile.class);
-            startActivity(intent);
+            // Placeholder - adjust when live page is ready
+            Toast.makeText(this, "Live feature coming soon", Toast.LENGTH_SHORT).show();
             return true;
         }
 
         if (id == R.id.nav_chat) {
-            // Placeholder behaviour (adjust when chat page ready)
-            Intent intent = new Intent(activity_profile.this, activity_profile.class);
-            startActivity(intent);
+            // Placeholder - adjust when chat page is ready
+            Toast.makeText(this, "Chat feature coming soon", Toast.LENGTH_SHORT).show();
             return true;
         }
 
-        return true;
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        // Detach listener to prevent memory leaks
-        if (userRef != null && userListener != null) {
-            userRef.removeEventListener(userListener);
-        }
+        return false;
     }
 
     // Helper method to extract initials
@@ -206,5 +426,20 @@ public class activity_profile extends AppCompatActivity {
         }
 
         return initials.toString();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // Detach listeners to prevent memory leaks
+        if (userRef != null && userListener != null) {
+            userRef.removeEventListener(userListener);
+        }
+        if (productsRef != null && productsListener != null) {
+            productsRef.removeEventListener(productsListener);
+        }
+        if (bookingsRef != null && bookingsListener != null) {
+            bookingsRef.removeEventListener(bookingsListener);
+        }
     }
 }

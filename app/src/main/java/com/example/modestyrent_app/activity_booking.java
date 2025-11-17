@@ -22,7 +22,7 @@ import java.util.Random;
 
 public class activity_booking extends AppCompatActivity {
 
-    private TextView tvBookingNumber, tvBookingId, tvProductName, tvRentalPeriod, tvDeliveryOption, tvPaymentMethod, tvTotalAmount, tvBookingStatus;
+    private TextView tvBookingNumber, tvProductName, tvRentalPeriod, tvDeliveryOption, tvPaymentMethod, tvTotalAmount, tvBookingStatus;
     private MaterialButton btnViewBookings, btnBackToHome;
     private ImageView backIcon;
 
@@ -51,7 +51,6 @@ public class activity_booking extends AppCompatActivity {
 
     private void initializeViews() {
         tvBookingNumber = findViewById(R.id.tvBookingNumber);
-        tvBookingId = findViewById(R.id.tvBookingId);
         tvProductName = findViewById(R.id.tvProductName);
         tvRentalPeriod = findViewById(R.id.tvRentalPeriod);
         tvDeliveryOption = findViewById(R.id.tvDeliveryOption);
@@ -64,22 +63,28 @@ public class activity_booking extends AppCompatActivity {
     }
 
     private void setupClickListeners() {
-        backIcon.setOnClickListener(v -> finish());
+        if (backIcon != null) {
+            backIcon.setOnClickListener(v -> finish());
+        }
 
-        btnViewBookings.setOnClickListener(v -> {
-            // Navigate to My Bookings page
-            Intent intent = new Intent(activity_booking.this, activity_myrentals.class);
-            startActivity(intent);
-            finish();
-        });
+        if (btnViewBookings != null) {
+            btnViewBookings.setOnClickListener(v -> {
+                // Navigate to My Bookings page
+                Intent intent = new Intent(activity_booking.this, activity_myrentals.class);
+                startActivity(intent);
+                finish();
+            });
+        }
 
-        btnBackToHome.setOnClickListener(v -> {
-            // Navigate back to home page
-            Intent intent = new Intent(activity_booking.this, activity_homepage.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            startActivity(intent);
-            finish();
-        });
+        if (btnBackToHome != null) {
+            btnBackToHome.setOnClickListener(v -> {
+                // Navigate back to home page
+                Intent intent = new Intent(activity_booking.this, activity_homepage.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                startActivity(intent);
+                finish();
+            });
+        }
     }
 
     private void loadBookingData() {
@@ -113,10 +118,9 @@ public class activity_booking extends AppCompatActivity {
                     String paymentMethod = snapshot.child("paymentMethod").getValue(String.class);
                     String status = snapshot.child("status").getValue(String.class);
 
-                    // Check if booking number exists, if not generate one
+                    // Check if booking number exists
                     String bookingNumber = snapshot.child("bookingNumber").getValue(String.class);
                     if (bookingNumber == null || bookingNumber.isEmpty()) {
-                        // Generate and save booking number
                         bookingNumber = generateBookingNumber();
                         saveBookingNumber(bookingNumber);
                     }
@@ -158,13 +162,10 @@ public class activity_booking extends AppCompatActivity {
     }
 
     private String generateBookingNumber() {
-        // Generate a proper booking number: MR + timestamp + random digits
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyMMddHHmmss", Locale.getDefault());
         String timestamp = dateFormat.format(System.currentTimeMillis());
-
         Random random = new Random();
-        int randomDigits = random.nextInt(900) + 100; // 100-999
-
+        int randomDigits = random.nextInt(900) + 100;
         return "MR" + timestamp + randomDigits;
     }
 
@@ -174,8 +175,6 @@ public class activity_booking extends AppCompatActivity {
                     .addOnCompleteListener(task -> {
                         if (task.isSuccessful()) {
                             System.out.println("Booking number saved: " + bookingNumber);
-                        } else {
-                            System.out.println("Failed to save booking number");
                         }
                     });
         }
@@ -185,14 +184,15 @@ public class activity_booking extends AppCompatActivity {
                                  String status, Long startDate, Long endDate, Long rentalDays,
                                  Double totalAmount, Double rentalAmount, Double depositAmount) {
 
-        // Set booking number (user-friendly)
-        tvBookingNumber.setText(bookingNumber != null ? bookingNumber : generateBookingNumber());
-
-        // Set booking ID (hidden but kept for reference)
-        tvBookingId.setText(bookingId != null ? bookingId : "--");
+        // Set booking number
+        if (tvBookingNumber != null) {
+            tvBookingNumber.setText(bookingNumber != null ? bookingNumber : generateBookingNumber());
+        }
 
         // Set product name
-        tvProductName.setText(productName != null ? productName : "Unknown Product");
+        if (tvProductName != null) {
+            tvProductName.setText(productName != null ? productName : "Unknown Product");
+        }
 
         // Set rental period
         String rentalPeriodText = "--";
@@ -204,51 +204,70 @@ public class activity_booking extends AppCompatActivity {
                 rentalPeriodText += " (" + rentalDays + " days)";
             }
         }
-        tvRentalPeriod.setText(rentalPeriodText);
+        if (tvRentalPeriod != null) {
+            tvRentalPeriod.setText(rentalPeriodText);
+        }
 
         // Set delivery option
-        tvDeliveryOption.setText(deliveryOption != null ? deliveryOption : "--");
+        if (tvDeliveryOption != null) {
+            tvDeliveryOption.setText(deliveryOption != null ? deliveryOption : "--");
+        }
 
         // Set payment method
-        tvPaymentMethod.setText(paymentMethod != null ? paymentMethod : "--");
+        if (tvPaymentMethod != null) {
+            tvPaymentMethod.setText(paymentMethod != null ? paymentMethod : "--");
+        }
 
         // Set total amount
-        if (totalAmount != null) {
-            tvTotalAmount.setText(String.format(Locale.getDefault(), "RM %.2f", totalAmount));
-        } else {
-            tvTotalAmount.setText("RM 0.00");
-        }
-
-        // Set status
-        if (status != null) {
-            tvBookingStatus.setText(status);
-            // You can customize status colors based on status
-            switch (status.toLowerCase()) {
-                case "pending":
-                    tvBookingStatus.setText("Pending Delivery");
-                    break;
-                case "confirmed":
-                    tvBookingStatus.setText("Confirmed");
-                    break;
-                case "delivered":
-                    tvBookingStatus.setText("Delivered");
-                    break;
-                case "completed":
-                    tvBookingStatus.setText("Completed");
-                    break;
-                case "cancelled":
-                    tvBookingStatus.setText("Cancelled");
-                    break;
+        if (tvTotalAmount != null) {
+            if (totalAmount != null) {
+                tvTotalAmount.setText(String.format(Locale.getDefault(), "RM %.2f", totalAmount));
+            } else {
+                tvTotalAmount.setText("RM 0.00");
             }
-        } else {
-            tvBookingStatus.setText("Pending Delivery");
         }
 
-        // Show breakdown in log (optional - you can display this in UI if needed)
-        if (rentalAmount != null && depositAmount != null) {
-            System.out.println("Rental Amount: RM " + rentalAmount);
-            System.out.println("Deposit Amount: RM " + depositAmount);
-            System.out.println("Total Amount: RM " + totalAmount);
+        // Set status - update status to "pending" after payment
+        if (tvBookingStatus != null) {
+            String displayStatus = "Pending Delivery";
+            if (status != null && status.equals("pending_payment")) {
+                displayStatus = "Payment Completed";
+                // Update status in Firebase to "pending"
+                updateBookingStatus("pending");
+            } else if (status != null) {
+                switch (status.toLowerCase()) {
+                    case "pending":
+                        displayStatus = "Pending Delivery";
+                        break;
+                    case "confirmed":
+                        displayStatus = "Confirmed";
+                        break;
+                    case "delivered":
+                        displayStatus = "Delivered";
+                        break;
+                    case "completed":
+                        displayStatus = "Completed";
+                        break;
+                    case "cancelled":
+                        displayStatus = "Cancelled";
+                        break;
+                    default:
+                        displayStatus = status;
+                        break;
+                }
+            }
+            tvBookingStatus.setText(displayStatus);
+        }
+    }
+
+    private void updateBookingStatus(String newStatus) {
+        if (bookingsRef != null && bookingId != null) {
+            bookingsRef.child(bookingId).child("status").setValue(newStatus)
+                    .addOnCompleteListener(task -> {
+                        if (task.isSuccessful()) {
+                            System.out.println("Booking status updated to: " + newStatus);
+                        }
+                    });
         }
     }
 }
