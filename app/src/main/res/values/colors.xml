@@ -4,5 +4,6 @@
     <color name="secondary">#D6D3CF</color>   <!-- Warm Beige -->
     <color name="neutral">#3A3A3A</color>     <!-- Charcoal Gray -->
     <color name="background">#FFFFFF</color>  <!-- White -->
+    <color name="textcolor">#4D4C4C</color>  <!-- Dark Gray -->
 </resources>
 

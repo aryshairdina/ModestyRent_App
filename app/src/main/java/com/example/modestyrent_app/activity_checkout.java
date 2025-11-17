@@ -15,7 +15,7 @@ import java.util.Locale;
 public class activity_checkout extends AppCompatActivity {
 
     private TextView tvProductName, tvProductSize, tvRentalPeriod, tvTotalPrice, tvRentalFee,
-            tvDaysCount, tvUnitPrice, tvFinalTotal;
+            tvDaysCount, tvUnitPrice, tvFinalTotal, tvDeposit, tvSubtotal;
     private TextInputEditText etFullName, etPhone, etAddress;
     private RadioGroup rgDeliveryOption, rgPaymentMethod;
     private RadioButton rbPickup, rbDelivery, rbQRBanking, rbCOD;
@@ -25,7 +25,7 @@ public class activity_checkout extends AppCompatActivity {
     private String productId, ownerId, productName;
     private long startDateMillis, endDateMillis;
     private int days;
-    private double unitPrice, totalAmount;
+    private double unitPrice, totalAmount, depositAmount, subtotalAmount;
     private String currentUserId;
 
     private DatabaseReference usersRef, productsRef, bookingsRef;
@@ -56,6 +56,8 @@ public class activity_checkout extends AppCompatActivity {
         tvDaysCount = findViewById(R.id.tvDaysCount);
         tvUnitPrice = findViewById(R.id.tvUnitPrice);
         tvFinalTotal = findViewById(R.id.tvFinalTotal);
+        tvDeposit = findViewById(R.id.tvDeposit);
+        tvSubtotal = findViewById(R.id.tvSubtotal);
 
         // Input fields
         etFullName = findViewById(R.id.etFullName);
@@ -76,9 +78,28 @@ public class activity_checkout extends AppCompatActivity {
         btnConfirmCheckout = findViewById(R.id.btnConfirmCheckout);
         backIcon = findViewById(R.id.backIcon);
 
-        // Set default selections
+        // Set default selections - This will now work properly
         rbPickup.setChecked(true);
         rbQRBanking.setChecked(true);
+
+        // Add listeners to ensure mutual exclusivity
+        rgDeliveryOption.setOnCheckedChangeListener((group, checkedId) -> {
+            // This ensures only one option can be selected
+            if (checkedId == R.id.rbPickup) {
+                rbDelivery.setChecked(false);
+            } else if (checkedId == R.id.rbDelivery) {
+                rbPickup.setChecked(false);
+            }
+        });
+
+        rgPaymentMethod.setOnCheckedChangeListener((group, checkedId) -> {
+            // This ensures only one option can be selected
+            if (checkedId == R.id.rbQRBanking) {
+                rbCOD.setChecked(false);
+            } else if (checkedId == R.id.rbCOD) {
+                rbQRBanking.setChecked(false);
+            }
+        });
     }
 
     private void getIntentData() {
@@ -89,7 +110,11 @@ public class activity_checkout extends AppCompatActivity {
         endDateMillis = getIntent().getLongExtra("endDateMillis", -1);
         days = getIntent().getIntExtra("days", 1);
         unitPrice = getIntent().getDoubleExtra("unitPrice", 0.0);
+
+        // Calculate amounts
         totalAmount = unitPrice * days;
+        depositAmount = 50.00; // Fixed RM 50 deposit
+        subtotalAmount = totalAmount + depositAmount;
     }
 
     private void initializeFirebase() {
@@ -161,11 +186,13 @@ public class activity_checkout extends AppCompatActivity {
         tvRentalPeriod.setText("Rental Period: " + startStr + " to " + endStr);
 
         // Update pricing
-        tvTotalPrice.setText(String.format(Locale.US, "RM %.2f", totalAmount));
+        tvTotalPrice.setText(String.format(Locale.US, "RM %.2f", subtotalAmount));
         tvRentalFee.setText(String.format(Locale.US, "RM %.2f", totalAmount));
         tvDaysCount.setText(days + " days");
         tvUnitPrice.setText(String.format(Locale.US, "RM %.2f/day", unitPrice));
-        tvFinalTotal.setText(String.format(Locale.US, "RM %.2f", totalAmount));
+        tvDeposit.setText(String.format(Locale.US, "RM %.2f", depositAmount));
+        tvSubtotal.setText(String.format(Locale.US, "RM %.2f", subtotalAmount));
+        tvFinalTotal.setText(String.format(Locale.US, "RM %.2f", subtotalAmount));
     }
 
     private void confirmBooking() {
@@ -186,6 +213,17 @@ public class activity_checkout extends AppCompatActivity {
 
         if (address.isEmpty()) {
             etAddress.setError("Please enter your address");
+            return;
+        }
+
+        // Validate radio button selections
+        if (!rbPickup.isChecked() && !rbDelivery.isChecked()) {
+            Toast.makeText(this, "Please select a delivery option", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (!rbQRBanking.isChecked() && !rbCOD.isChecked()) {
+            Toast.makeText(this, "Please select a payment method", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -217,7 +255,9 @@ public class activity_checkout extends AppCompatActivity {
         booking.setEndDate(endDateMillis);
         booking.setRentalDays(days);
         booking.setUnitPrice(unitPrice);
-        booking.setTotalAmount(totalAmount);
+        booking.setRentalAmount(totalAmount);
+        booking.setDepositAmount(depositAmount);
+        booking.setTotalAmount(subtotalAmount);
         booking.setStatus("pending");
         booking.setBookingDate(System.currentTimeMillis());
 
@@ -237,6 +277,6 @@ public class activity_checkout extends AppCompatActivity {
                 });
     }
 
-    // Booking model class (inner class for simplicity)
+    // Updated Booking model class with deposit
 
 }

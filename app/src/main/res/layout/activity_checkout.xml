@@ -107,7 +107,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Product Name"
                                 android:textColor="@color/neutral"
-                                android:textSize="14sp"
+                                android:textSize="16sp"
                                 android:textStyle="bold"
                                 android:maxLines="1"
                                 android:ellipsize="end" />
@@ -118,7 +118,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Size: M"
                                 android:textColor="@color/neutral"
-                                android:textSize="12sp"
+                                android:textSize="15sp"
                                 android:alpha="0.7"
                                 android:layout_marginTop="2dp" />
 
@@ -128,7 +128,7 @@
                                 android:layout_height="wrap_content"
                                 android:text="Rental Period: —"
                                 android:textColor="@color/neutral"
-                                android:textSize="12sp"
+                                android:textSize="15sp"
                                 android:alpha="0.7"
                                 android:layout_marginTop="2dp" />
 
@@ -221,6 +221,59 @@
                             android:text="RM 0/day"
                             android:textColor="@color/neutral"
                             android:textSize="14sp" />
+
+                    </LinearLayout>
+
+                    <!-- Deposit Section - ADDED -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="4dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Deposit"
+                            android:textColor="@color/neutral"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/tvDeposit"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="RM 50.00"
+                            android:textColor="@color/neutral"
+                            android:textSize="14sp" />
+
+                    </LinearLayout>
+
+                    <!-- Total Amount Section - ADDED -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginTop="8dp"
+                        android:paddingTop="8dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Total Amount"
+                            android:textColor="@color/neutral"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvSubtotal"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="RM 0"
+                            android:textColor="@color/primary"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
 
                     </LinearLayout>
 
@@ -334,6 +387,7 @@
                         android:textStyle="bold"
                         android:layout_marginBottom="8dp" />
 
+                    <!-- Fixed RadioGroup for Delivery Options -->
                     <RadioGroup
                         android:id="@+id/rgDeliveryOption"
                         android:layout_width="match_parent"
@@ -341,45 +395,29 @@
                         android:orientation="horizontal"
                         android:layout_marginBottom="16dp">
 
-                        <com.google.android.material.card.MaterialCardView
+                        <RadioButton
+                            android:id="@+id/rbPickup"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:layout_marginEnd="8dp"
-                            app:cardCornerRadius="12dp"
-                            app:cardElevation="2dp">
+                            android:text="Pickup"
+                            android:buttonTint="@color/primary"
+                            android:textColor="@color/neutral"
+                            android:padding="16dp"
+                            android:gravity="center" />
 
-                            <RadioButton
-                                android:id="@+id/rbPickup"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:text="Pickup"
-                                android:buttonTint="@color/primary"
-                                android:textColor="@color/neutral"
-                                android:padding="16dp"
-                                android:background="?android:attr/selectableItemBackground" />
-
-                        </com.google.android.material.card.MaterialCardView>
-
-                        <com.google.android.material.card.MaterialCardView
+                        <RadioButton
+                            android:id="@+id/rbDelivery"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:layout_marginStart="8dp"
-                            app:cardCornerRadius="12dp"
-                            app:cardElevation="2dp">
-
-                            <RadioButton
-                                android:id="@+id/rbDelivery"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:text="Delivery"
-                                android:buttonTint="@color/primary"
-                                android:textColor="@color/neutral"
-                                android:padding="16dp"
-                                android:background="?android:attr/selectableItemBackground" />
-
-                        </com.google.android.material.card.MaterialCardView>
+                            android:text="Delivery"
+                            android:buttonTint="@color/primary"
+                            android:textColor="@color/neutral"
+                            android:padding="16dp"
+                            android:gravity="center" />
 
                     </RadioGroup>
 
@@ -411,48 +449,31 @@
                         android:textStyle="bold"
                         android:layout_marginBottom="16dp" />
 
+                    <!-- Fixed RadioGroup for Payment Methods -->
                     <RadioGroup
                         android:id="@+id/rgPaymentMethod"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical">
 
-                        <com.google.android.material.card.MaterialCardView
+                        <RadioButton
+                            android:id="@+id/rbQRBanking"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginBottom="8dp"
-                            app:cardCornerRadius="12dp"
-                            app:cardElevation="2dp">
+                            android:text="QR Code Banking"
+                            android:buttonTint="@color/primary"
+                            android:textColor="@color/neutral"
+                            android:padding="16dp"
+                            android:layout_marginBottom="8dp" />
 
-                            <RadioButton
-                                android:id="@+id/rbQRBanking"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:text="QR Code Banking"
-                                android:buttonTint="@color/primary"
-                                android:textColor="@color/neutral"
-                                android:padding="16dp"
-                                android:background="?android:attr/selectableItemBackground" />
-
-                        </com.google.android.material.card.MaterialCardView>
-
-                        <com.google.android.material.card.MaterialCardView
+                        <RadioButton
+                            android:id="@+id/rbCOD"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            app:cardCornerRadius="12dp"
-                            app:cardElevation="2dp">
-
-                            <RadioButton
-                                android:id="@+id/rbCOD"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:text="Cash on Delivery (COD)"
-                                android:buttonTint="@color/primary"
-                                android:textColor="@color/neutral"
-                                android:padding="16dp"
-                                android:background="?android:attr/selectableItemBackground" />
-
-                        </com.google.android.material.card.MaterialCardView>
+                            android:text="Cash on Delivery (COD)"
+                            android:buttonTint="@color/primary"
+                            android:textColor="@color/neutral"
+                            android:padding="16dp" />
 
                     </RadioGroup>
 

@@ -121,7 +121,8 @@
                 android:layout_marginTop="-60dp"
                 app:cardCornerRadius="20dp"
                 app:cardElevation="8dp"
-                app:cardUseCompatPadding="true">
+                app:cardUseCompatPadding="true"
+                app:cardBackgroundColor="@color/secondary" >
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -145,8 +146,8 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Evening Dress • Size M"
-                        android:textSize="14sp"
-                        android:textColor="@color/neutral"
+                        android:textSize="16sp"
+                        android:textColor="@color/textcolor"
                         android:alpha="0.6"
                         android:layout_marginTop="4dp"/>
 
@@ -223,7 +224,8 @@
                 android:layout_marginBottom="16dp"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="4dp"
-                app:cardUseCompatPadding="true">
+                app:cardUseCompatPadding="true"
+                app:cardBackgroundColor="@color/secondary" >
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -386,7 +388,8 @@
                 android:layout_marginBottom="20dp"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="4dp"
-                app:cardUseCompatPadding="true">
+                app:cardUseCompatPadding="true"
+                app:cardBackgroundColor="@color/secondary" >
 
                 <LinearLayout
                     android:padding="20dp"
@@ -395,19 +398,23 @@
                     android:orientation="horizontal"
                     android:gravity="center_vertical">
 
+                    <!-- Avatar with initials -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="60dp"
                         android:layout_height="60dp"
                         app:cardCornerRadius="30dp"
-                        app:cardElevation="2dp">
+                        app:cardElevation="2dp"
+                        app:cardBackgroundColor="@color/primary">
 
-                        <ImageView
-                            android:id="@+id/ivOwnerAvatar"
+                        <TextView
+                            android:id="@+id/tvOwnerAvatar"
                             android:layout_width="60dp"
                             android:layout_height="60dp"
-                            android:src="@drawable/ic_person"
-                            android:scaleType="centerCrop"
-                            android:background="@color/secondary"/>
+                            android:gravity="center"
+                            android:textColor="@color/background"
+                            android:textSize="18sp"
+                            android:textStyle="bold"
+                            android:text="OO" />
 
                     </com.google.android.material.card.MaterialCardView>
 
@@ -431,18 +438,9 @@
                             android:id="@+id/tvOwnerBio"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Fashion Designer • 4.8 ⭐"
+                            android:text="4.8 ⭐"
                             android:textSize="13sp"
                             android:alpha="0.7"
-                            android:textColor="@color/neutral"
-                            android:layout_marginTop="2dp"/>
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="UiTM Shah Alam"
-                            android:textSize="12sp"
-                            android:alpha="0.5"
                             android:textColor="@color/neutral"
                             android:layout_marginTop="2dp"/>
 

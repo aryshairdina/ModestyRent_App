@@ -5,7 +5,7 @@ public class Booking {
     private String deliveryAddress, deliveryOption, paymentMethod, status;
     private long startDate, endDate, bookingDate;
     private int rentalDays;
-    private double unitPrice, totalAmount;
+    private double unitPrice, rentalAmount, depositAmount, totalAmount;
 
     // Getters and setters
     public String getBookingId() { return bookingId; }
@@ -55,6 +55,12 @@ public class Booking {
 
     public double getUnitPrice() { return unitPrice; }
     public void setUnitPrice(double unitPrice) { this.unitPrice = unitPrice; }
+
+    public double getRentalAmount() { return rentalAmount; }
+    public void setRentalAmount(double rentalAmount) { this.rentalAmount = rentalAmount; }
+
+    public double getDepositAmount() { return depositAmount; }
+    public void setDepositAmount(double depositAmount) { this.depositAmount = depositAmount; }
 
     public double getTotalAmount() { return totalAmount; }
     public void setTotalAmount(double totalAmount) { this.totalAmount = totalAmount; }
