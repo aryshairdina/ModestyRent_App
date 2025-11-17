@@ -1,7 +1,7 @@
 package com.example.modestyrent_app;
 
 public class Booking {
-    private String bookingId, productId, ownerId, renterId, productName, renterName, renterPhone;
+    private String bookingId, bookingNumber, productId, ownerId, renterId, productName, renterName, renterPhone;
     private String deliveryAddress, deliveryOption, paymentMethod, status;
     private long startDate, endDate, bookingDate;
     private int rentalDays;
@@ -64,4 +64,7 @@ public class Booking {
 
     public double getTotalAmount() { return totalAmount; }
     public void setTotalAmount(double totalAmount) { this.totalAmount = totalAmount; }
+
+    public String getBookingNumber() { return bookingNumber; }
+    public void setBookingNumber(String bookingNumber) { this.bookingNumber = bookingNumber; }
 }

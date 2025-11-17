@@ -11,6 +11,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.*;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
+import java.util.Random;
 
 public class activity_checkout extends AppCompatActivity {
 
@@ -195,6 +196,17 @@ public class activity_checkout extends AppCompatActivity {
         tvFinalTotal.setText(String.format(Locale.US, "RM %.2f", subtotalAmount));
     }
 
+    private String generateBookingNumber() {
+        // Generate a proper booking number: MR + timestamp + random digits
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyMMddHHmmss", Locale.getDefault());
+        String timestamp = dateFormat.format(System.currentTimeMillis());
+
+        Random random = new Random();
+        int randomDigits = random.nextInt(900) + 100; // 100-999
+
+        return "MR" + timestamp + randomDigits;
+    }
+
     private void confirmBooking() {
         // Validate input fields
         String fullName = etFullName.getText().toString().trim();
@@ -236,12 +248,14 @@ public class activity_checkout extends AppCompatActivity {
             return;
         }
 
-        // Generate booking ID
+        // Generate booking ID and booking number
         String bookingId = bookingsRef.push().getKey();
+        String bookingNumber = generateBookingNumber();
 
         // Create booking object
         Booking booking = new Booking();
         booking.setBookingId(bookingId);
+        booking.setBookingNumber(bookingNumber);
         booking.setProductId(productId);
         booking.setOwnerId(ownerId);
         booking.setRenterId(currentUserId);
@@ -276,7 +290,4 @@ public class activity_checkout extends AppCompatActivity {
                     Toast.makeText(activity_checkout.this, "Failed to confirm booking: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
     }
-
-    // Updated Booking model class with deposit
-
 }

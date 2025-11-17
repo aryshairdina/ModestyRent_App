@@ -1,19 +1,254 @@
 package com.example.modestyrent_app;
 
+import android.content.Intent;
 import android.os.Bundle;
+import android.widget.ImageView;
+import android.widget.TextView;
+import android.widget.Toast;
 
-import androidx.activity.EdgeToEdge;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
+
+import com.google.android.material.button.MaterialButton;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+
+import java.text.SimpleDateFormat;
+import java.util.Locale;
+import java.util.Random;
 
 public class activity_booking extends AppCompatActivity {
+
+    private TextView tvBookingNumber, tvBookingId, tvProductName, tvRentalPeriod, tvDeliveryOption, tvPaymentMethod, tvTotalAmount, tvBookingStatus;
+    private MaterialButton btnViewBookings, btnBackToHome;
+    private ImageView backIcon;
+
+    private DatabaseReference bookingsRef;
+    private String bookingId;
+
+    private final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd MMM yyyy", Locale.getDefault());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this);
         setContentView(R.layout.activity_booking);
+
+        // Get bookingId from intent
+        bookingId = getIntent().getStringExtra("bookingId");
+        if (bookingId == null || bookingId.isEmpty()) {
+            Toast.makeText(this, "Booking information not available", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        initializeViews();
+        setupClickListeners();
+        loadBookingData();
+    }
+
+    private void initializeViews() {
+        tvBookingNumber = findViewById(R.id.tvBookingNumber);
+        tvBookingId = findViewById(R.id.tvBookingId);
+        tvProductName = findViewById(R.id.tvProductName);
+        tvRentalPeriod = findViewById(R.id.tvRentalPeriod);
+        tvDeliveryOption = findViewById(R.id.tvDeliveryOption);
+        tvPaymentMethod = findViewById(R.id.tvPaymentMethod);
+        tvTotalAmount = findViewById(R.id.tvTotalAmount);
+        tvBookingStatus = findViewById(R.id.tvBookingStatus);
+        btnViewBookings = findViewById(R.id.btnViewBookings);
+        btnBackToHome = findViewById(R.id.btnBackToHome);
+        backIcon = findViewById(R.id.backIcon);
+    }
+
+    private void setupClickListeners() {
+        backIcon.setOnClickListener(v -> finish());
+
+        btnViewBookings.setOnClickListener(v -> {
+            // Navigate to My Bookings page
+            Intent intent = new Intent(activity_booking.this, activity_myrentals.class);
+            startActivity(intent);
+            finish();
+        });
+
+        btnBackToHome.setOnClickListener(v -> {
+            // Navigate back to home page
+            Intent intent = new Intent(activity_booking.this, activity_homepage.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(intent);
+            finish();
+        });
+    }
+
+    private void loadBookingData() {
+        // Resolve bookings path
+        DatabaseReference root = FirebaseDatabase.getInstance().getReference();
+        DatabaseReference candidate = root.child("ModestyRent - App").child("bookings");
+
+        candidate.get().addOnCompleteListener(task -> {
+            if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
+                bookingsRef = candidate;
+            } else {
+                bookingsRef = root.child("bookings");
+            }
+            fetchBookingDetails();
+        }).addOnFailureListener(e -> {
+            bookingsRef = root.child("bookings");
+            fetchBookingDetails();
+        });
+    }
+
+    private void fetchBookingDetails() {
+        if (bookingsRef == null) return;
+
+        bookingsRef.child(bookingId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    // Get booking data
+                    String productName = snapshot.child("productName").getValue(String.class);
+                    String deliveryOption = snapshot.child("deliveryOption").getValue(String.class);
+                    String paymentMethod = snapshot.child("paymentMethod").getValue(String.class);
+                    String status = snapshot.child("status").getValue(String.class);
+
+                    // Check if booking number exists, if not generate one
+                    String bookingNumber = snapshot.child("bookingNumber").getValue(String.class);
+                    if (bookingNumber == null || bookingNumber.isEmpty()) {
+                        // Generate and save booking number
+                        bookingNumber = generateBookingNumber();
+                        saveBookingNumber(bookingNumber);
+                    }
+
+                    Long startDate = snapshot.child("startDate").getValue(Long.class);
+                    Long endDate = snapshot.child("endDate").getValue(Long.class);
+                    Long rentalDays = snapshot.child("rentalDays").getValue(Long.class);
+
+                    Double totalAmount = snapshot.child("totalAmount").getValue(Double.class);
+                    Double rentalAmount = snapshot.child("rentalAmount").getValue(Double.class);
+                    Double depositAmount = snapshot.child("depositAmount").getValue(Double.class);
+
+                    // Update UI with booking data
+                    updateBookingUI(
+                            bookingNumber,
+                            productName,
+                            deliveryOption,
+                            paymentMethod,
+                            status,
+                            startDate,
+                            endDate,
+                            rentalDays,
+                            totalAmount,
+                            rentalAmount,
+                            depositAmount
+                    );
+                } else {
+                    Toast.makeText(activity_booking.this, "Booking details not found", Toast.LENGTH_SHORT).show();
+                    finish();
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Toast.makeText(activity_booking.this, "Failed to load booking details", Toast.LENGTH_SHORT).show();
+                finish();
+            }
+        });
+    }
+
+    private String generateBookingNumber() {
+        // Generate a proper booking number: MR + timestamp + random digits
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyMMddHHmmss", Locale.getDefault());
+        String timestamp = dateFormat.format(System.currentTimeMillis());
+
+        Random random = new Random();
+        int randomDigits = random.nextInt(900) + 100; // 100-999
+
+        return "MR" + timestamp + randomDigits;
+    }
+
+    private void saveBookingNumber(String bookingNumber) {
+        if (bookingsRef != null && bookingId != null) {
+            bookingsRef.child(bookingId).child("bookingNumber").setValue(bookingNumber)
+                    .addOnCompleteListener(task -> {
+                        if (task.isSuccessful()) {
+                            System.out.println("Booking number saved: " + bookingNumber);
+                        } else {
+                            System.out.println("Failed to save booking number");
+                        }
+                    });
+        }
+    }
+
+    private void updateBookingUI(String bookingNumber, String productName, String deliveryOption, String paymentMethod,
+                                 String status, Long startDate, Long endDate, Long rentalDays,
+                                 Double totalAmount, Double rentalAmount, Double depositAmount) {
+
+        // Set booking number (user-friendly)
+        tvBookingNumber.setText(bookingNumber != null ? bookingNumber : generateBookingNumber());
+
+        // Set booking ID (hidden but kept for reference)
+        tvBookingId.setText(bookingId != null ? bookingId : "--");
+
+        // Set product name
+        tvProductName.setText(productName != null ? productName : "Unknown Product");
+
+        // Set rental period
+        String rentalPeriodText = "--";
+        if (startDate != null && endDate != null) {
+            String startStr = DATE_FORMAT.format(startDate);
+            String endStr = DATE_FORMAT.format(endDate);
+            rentalPeriodText = startStr + " to " + endStr;
+            if (rentalDays != null) {
+                rentalPeriodText += " (" + rentalDays + " days)";
+            }
+        }
+        tvRentalPeriod.setText(rentalPeriodText);
+
+        // Set delivery option
+        tvDeliveryOption.setText(deliveryOption != null ? deliveryOption : "--");
+
+        // Set payment method
+        tvPaymentMethod.setText(paymentMethod != null ? paymentMethod : "--");
+
+        // Set total amount
+        if (totalAmount != null) {
+            tvTotalAmount.setText(String.format(Locale.getDefault(), "RM %.2f", totalAmount));
+        } else {
+            tvTotalAmount.setText("RM 0.00");
+        }
+
+        // Set status
+        if (status != null) {
+            tvBookingStatus.setText(status);
+            // You can customize status colors based on status
+            switch (status.toLowerCase()) {
+                case "pending":
+                    tvBookingStatus.setText("Pending Delivery");
+                    break;
+                case "confirmed":
+                    tvBookingStatus.setText("Confirmed");
+                    break;
+                case "delivered":
+                    tvBookingStatus.setText("Delivered");
+                    break;
+                case "completed":
+                    tvBookingStatus.setText("Completed");
+                    break;
+                case "cancelled":
+                    tvBookingStatus.setText("Cancelled");
+                    break;
+            }
+        } else {
+            tvBookingStatus.setText("Pending Delivery");
+        }
+
+        // Show breakdown in log (optional - you can display this in UI if needed)
+        if (rentalAmount != null && depositAmount != null) {
+            System.out.println("Rental Amount: RM " + rentalAmount);
+            System.out.println("Deposit Amount: RM " + depositAmount);
+            System.out.println("Total Amount: RM " + totalAmount);
+        }
     }
 }
