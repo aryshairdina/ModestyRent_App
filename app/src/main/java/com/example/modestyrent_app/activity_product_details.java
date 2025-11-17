@@ -30,8 +30,8 @@ public class activity_product_details extends AppCompatActivity {
 
     private ViewPager2 viewPagerImages;
     private TabLayout tabLayoutIndicator;
-    private TextView tvItemTitle, tvShortDesc, tvFullDesc, tvCategory, tvSize, tvPricePerDay, tvEstimate,
-            tvOwnerName, tvFromDate, tvToDate, tvDaysCount;
+    private TextView tvItemTitle, tvShortDesc, tvCategory, tvSize, tvPricePerDay,
+            tvOwnerName, tvFromDate, tvToDate, tvDaysCount, tvTotalPrice;
     private ImageView ivOwnerAvatar;
     private CalendarView calendarAvailability;
     private Button btnBook, btnChatOwner, btnViewProfile;
@@ -64,7 +64,6 @@ public class activity_product_details extends AppCompatActivity {
         tvCategory = findViewById(R.id.tvCategory);
         tvSize = findViewById(R.id.tvSize);
         tvPricePerDay = findViewById(R.id.tvPricePerDay);
-        tvEstimate = findViewById(R.id.tvEstimate);
         tvOwnerName = findViewById(R.id.tvOwnerName);
         ivOwnerAvatar = findViewById(R.id.ivOwnerAvatar);
         calendarAvailability = findViewById(R.id.calendarAvailability);
@@ -75,6 +74,7 @@ public class activity_product_details extends AppCompatActivity {
         tvFromDate = findViewById(R.id.tvFromDate);
         tvToDate = findViewById(R.id.tvToDate);
         tvDaysCount = findViewById(R.id.tvDaysCount);
+        tvTotalPrice = findViewById(R.id.tvTotalPrice);
 
         productId = getIntent().getStringExtra(EXTRA_PRODUCT_ID);
         if (TextUtils.isEmpty(productId)) {
@@ -107,7 +107,7 @@ public class activity_product_details extends AppCompatActivity {
                 tvFromDate.setText(DATE_FORMAT.format(startDateMillis));
                 tvToDate.setText("—");
                 tvDaysCount.setText("0");
-                tvEstimate.setText(String.format(Locale.US, "Estimate: RM %.2f", 0.0));
+                tvTotalPrice.setText("RM 0");
                 Toast.makeText(activity_product_details.this, "Start date selected. Now tap end date.", Toast.LENGTH_SHORT).show();
             } else {
                 // choose end
@@ -165,8 +165,7 @@ public class activity_product_details extends AppCompatActivity {
 
                     unitPrice = product.getPrice();
                     tvPricePerDay.setText(String.format(Locale.US, "RM %.2f / day", unitPrice));
-                    // estimate initially 0
-                    tvEstimate.setText(String.format(Locale.US, "Estimate: RM %.2f", 0.0));
+                    tvTotalPrice.setText("RM 0");
 
                     ownerId = product.getUserId() != null ? product.getUserId() : "";
 
@@ -199,7 +198,7 @@ public class activity_product_details extends AppCompatActivity {
         int days = calculateDaysInclusive(startDateMillis, endDateMillis);
         tvDaysCount.setText(String.valueOf(days));
         double estimate = unitPrice * days;
-        tvEstimate.setText(String.format(Locale.US, "Estimate: RM %.2f", estimate));
+        tvTotalPrice.setText(String.format(Locale.US, "RM %.2f", estimate));
     }
 
     private int calculateDaysInclusive(long startMs, long endMs) {

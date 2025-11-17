@@ -5,14 +5,16 @@
     android:id="@+id/coordinatorRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/secondary"
+    android:background="@color/background"
     android:fitsSystemWindows="true">
 
-    <!-- AppBar + custom top bar -->
+    <!-- AppBar with custom design -->
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:fitsSystemWindows="true">
+        android:background="@android:color/transparent"
+        android:fitsSystemWindows="true"
+        android:elevation="0dp">
 
         <LinearLayout
             android:id="@+id/topBar"
@@ -21,18 +23,18 @@
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
-            android:paddingEnd="12dp"
-            android:background="@color/background"
-            android:elevation="4dp"
+            android:paddingEnd="16dp"
+            android:background="@android:color/transparent"
             app:layout_scrollFlags="scroll|enterAlways">
 
-            <ImageView
-                android:id="@+id/backIcon"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:src="@drawable/ic_arrow_back"
-                android:padding="6dp"
-                android:contentDescription="Back" />
+                <ImageView
+                    android:id="@+id/backIcon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_arrow_back"
+                    android:layout_gravity="center"
+                    android:backgroundTint="@color/neutral"
+                    android:contentDescription="Back" />
 
             <TextView
                 android:id="@+id/topTitle"
@@ -43,7 +45,7 @@
                 android:letterSpacing="0.02"
                 android:text="Product Details"
                 android:textAlignment="center"
-                android:textColor="@color/primary"
+                android:textColor="@color/neutral"
                 android:textSize="18sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -54,7 +56,7 @@
         android:id="@+id/scrollView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:padding="16dp"
+        android:padding="0dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior"
         android:clipToPadding="false"
         android:layout_marginBottom="100dp">
@@ -65,232 +67,352 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Image slider -->
-            <androidx.cardview.widget.CardView
+            <!-- Fashion-style image slider -->
+            <RelativeLayout
                 android:layout_width="match_parent"
-                android:layout_height="400dp"
-                app:cardElevation="6dp"
-                app:cardCornerRadius="14dp"
-                android:layout_marginBottom="12dp">
+                android:layout_height="420dp"
+                android:background="@color/secondary">
 
-                <FrameLayout
+                <androidx.viewpager2.widget.ViewPager2
+                    android:id="@+id/viewPagerImages"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent">
+                    android:layout_height="match_parent" />
 
-                    <androidx.viewpager2.widget.ViewPager2
-                        android:id="@+id/viewPagerImages"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent" />
+                <!-- Image indicator -->
+                <com.google.android.material.tabs.TabLayout
+                    android:id="@+id/tabLayoutIndicator"
+                    android:layout_width="20dp"
+                    android:layout_height="10dp"
+                    android:layout_alignParentBottom="true"
+                    android:layout_marginBottom="16dp"
+                    android:layout_centerHorizontal="true"
+                    android:background="@android:color/transparent"
+                    app:tabGravity="center"
+                    app:tabMode="fixed"
+                    app:tabIndicator="@null"
+                    app:tabIndicatorHeight="0dp"
+                    app:tabRippleColor="@android:color/transparent"
+                    app:tabBackground="@drawable/fashion_dot_selector"
+                    app:tabMinWidth="8dp"
+                    app:tabMaxWidth="8dp"
+                    app:tabPaddingStart="4dp"
+                    app:tabPaddingEnd="4dp"/>
 
-                    <com.google.android.material.tabs.TabLayout
-                        android:id="@+id/tabLayoutIndicator"
-                        android:layout_width="20dp"
-                        android:layout_height="10dp"
-                        android:layout_gravity="bottom|center"
-                        android:layout_marginBottom="12dp"
-                        android:background="@android:color/transparent"
-                        android:padding="-4dp"
-                        app:tabGravity="center"
-                        app:tabMode="fixed"
-                        app:tabIndicator="@null"
-                        app:tabIndicatorHeight="0dp"
-                        app:tabRippleColor="@android:color/transparent"
-                        app:tabBackground="@drawable/tab_dot_selector"
-                        app:tabMinWidth="0dp"
-                        app:tabMaxWidth="0dp"
-                        app:tabPadding="0dp"/>
-                </FrameLayout>
-            </androidx.cardview.widget.CardView>
-
-            <!-- Title -->
-            <TextView
-                android:id="@+id/tvItemTitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Item Name"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:textColor="@color/neutral"/>
-
-            <TextView
-                android:id="@+id/tvCategory"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Category • Size"
-                android:textSize="13sp"
-                android:textColor="@color/neutral"
-                android:alpha="0.7"
-                android:layout_marginTop="4dp"/>
-
-            <!-- Price & estimate -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginTop="10dp">
-
-                <TextView
-                    android:id="@+id/tvPricePerDay"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:text="RM 0 / day"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/primary"/>
-
-                <TextView
-                    android:id="@+id/tvEstimate"
+                <!-- Fashion tag -->
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Estimate: RM 0"
-                    android:textStyle="bold"
-                    android:textColor="@color/neutral"/>
-            </LinearLayout>
+                    android:layout_height="28dp"
+                    android:layout_alignParentTop="true"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_alignParentEnd="true"
+                    app:cardCornerRadius="14dp"
+                    app:cardBackgroundColor="@color/primary"
+                    app:cardElevation="2dp">
+                </com.google.android.material.card.MaterialCardView>
 
-            <TextView
-                android:id="@+id/tvShortDesc"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Short description here..."
-                android:layout_marginTop="10dp"
-                android:textColor="@color/neutral"
-                android:alpha="0.85"/>
+            </RelativeLayout>
 
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginTop="12dp"
-                android:background="@color/secondary"
-                android:alpha="0.25" />
-
-            <TextView
-                android:layout_marginTop="12dp"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Size and Measurements"
-                android:textStyle="bold"
-                android:textColor="@color/neutral"/>
-
-            <TextView
-                android:id="@+id/tvSize"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="M"
-                android:layout_marginTop="6dp"
-                android:textColor="@color/neutral"/>
-
-            <!-- Select date -->
-            <TextView
-                android:layout_marginTop="12dp"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Select date range"
-                android:textStyle="bold"
-                android:textColor="@color/neutral"/>
-
+            <!-- Product info card -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                app:cardCornerRadius="14dp"
-                app:cardElevation="2dp"
-                app:cardUseCompatPadding="true"
-                android:clipToPadding="false"
-                android:clipToOutline="true">
-
-                <CalendarView
-                    android:id="@+id/calendarAvailability"
-                    android:layout_width="match_parent"
-                    android:layout_height="330dp"
-                    android:background="@color/background" />
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- Date range display + estimate -->
-            <LinearLayout
-                android:layout_marginTop="14dp"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-                <TextView
-                    android:id="@+id/tvFromLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="From:"
-                    android:textColor="@color/neutral"
-                    android:layout_marginEnd="6dp"/>
-
-                <TextView
-                    android:id="@+id/tvFromDate"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="—"
-                    android:textColor="@color/neutral"
-                    android:layout_marginEnd="12dp"/>
-
-                <TextView
-                    android:id="@+id/tvToLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="To:"
-                    android:textColor="@color/neutral"
-                    android:layout_marginEnd="6dp"/>
-
-                <TextView
-                    android:id="@+id/tvToDate"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="—"
-                    android:textColor="@color/neutral"
-                    android:layout_marginEnd="12dp"/>
-
-                <TextView
-                    android:id="@+id/tvDaysLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Days:"
-                    android:textColor="@color/neutral"
-                    android:layout_marginEnd="6dp"/>
-
-                <TextView
-                    android:id="@+id/tvDaysCount"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0"
-                    android:textColor="@color/neutral"
-                    android:textStyle="bold"
-                    android:layout_marginEnd="16dp"/>
-            </LinearLayout>
-
-            <!-- Owner card -->
-            <androidx.cardview.widget.CardView
-                android:layout_marginTop="12dp"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:cardCornerRadius="10dp"
-                app:cardElevation="2dp"
-                android:layout_marginBottom="20dp">
+                android:layout_margin="16dp"
+                android:layout_marginTop="-60dp"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="8dp"
+                app:cardUseCompatPadding="true">
 
                 <LinearLayout
-                    android:padding="12dp"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <!-- Title and category -->
+                    <TextView
+                        android:id="@+id/tvItemTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Designer Dress Collection"
+                        android:textSize="22sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/neutral"
+                        android:lineSpacingMultiplier="1.1"/>
+
+                    <TextView
+                        android:id="@+id/tvCategory"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Evening Dress • Size M"
+                        android:textSize="14sp"
+                        android:textColor="@color/neutral"
+                        android:alpha="0.6"
+                        android:layout_marginTop="4dp"/>
+
+                    <!-- Price section -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginTop="12dp">
+
+                        <TextView
+                            android:id="@+id/tvPricePerDay"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="RM 45 / day"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/primary"/>
+
+                    </LinearLayout>
+
+                    <!-- Description -->
+                    <TextView
+                        android:id="@+id/tvShortDesc"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Elegant evening dress perfect for special occasions. Features delicate embroidery and premium fabric that drapes beautifully."
+                        android:layout_marginTop="12dp"
+                        android:textColor="@color/neutral"
+                        android:alpha="0.8"
+                        android:lineSpacingMultiplier="1.2"
+                        android:textSize="14sp"/>
+
+                    <!-- Size section -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginTop="20dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Size and Fit"
+                            android:textStyle="bold"
+                            android:textColor="@color/neutral"
+                            android:textSize="16sp"/>
+
+                        <TextView
+                            android:id="@+id/tvSize"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="M"
+                            android:layout_marginTop="6dp"
+                            android:textColor="@color/neutral"
+                            android:alpha="0.7"
+                            android:lineSpacingMultiplier="1.3"
+                            android:textSize="13sp"/>
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Date selection card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="4dp"
+                app:cardUseCompatPadding="true">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Select Rental Period"
+                        android:textStyle="bold"
+                        android:textColor="@color/neutral"
+                        android:textSize="16sp"/>
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        app:cardCornerRadius="12dp"
+                        app:cardElevation="2dp"
+                        app:cardUseCompatPadding="true"
+                        android:clipToPadding="false"
+                        android:clipToOutline="true">
+
+                        <CalendarView
+                            android:id="@+id/calendarAvailability"
+                            android:layout_width="match_parent"
+                            android:layout_height="330dp"
+                            android:background="@color/background" />
+
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <!-- Date summary -->
+                    <LinearLayout
+                        android:layout_marginTop="16dp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:background="@drawable/date_summary_bg"
+                        android:padding="16dp">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/tvFromLabel"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="START DATE"
+                                android:textColor="@color/neutral"
+                                android:textSize="10sp"
+                                android:alpha="0.6"
+                                android:textStyle="bold"
+                                android:letterSpacing="0.05"/>
+
+                            <TextView
+                                android:id="@+id/tvFromDate"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="—"
+                                android:textColor="@color/neutral"
+                                android:textStyle="bold"
+                                android:layout_marginTop="2dp"
+                                android:textSize="14sp"/>
+
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_arrow_forward"
+                            android:backgroundTint="@color/neutral"
+                            android:alpha="0.5"
+                            android:layout_marginStart="8dp"
+                            android:layout_marginEnd="8dp"/>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:gravity="end">
+
+                            <TextView
+                                android:id="@+id/tvToLabel"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="END DATE"
+                                android:textColor="@color/neutral"
+                                android:textSize="10sp"
+                                android:alpha="0.6"
+                                android:textStyle="bold"
+                                android:letterSpacing="0.05"/>
+
+                            <TextView
+                                android:id="@+id/tvToDate"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="—"
+                                android:textColor="@color/neutral"
+                                android:textStyle="bold"
+                                android:layout_marginTop="2dp"
+                                android:textSize="14sp"/>
+
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="24dp"
+                            android:background="@color/secondary"
+                            android:layout_marginStart="16dp"
+                            android:layout_marginEnd="16dp"/>
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:gravity="center">
+
+                            <TextView
+                                android:id="@+id/tvDaysLabel"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="DAYS"
+                                android:textColor="@color/neutral"
+                                android:textSize="10sp"
+                                android:alpha="0.6"
+                                android:textStyle="bold"
+                                android:letterSpacing="0.05"/>
+
+                            <TextView
+                                android:id="@+id/tvDaysCount"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0"
+                                android:textColor="@color/primary"
+                                android:textStyle="bold"
+                                android:textSize="16sp"
+                                android:layout_marginTop="2dp"/>
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Owner card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="20dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="4dp"
+                app:cardUseCompatPadding="true">
+
+                <LinearLayout
+                    android:padding="20dp"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical">
 
-                    <ImageView
-                        android:id="@+id/ivOwnerAvatar"
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:src="@drawable/ic_person"
-                        android:background="@drawable/circle_placeholder"
-                        android:scaleType="centerCrop"/>
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="60dp"
+                        android:layout_height="60dp"
+                        app:cardCornerRadius="30dp"
+                        app:cardElevation="2dp">
+
+                        <ImageView
+                            android:id="@+id/ivOwnerAvatar"
+                            android:layout_width="60dp"
+                            android:layout_height="60dp"
+                            android:src="@drawable/ic_person"
+                            android:scaleType="centerCrop"
+                            android:background="@color/secondary"/>
+
+                    </com.google.android.material.card.MaterialCardView>
 
                     <LinearLayout
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="16dp"
                         android:layout_width="0dp"
                         android:layout_weight="1"
                         android:layout_height="wrap_content"
@@ -300,33 +422,53 @@
                             android:id="@+id/tvOwnerName"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Owner Name"
+                            android:text="Sarah Johnson"
                             android:textStyle="bold"
-                            android:textColor="@color/neutral"/>
+                            android:textColor="@color/neutral"
+                            android:textSize="16sp"/>
 
                         <TextView
                             android:id="@+id/tvOwnerBio"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="UiTM Shah Alam"
+                            android:text="Fashion Designer • 4.8 ⭐"
                             android:textSize="13sp"
                             android:alpha="0.7"
-                            android:textColor="@color/neutral"/>
+                            android:textColor="@color/neutral"
+                            android:layout_marginTop="2dp"/>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="UiTM Shah Alam"
+                            android:textSize="12sp"
+                            android:alpha="0.5"
+                            android:textColor="@color/neutral"
+                            android:layout_marginTop="2dp"/>
+
                     </LinearLayout>
 
-                    <Button
+                    <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnViewProfile"
                         android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Profile"
+                        android:layout_height="36dp"
+                        android:text="View"
                         android:backgroundTint="@color/primary"
-                        android:textColor="@color/background"/>
+                        android:textColor="@color/background"
+                        android:textSize="12sp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        app:cornerRadius="18dp"/>
+
                 </LinearLayout>
-            </androidx.cardview.widget.CardView>
+
+            </com.google.android.material.card.MaterialCardView>
+
         </LinearLayout>
+
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Floating Chat (no illegal anchor) -->
+    <!-- Floating Chat Button -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabChat"
         android:layout_width="56dp"
@@ -336,44 +478,80 @@
         app:backgroundTint="@color/primary"
         android:layout_margin="16dp"
         android:layout_gravity="bottom|end"
+        app:elevation="8dp"
         android:contentDescription="Chat" />
 
-    <!-- BOOK & CHAT BOTTOM BAR -->
-    <androidx.cardview.widget.CardView
+    <!-- Bottom Action Bar -->
+    <com.google.android.material.card.MaterialCardView
         android:id="@+id/bottomBookingBar"
         android:layout_width="match_parent"
-        android:layout_height="84dp"
-        android:layout_margin="12dp"
+        android:layout_height="80dp"
+        android:layout_margin="16dp"
         android:layout_gravity="bottom"
-        app:cardCornerRadius="12dp"
-        app:cardElevation="8dp">
+        app:cardCornerRadius="20dp"
+        app:cardElevation="12dp"
+        app:cardBackgroundColor="@color/background">
 
         <LinearLayout
-            android:padding="12dp"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:layout_width="match_parent"
             android:layout_height="match_parent">
 
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvTotalPrice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="RM 0"
+                    android:textColor="@color/primary"
+                    android:textSize="18sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Total for 0 days"
+                    android:textColor="@color/neutral"
+                    android:textSize="11sp"
+                    android:alpha="0.6"/>
+
+            </LinearLayout>
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnChatOwner"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="56dp"
-                android:text="Chat Owner"
-                android:textColor="@color/background"
-                android:backgroundTint="@color/primary"/>
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:text="Chat"
+                android:textColor="@color/primary"
+                android:backgroundTint="@android:color/transparent"
+                android:layout_marginEnd="8dp"
+                app:strokeColor="@color/primary"
+                app:strokeWidth="1dp"
+                app:cornerRadius="24dp"
+                style="@style/Widget.Material3.Button.OutlinedButton"/>
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnBook"
-                android:layout_marginStart="10dp"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="56dp"
-                android:text="Book"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:text="Book Now"
                 android:backgroundTint="@color/primary"
-                android:textColor="@color/background"/>
+                android:textColor="@color/background"
+                app:cornerRadius="24dp"
+                android:paddingStart="24dp"
+                android:paddingEnd="24dp"
+                style="@style/Widget.Material3.Button"/>
+
         </LinearLayout>
-    </androidx.cardview.widget.CardView>
+
+    </com.google.android.material.card.MaterialCardView>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
