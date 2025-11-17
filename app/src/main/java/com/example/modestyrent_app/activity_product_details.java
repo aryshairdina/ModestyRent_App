@@ -31,8 +31,7 @@ public class activity_product_details extends AppCompatActivity {
     private ViewPager2 viewPagerImages;
     private TabLayout tabLayoutIndicator;
     private TextView tvItemTitle, tvShortDesc, tvCategory, tvSize, tvPricePerDay,
-            tvOwnerName, tvFromDate, tvToDate, tvDaysCount, tvTotalPrice;
-    private ImageView ivOwnerAvatar;
+            tvOwnerName, tvFromDate, tvToDate, tvDaysCount, tvTotalPrice, tvOwnerAvatar;
     private CalendarView calendarAvailability;
     private Button btnBook, btnChatOwner, btnViewProfile;
     private FloatingActionButton fabChat;
@@ -65,7 +64,7 @@ public class activity_product_details extends AppCompatActivity {
         tvSize = findViewById(R.id.tvSize);
         tvPricePerDay = findViewById(R.id.tvPricePerDay);
         tvOwnerName = findViewById(R.id.tvOwnerName);
-        ivOwnerAvatar = findViewById(R.id.ivOwnerAvatar);
+        tvOwnerAvatar = findViewById(R.id.tvOwnerAvatar);
         calendarAvailability = findViewById(R.id.calendarAvailability);
         btnBook = findViewById(R.id.btnBook);
         btnChatOwner = findViewById(R.id.btnChatOwner);
@@ -175,20 +174,76 @@ public class activity_product_details extends AppCompatActivity {
                     }
                     setupImageSlider();
 
-                    if (!ownerId.isEmpty()) {
-                        usersRef.child(ownerId).get().addOnCompleteListener(uTask -> {
-                            if (uTask.isSuccessful() && uTask.getResult().exists()) {
-                                DataSnapshot usnap = uTask.getResult();
-                                String ownerName = usnap.child("name").getValue(String.class);
-                                tvOwnerName.setText(ownerName != null ? ownerName : "Owner");
-                            }
-                        });
-                    }
+                    // Load owner data from Firebase
+                    loadOwnerData();
                 }
             } else {
                 Toast.makeText(activity_product_details.this, "Failed to load product", Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    private void loadOwnerData() {
+        if (!ownerId.isEmpty()) {
+            usersRef.child(ownerId).get().addOnCompleteListener(uTask -> {
+                if (uTask.isSuccessful() && uTask.getResult().exists()) {
+                    DataSnapshot usnap = uTask.getResult();
+                    String ownerName = usnap.child("fullName").getValue(String.class);
+
+                    // Set owner name
+                    if (ownerName != null && !ownerName.isEmpty()) {
+                        tvOwnerName.setText(ownerName);
+
+                        // Create avatar with first two letters
+                        createAvatarFromName(ownerName);
+                    } else {
+                        // Fallback if fullName doesn't exist, try name field
+                        ownerName = usnap.child("name").getValue(String.class);
+                        if (ownerName != null && !ownerName.isEmpty()) {
+                            tvOwnerName.setText(ownerName);
+                            createAvatarFromName(ownerName);
+                        } else {
+                            tvOwnerName.setText("Owner");
+                            createAvatarFromName("Owner");
+                        }
+                    }
+                } else {
+                    // Fallback if user data not found
+                    tvOwnerName.setText("Owner");
+                    createAvatarFromName("Owner");
+                }
+            });
+        } else {
+            // Fallback if no owner ID
+            tvOwnerName.setText("Owner");
+            createAvatarFromName("Owner");
+        }
+    }
+
+    private void createAvatarFromName(String fullName) {
+        // Get first two letters from the name
+        String avatarText = getInitialsFromName(fullName);
+
+        // Set the text to the avatar TextView
+        tvOwnerAvatar.setText(avatarText);
+    }
+
+    private String getInitialsFromName(String fullName) {
+        if (fullName == null || fullName.trim().isEmpty()) {
+            return "OO"; // Owner Initials
+        }
+
+        String[] nameParts = fullName.trim().split("\\s+");
+
+        if (nameParts.length == 1) {
+            // Single word name - take first two characters
+            return nameParts[0].substring(0, Math.min(2, nameParts[0].length())).toUpperCase();
+        } else {
+            // Multiple words - take first character from first two words
+            String firstInitial = nameParts[0].substring(0, 1).toUpperCase();
+            String secondInitial = nameParts[1].substring(0, 1).toUpperCase();
+            return firstInitial + secondInitial;
+        }
     }
 
     private void updateEstimateFromRange() {
