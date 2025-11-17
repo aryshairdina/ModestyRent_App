@@ -6,7 +6,6 @@ import android.text.TextUtils;
 import android.widget.Button;
 import android.widget.CalendarView;
 import android.widget.ImageView;
-import android.widget.NumberPicker;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -20,8 +19,10 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.DatabaseReference;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 
 public class activity_product_details extends AppCompatActivity {
 
@@ -29,22 +30,27 @@ public class activity_product_details extends AppCompatActivity {
 
     private ViewPager2 viewPagerImages;
     private TabLayout tabLayoutIndicator;
-    private TextView tvItemTitle, tvShortDesc, tvFullDesc, tvCategory, tvSize, tvPricePerDay, tvPriceInfo, tvOwnerName;
+    private TextView tvItemTitle, tvShortDesc, tvFullDesc, tvCategory, tvSize, tvPricePerDay, tvEstimate,
+            tvOwnerName, tvFromDate, tvToDate, tvDaysCount;
     private ImageView ivOwnerAvatar;
     private CalendarView calendarAvailability;
-    private NumberPicker npDays;
     private Button btnBook, btnChatOwner, btnViewProfile;
     private FloatingActionButton fabChat;
 
     private String productId;
     private Product product;
-    private long selectedDateMillis = -1;
+    private long startDateMillis = -1;
+    private long endDateMillis = -1;
     private double unitPrice = 0.0;
     private ArrayList<String> imageUrls = new ArrayList<>();
     private String ownerId = "";
 
     private DatabaseReference productsRef;
     private DatabaseReference usersRef;
+
+    private boolean waitingForEnd = false; // if user tapped start already
+
+    private final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd MMM yyyy", Locale.getDefault());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,23 +61,20 @@ public class activity_product_details extends AppCompatActivity {
         tabLayoutIndicator = findViewById(R.id.tabLayoutIndicator);
         tvItemTitle = findViewById(R.id.tvItemTitle);
         tvShortDesc = findViewById(R.id.tvShortDesc);
-        tvFullDesc = findViewById(R.id.tvFullDesc);
         tvCategory = findViewById(R.id.tvCategory);
         tvSize = findViewById(R.id.tvSize);
         tvPricePerDay = findViewById(R.id.tvPricePerDay);
-        tvPriceInfo = findViewById(R.id.tvPriceInfo);
+        tvEstimate = findViewById(R.id.tvEstimate);
         tvOwnerName = findViewById(R.id.tvOwnerName);
         ivOwnerAvatar = findViewById(R.id.ivOwnerAvatar);
         calendarAvailability = findViewById(R.id.calendarAvailability);
-        npDays = findViewById(R.id.npDays);
         btnBook = findViewById(R.id.btnBook);
         btnChatOwner = findViewById(R.id.btnChatOwner);
         btnViewProfile = findViewById(R.id.btnViewProfile);
         fabChat = findViewById(R.id.fabChat);
-
-        npDays.setMinValue(1);
-        npDays.setMaxValue(14);
-        npDays.setValue(1);
+        tvFromDate = findViewById(R.id.tvFromDate);
+        tvToDate = findViewById(R.id.tvToDate);
+        tvDaysCount = findViewById(R.id.tvDaysCount);
 
         productId = getIntent().getStringExtra(EXTRA_PRODUCT_ID);
         if (TextUtils.isEmpty(productId)) {
@@ -80,31 +83,60 @@ public class activity_product_details extends AppCompatActivity {
             return;
         }
 
+        ImageView backIcon = findViewById(R.id.backIcon);
+        backIcon.setOnClickListener(v -> finish());
+
         FirebaseDatabase database = FirebaseDatabase.getInstance();
         productsRef = database.getReference("products").child(productId);
         usersRef = database.getReference("users");
 
         loadProduct();
 
+        // Calendar taps: first tap = start, second tap = end (or overwrite)
         calendarAvailability.setOnDateChangeListener((view, year, month, dayOfMonth) -> {
+            // month is 0-based
             java.util.Calendar cal = java.util.Calendar.getInstance();
             cal.set(year, month, dayOfMonth, 0, 0, 0);
-            selectedDateMillis = cal.getTimeInMillis();
+            long tapped = cal.getTimeInMillis();
+
+            if (!waitingForEnd) {
+                // choose start
+                startDateMillis = tapped;
+                endDateMillis = -1;
+                waitingForEnd = true;
+                tvFromDate.setText(DATE_FORMAT.format(startDateMillis));
+                tvToDate.setText("—");
+                tvDaysCount.setText("0");
+                tvEstimate.setText(String.format(Locale.US, "Estimate: RM %.2f", 0.0));
+                Toast.makeText(activity_product_details.this, "Start date selected. Now tap end date.", Toast.LENGTH_SHORT).show();
+            } else {
+                // choose end
+                endDateMillis = tapped;
+                // if user chose end before start, swap
+                if (endDateMillis < startDateMillis) {
+                    long tmp = startDateMillis;
+                    startDateMillis = endDateMillis;
+                    endDateMillis = tmp;
+                }
+                waitingForEnd = false;
+                tvFromDate.setText(DATE_FORMAT.format(startDateMillis));
+                tvToDate.setText(DATE_FORMAT.format(endDateMillis));
+                updateEstimateFromRange();
+            }
         });
 
-        npDays.setOnValueChangedListener((picker, oldVal, newVal) -> updateEstimate());
-
         btnBook.setOnClickListener(v -> {
-            if (selectedDateMillis <= 0) {
-                Toast.makeText(activity_product_details.this, "Please choose a date from the calendar", Toast.LENGTH_SHORT).show();
+            if (startDateMillis <= 0 || endDateMillis <= 0) {
+                Toast.makeText(activity_product_details.this, "Please select start and end dates", Toast.LENGTH_SHORT).show();
                 return;
             }
-            int days = npDays.getValue();
+            int days = calculateDaysInclusive(startDateMillis, endDateMillis);
             Intent intent = new Intent(activity_product_details.this, activity_checkout.class);
             intent.putExtra("productId", productId);
             intent.putExtra("productName", product != null ? product.getName() : "");
             intent.putExtra("ownerId", ownerId);
-            intent.putExtra("selectedDateMillis", selectedDateMillis);
+            intent.putExtra("startDateMillis", startDateMillis);
+            intent.putExtra("endDateMillis", endDateMillis);
             intent.putExtra("days", days);
             intent.putExtra("unitPrice", unitPrice);
             startActivity(intent);
@@ -128,13 +160,13 @@ public class activity_product_details extends AppCompatActivity {
                 if (product != null) {
                     tvItemTitle.setText(product.getName() != null ? product.getName() : "");
                     tvShortDesc.setText(product.getDescription() != null ? product.getDescription() : "");
-                    tvFullDesc.setText(product.getDescription() != null ? product.getDescription() : "");
                     tvCategory.setText((product.getCategory() != null ? product.getCategory() : "") + " • " + (product.getSize() != null ? product.getSize() : ""));
                     tvSize.setText(product.getSize() != null ? product.getSize() : "—");
 
                     unitPrice = product.getPrice();
                     tvPricePerDay.setText(String.format(Locale.US, "RM %.2f / day", unitPrice));
-                    updateEstimate();
+                    // estimate initially 0
+                    tvEstimate.setText(String.format(Locale.US, "Estimate: RM %.2f", 0.0));
 
                     ownerId = product.getUserId() != null ? product.getUserId() : "";
 
@@ -160,10 +192,21 @@ public class activity_product_details extends AppCompatActivity {
         });
     }
 
-    private void updateEstimate() {
-        int days = npDays.getValue();
+    private void updateEstimateFromRange() {
+        if (startDateMillis <= 0 || endDateMillis <= 0) {
+            return;
+        }
+        int days = calculateDaysInclusive(startDateMillis, endDateMillis);
+        tvDaysCount.setText(String.valueOf(days));
         double estimate = unitPrice * days;
-        tvPriceInfo.setText(String.format(Locale.US, "Estimate: RM %.2f", estimate));
+        tvEstimate.setText(String.format(Locale.US, "Estimate: RM %.2f", estimate));
+    }
+
+    private int calculateDaysInclusive(long startMs, long endMs) {
+        long diff = endMs - startMs;
+        // convert ms -> days
+        long daysBetween = TimeUnit.MILLISECONDS.toDays(diff);
+        return (int) daysBetween + 1; // inclusive
     }
 
     private void setupImageSlider() {
