@@ -5,5 +5,12 @@
     <color name="neutral">#3A3A3A</color>     <!-- Charcoal Gray -->
     <color name="background">#FFFFFF</color>  <!-- White -->
     <color name="textcolor">#4D4C4C</color>  <!-- Dark Gray -->
+
+    <color name="chat_bubble_sent">#E8F5E8</color>
+    <color name="chat_bubble_received">#F0F0F0</color>
+    <color name="chat_time_sent">#666666</color>
+    <color name="chat_time_received">#999999</color>
+    <color name="online_green">#4CAF50</color>
+    <color name="offline_gray">#CCCCCC</color>
 </resources>
 

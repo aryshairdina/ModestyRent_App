@@ -167,7 +167,7 @@ public class activity_homepage extends AppCompatActivity {
 
         if (id == R.id.nav_chat) {
             // Go to Chat or profile placeholder
-            Intent intent = new Intent(activity_homepage.this, activity_profile.class);
+            Intent intent = new Intent(activity_homepage.this, activity_chat_list.class);
             startActivity(intent);
             return true;
         }

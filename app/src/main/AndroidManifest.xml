@@ -17,6 +17,15 @@
         android:theme="@style/Theme.ModestyRentApp"
         tools:targetApi="31">
         <activity
+            android:name=".activity_chat_list"
+            android:exported="false" />
+        <activity
+            android:name=".activity_chat_owner"
+            android:exported="false" />
+        <activity
+            android:name=".activity_notifications"
+            android:exported="false" />
+        <activity
             android:name=".activity_booking_requests"
             android:exported="false" />
         <activity
@@ -27,9 +36,6 @@
             android:exported="false" />
         <activity
             android:name=".activity_booking"
-            android:exported="false" />
-        <activity
-            android:name=".activity_chat_owner"
             android:exported="false" />
         <activity
             android:name=".activity_checkout"

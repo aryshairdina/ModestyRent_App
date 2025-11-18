@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="8dp">
+
+    <!-- Received Message (align left) -->
+    <LinearLayout
+        android:id="@+id/layoutReceived"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="start"
+        android:visibility="gone">
+
+        <!-- Message Bubble -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="18dp"
+            app:cardBackgroundColor="@color/chat_bubble_received"
+            app:cardElevation="1dp"
+            android:layout_marginBottom="4dp"
+            android:layout_marginEnd="60dp">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="12dp">
+
+                <!-- File Icon -->
+                <ImageView
+                    android:id="@+id/ivFileReceived"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:visibility="gone"
+                    android:layout_marginEnd="8dp"
+                    tools:src="@drawable/ic_file" />
+
+                <!-- Text Message -->
+                <TextView
+                    android:id="@+id/tvMessageReceived"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    tools:text="This is a received message"
+                    android:textColor="@color/neutral"
+                    android:textSize="16sp"
+                    android:lineSpacingExtra="2dp" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Time Stamp -->
+        <TextView
+            android:id="@+id/tvTimeReceived"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            tools:text="10:30 AM"
+            android:textColor="@color/chat_time_received"
+            android:textSize="12sp"
+            android:paddingStart="8dp" />
+
+    </LinearLayout>
+
+    <!-- Sent Message (align right) -->
+    <LinearLayout
+        android:id="@+id/layoutSent"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="end"
+        android:visibility="gone">
+
+        <!-- Message Bubble -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="18dp"
+            app:cardBackgroundColor="@color/primary"
+            app:cardElevation="2dp"
+            android:layout_marginBottom="4dp"
+            android:layout_marginStart="60dp">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="12dp">
+
+                <!-- File Icon -->
+                <ImageView
+                    android:id="@+id/ivFileSent"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:visibility="gone"
+                    android:layout_marginEnd="8dp"
+                    tools:src="@drawable/ic_file" />
+
+                <!-- Text Message -->
+                <TextView
+                    android:id="@+id/tvMessageSent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    tools:text="This is a sent message"
+                    android:textColor="@color/background"
+                    android:textSize="16sp"
+                    android:lineSpacingExtra="2dp" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Time Stamp -->
+        <TextView
+            android:id="@+id/tvTimeSent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            tools:text="10:30 AM"
+            android:textColor="@color/chat_time_sent"
+            android:textSize="12sp"
+            android:paddingEnd="8dp" />
+
+    </LinearLayout>
+
+</LinearLayout>
