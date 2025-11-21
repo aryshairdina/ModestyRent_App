@@ -17,6 +17,21 @@
         android:theme="@style/Theme.ModestyRentApp"
         tools:targetApi="31">
         <activity
+            android:name=".activity_inspection"
+            android:exported="false" />
+        <activity
+            android:name=".activity_rating_review"
+            android:exported="false" />
+        <activity
+            android:name=".activtiy_return_rentals"
+            android:exported="false" />
+        <activity
+            android:name=".activity_rentals_details"
+            android:exported="false" />
+        <activity
+            android:name=".activity_live_stream"
+            android:exported="false" />
+        <activity
             android:name=".activity_chat_list"
             android:exported="false" />
         <activity
@@ -51,9 +66,6 @@
             android:exported="false" />
         <activity
             android:name=".activity_listing_details"
-            android:exported="false" />
-        <activity
-            android:name=".activity_chat"
             android:exported="false" />
         <activity
             android:name=".activity_mylisting"

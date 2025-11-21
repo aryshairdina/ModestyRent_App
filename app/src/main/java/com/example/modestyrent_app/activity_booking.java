@@ -232,8 +232,8 @@ public class activity_booking extends AppCompatActivity {
             String displayStatus = "Pending Delivery";
             if (status != null && status.equals("pending_payment")) {
                 displayStatus = "Payment Completed";
-                // Update status in Firebase to "pending"
-                updateBookingStatus("pending");
+                // Update status in Firebase to "confirmed"
+                updateBookingStatus("Confirmed");
             } else if (status != null) {
                 switch (status.toLowerCase()) {
                     case "pending":

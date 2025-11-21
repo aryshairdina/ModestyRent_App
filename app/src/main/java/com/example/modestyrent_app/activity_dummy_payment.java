@@ -127,7 +127,7 @@ public class activity_dummy_payment extends AppCompatActivity {
     private void updateBookingStatus() {
         if (bookingsRef != null && bookingId != null) {
             // Update booking status to "paid" and add payment timestamp
-            bookingsRef.child(bookingId).child("status").setValue("pending");
+            bookingsRef.child(bookingId).child("status").setValue("Confirmed");
             bookingsRef.child(bookingId).child("paymentStatus").setValue("paid");
             bookingsRef.child(bookingId).child("paymentDate").setValue(System.currentTimeMillis());
 

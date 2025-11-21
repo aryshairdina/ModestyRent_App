@@ -287,7 +287,7 @@ public class activity_checkout extends AppCompatActivity {
         booking.setRentalAmount(totalAmount);
         booking.setDepositAmount(depositAmount);
         booking.setTotalAmount(subtotalAmount);
-        booking.setStatus("pending");
+        booking.setStatus("Confirmed");
         booking.setBookingDate(System.currentTimeMillis());
 
         // Save to Firebase and update product status

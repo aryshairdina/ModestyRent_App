@@ -10,7 +10,5 @@
     <color name="chat_bubble_received">#F0F0F0</color>
     <color name="chat_time_sent">#666666</color>
     <color name="chat_time_received">#999999</color>
-    <color name="online_green">#4CAF50</color>
-    <color name="offline_gray">#CCCCCC</color>
 </resources>
 
