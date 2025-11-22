@@ -17,6 +17,18 @@
         android:theme="@style/Theme.ModestyRentApp"
         tools:targetApi="31">
         <activity
+            android:name=".activity_dispute_details"
+            android:exported="false" />
+        <activity
+            android:name=".activity_transaction_details"
+            android:exported="false" />
+        <activity
+            android:name=".activity_leave_review"
+            android:exported="false" />
+        <activity
+            android:name=".activity_arrange_return"
+            android:exported="false" />
+        <activity
             android:name=".activity_inspection"
             android:exported="false" />
         <activity
