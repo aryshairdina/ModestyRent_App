@@ -425,46 +425,61 @@ public class activity_booking_requests extends AppCompatActivity {
             renterName = "Renter";
         }
 
+        // Get owner name for the chat
+        String ownerName = renterNameMap.get(currentUserId);
+        if (ownerName == null) {
+            ownerName = "Owner";
+        }
+
         // Generate chat ID using the same format as your existing chats
         String chatId = generateChatId(currentUserId, renterId);
 
         // Check if chat exists, if not create it
-        checkAndCreateChat(chatId, currentUserId, renterId, productId, renterName, booking);
+        checkAndCreateChat(chatId, currentUserId, renterId, productId, ownerName, renterName, booking);
     }
 
-    private void checkAndCreateChat(String chatId, String currentUserId, String renterId, String productId, String renterName, Booking booking) {
+    private void checkAndCreateChat(String chatId, String currentUserId, String renterId, String productId, String ownerName, String renterName, Booking booking) {
         chatsRef.child(chatId).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (!snapshot.exists()) {
-                    // Create new chat
+                    // Create new chat with consistent structure
                     Map<String, Object> chatData = new HashMap<>();
                     chatData.put("chatId", chatId);
                     chatData.put("user1Id", currentUserId);
                     chatData.put("user2Id", renterId);
-                    chatData.put("user1Name", renterNameMap.get(currentUserId)); // Owner name
+                    chatData.put("user1Name", ownerName);
                     chatData.put("user2Name", renterName);
                     chatData.put("productId", productId);
                     chatData.put("productName", booking.getProductName());
                     chatData.put("lastMessage", "");
                     chatData.put("lastMessageTime", System.currentTimeMillis());
+                    chatData.put("lastMessageSender", "");
                     chatData.put("createdAt", System.currentTimeMillis());
+
+                    // Create participants node
+                    Map<String, Boolean> participants = new HashMap<>();
+                    participants.put(currentUserId, true);
+                    participants.put(renterId, true);
+                    chatData.put("participants", participants);
 
                     chatsRef.child(chatId).setValue(chatData)
                             .addOnSuccessListener(aVoid -> {
+                                Toast.makeText(activity_booking_requests.this, "Chat created successfully", Toast.LENGTH_SHORT).show();
                                 openChatActivity(chatId, renterId, productId, renterName, booking);
                             })
                             .addOnFailureListener(e -> {
-                                Toast.makeText(activity_booking_requests.this, "Failed to create chat", Toast.LENGTH_SHORT).show();
+                                Toast.makeText(activity_booking_requests.this, "Failed to create chat: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                             });
                 } else {
+                    // Chat exists, just open it
                     openChatActivity(chatId, renterId, productId, renterName, booking);
                 }
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                Toast.makeText(activity_booking_requests.this, "Failed to check chat", Toast.LENGTH_SHORT).show();
+                Toast.makeText(activity_booking_requests.this, "Failed to check chat: " + error.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -472,9 +487,9 @@ public class activity_booking_requests extends AppCompatActivity {
     private void openChatActivity(String chatId, String renterId, String productId, String renterName, Booking booking) {
         Intent chatIntent = new Intent(this, activity_chat_owner.class);
         chatIntent.putExtra("chatId", chatId);
-        chatIntent.putExtra("renterId", renterId);
+        chatIntent.putExtra("ownerId", renterId); // In this context, the renter becomes the "owner" for the chat activity
         chatIntent.putExtra("productId", productId);
-        chatIntent.putExtra("renterName", renterName);
+        chatIntent.putExtra("ownerName", renterName);
         chatIntent.putExtra("bookingId", booking.getBookingId());
         this.startActivity(chatIntent);
     }
