@@ -30,7 +30,7 @@ public class activity_booking_requests extends AppCompatActivity {
     private MaterialCardView statusFilterCard, dateFilterCard;
     private TextView statusFilterText, dateFilterText;
 
-    private DatabaseReference bookingsRef, productsRef, usersRef;
+    private DatabaseReference bookingsRef, productsRef, usersRef, chatsRef;
     private FirebaseAuth mAuth;
     private List<Booking> bookingList = new ArrayList<>();
     private List<Booking> filteredList = new ArrayList<>();
@@ -73,6 +73,7 @@ public class activity_booking_requests extends AppCompatActivity {
         bookingsRef = FirebaseDatabase.getInstance().getReference("bookings");
         productsRef = FirebaseDatabase.getInstance().getReference("products");
         usersRef = FirebaseDatabase.getInstance().getReference("users");
+        chatsRef = FirebaseDatabase.getInstance().getReference("chats");
     }
 
     private void setupRecyclerView() {
@@ -80,6 +81,11 @@ public class activity_booking_requests extends AppCompatActivity {
             @Override
             public void onPrepareDelivery(Booking booking) {
                 prepareDelivery(booking);
+            }
+
+            @Override
+            public void onPreparePickup(Booking booking) {
+                preparePickup(booking);
             }
 
             @Override
@@ -156,7 +162,7 @@ public class activity_booking_requests extends AppCompatActivity {
     }
 
     private void showStatusFilterDialog() {
-        String[] statusOptions = {"All", "Confirmed", "PreparingDelivery", "OutForDelivery", "OnRent", "ReturnRequested", "AwaitingInspection", "Completed", "Dispute"};
+        String[] statusOptions = {"All", "Confirmed", "PreparingDelivery", "PreparingPickup", "OutForDelivery", "ReadyForPickup", "OnRent", "ReturnRequested", "AwaitingInspection", "Completed", "Dispute"};
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Filter by Status");
@@ -291,7 +297,8 @@ public class activity_booking_requests extends AppCompatActivity {
                     (booking.getBookingNumber() != null && booking.getBookingNumber().toLowerCase().contains(currentSearchQuery));
 
             boolean matchesStatus = selectedStatus.equals("All") ||
-                    (booking.getStatus() != null && booking.getStatus().equals(selectedStatus));
+                    (booking.getStatus() != null && booking.getStatus().equals(selectedStatus)) ||
+                    (selectedStatus.equals("ReadyForPickup") && "ReadyForPickup".equals(booking.getDeliveryStatus()));
 
             boolean matchesDate = selectedDateFilter.equals("All") ||
                     matchesDateFilter(booking, selectedDateFilter);
@@ -359,6 +366,22 @@ public class activity_booking_requests extends AppCompatActivity {
         bookingsRef.child(booking.getBookingId()).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Delivery preparation started", Toast.LENGTH_SHORT).show();
+                    // Button will disappear automatically due to status change
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, "Failed to update status", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void preparePickup(Booking booking) {
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("status", "PreparingPickup");
+        updates.put("preparationTime", System.currentTimeMillis());
+
+        bookingsRef.child(booking.getBookingId()).updateChildren(updates)
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(this, "Pickup preparation started", Toast.LENGTH_SHORT).show();
+                    // Button will disappear automatically due to status change
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to update status", Toast.LENGTH_SHORT).show();
@@ -373,6 +396,7 @@ public class activity_booking_requests extends AppCompatActivity {
         bookingsRef.child(booking.getBookingId()).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Item ready for pickup", Toast.LENGTH_SHORT).show();
+                    // Button will disappear automatically due to status change
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to update status", Toast.LENGTH_SHORT).show();
@@ -404,6 +428,48 @@ public class activity_booking_requests extends AppCompatActivity {
         // Generate chat ID using the same format as your existing chats
         String chatId = generateChatId(currentUserId, renterId);
 
+        // Check if chat exists, if not create it
+        checkAndCreateChat(chatId, currentUserId, renterId, productId, renterName, booking);
+    }
+
+    private void checkAndCreateChat(String chatId, String currentUserId, String renterId, String productId, String renterName, Booking booking) {
+        chatsRef.child(chatId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (!snapshot.exists()) {
+                    // Create new chat
+                    Map<String, Object> chatData = new HashMap<>();
+                    chatData.put("chatId", chatId);
+                    chatData.put("user1Id", currentUserId);
+                    chatData.put("user2Id", renterId);
+                    chatData.put("user1Name", renterNameMap.get(currentUserId)); // Owner name
+                    chatData.put("user2Name", renterName);
+                    chatData.put("productId", productId);
+                    chatData.put("productName", booking.getProductName());
+                    chatData.put("lastMessage", "");
+                    chatData.put("lastMessageTime", System.currentTimeMillis());
+                    chatData.put("createdAt", System.currentTimeMillis());
+
+                    chatsRef.child(chatId).setValue(chatData)
+                            .addOnSuccessListener(aVoid -> {
+                                openChatActivity(chatId, renterId, productId, renterName, booking);
+                            })
+                            .addOnFailureListener(e -> {
+                                Toast.makeText(activity_booking_requests.this, "Failed to create chat", Toast.LENGTH_SHORT).show();
+                            });
+                } else {
+                    openChatActivity(chatId, renterId, productId, renterName, booking);
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Toast.makeText(activity_booking_requests.this, "Failed to check chat", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void openChatActivity(String chatId, String renterId, String productId, String renterName, Booking booking) {
         Intent chatIntent = new Intent(this, activity_chat_owner.class);
         chatIntent.putExtra("chatId", chatId);
         chatIntent.putExtra("renterId", renterId);
@@ -425,7 +491,7 @@ public class activity_booking_requests extends AppCompatActivity {
         Intent intent = new Intent(this, activity_rentals_details.class);
         intent.putExtra("bookingId", booking.getBookingId());
         intent.putExtra("productId", booking.getProductId());
-        intent.putExtra("renterId", booking.getRenterId());
+        intent.putExtra("ownerId", booking.getOwnerId());
         this.startActivity(intent);
     }
 

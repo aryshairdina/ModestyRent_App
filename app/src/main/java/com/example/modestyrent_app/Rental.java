@@ -14,6 +14,7 @@ public class Rental {
     private double depositAmount;
     private double totalAmount;
     private String deliveryOption;
+    private String deliveryStatus;
     private String status;
     private String paymentStatus;
 
@@ -65,4 +66,10 @@ public class Rental {
 
     public String getPaymentStatus() { return paymentStatus; }
     public void setPaymentStatus(String paymentStatus) { this.paymentStatus = paymentStatus; }
+
+
+    // Add deliveryStatus field and getter
+    public String getDeliveryStatus() {return deliveryStatus;}
+
+    public void setDeliveryStatus(String deliveryStatus) {this.deliveryStatus = deliveryStatus;}
 }

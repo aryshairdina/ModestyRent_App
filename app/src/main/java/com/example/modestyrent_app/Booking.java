@@ -15,6 +15,7 @@ public class Booking {
     private Long deliveryTime;
     private Long returnRequestTime;
     private Long returnTime;
+    private Long inspectionTime;
     private Long completionTime;
     private Boolean depositReturned;
     private Long depositReturnDate;
@@ -112,6 +113,9 @@ public class Booking {
 
     public Long getReturnTime() { return returnTime; }
     public void setReturnTime(Long returnTime) { this.returnTime = returnTime; }
+
+    public Long getInspectionTime() { return inspectionTime; }
+    public void setInspectionTime(Long inspectionTime) { this.inspectionTime = inspectionTime; }
 
     public Long getCompletionTime() { return completionTime; }
     public void setCompletionTime(Long completionTime) { this.completionTime = completionTime; }

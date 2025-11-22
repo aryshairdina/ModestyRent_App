@@ -11,8 +11,10 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
 import com.google.android.material.button.MaterialButton;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.*;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -22,11 +24,13 @@ public class RentalAdapter extends RecyclerView.Adapter<RentalAdapter.RentalView
     private List<Rental> rentalList;
     private Map<String, String> productImageMap;
     private Map<String, String> ownerNameMap;
+    private DatabaseReference chatsRef;
 
     public RentalAdapter(List<Rental> rentalList, Map<String, String> productImageMap, Map<String, String> ownerNameMap) {
         this.rentalList = rentalList;
         this.productImageMap = productImageMap;
         this.ownerNameMap = ownerNameMap;
+        this.chatsRef = FirebaseDatabase.getInstance().getReference("chats");
     }
 
     @NonNull
@@ -126,6 +130,10 @@ public class RentalAdapter extends RecyclerView.Adapter<RentalAdapter.RentalView
             switch (status.toLowerCase()) {
                 case "confirmed": return "Confirmed";
                 case "pending": return "Pending";
+                case "preparingdelivery": return "Preparing Delivery";
+                case "preparingpickup": return "Preparing Pickup";
+                case "outfordelivery": return "Out for Delivery";
+                case "readyforpickup": return "Ready for Pickup";
                 case "onrent": return "On Rent";
                 case "returnrequested": return "Return Requested";
                 case "awaitinginspection": return "Awaiting Inspection";
@@ -137,37 +145,51 @@ public class RentalAdapter extends RecyclerView.Adapter<RentalAdapter.RentalView
 
         private void setupActionButtons(Rental rental) {
             String status = rental.getStatus() != null ? rental.getStatus().toLowerCase() : "unknown";
+            String deliveryStatus = rental.getDeliveryStatus();
+            String deliveryOption = rental.getDeliveryOption();
 
-            switch (status) {
-                case "pending":
-                case "confirmed":
-                    primaryAction.setText("View Booking");
-                    secondaryAction.setText("Message Owner");
-                    break;
-                case "onrent":
-                    primaryAction.setText("Start Return");
-                    secondaryAction.setText("Message Owner");
-                    break;
-                case "returnrequested":
-                    primaryAction.setText("View Return");
-                    secondaryAction.setText("Message Owner");
-                    break;
-                case "awaitinginspection":
-                    primaryAction.setText("View Inspection");
-                    secondaryAction.setText("Add Evidence");
-                    break;
-                case "completed":
-                    primaryAction.setText("Leave Review");
-                    secondaryAction.setText("Message Owner");
-                    break;
-                case "dispute":
-                    primaryAction.setText("View Dispute");
-                    secondaryAction.setText("Message Owner");
-                    break;
-                default:
-                    primaryAction.setText("View Details");
-                    secondaryAction.setText("Message Owner");
-                    break;
+            // Check borrower-specific actions
+            boolean showMarkAsPickedUp = "readyforpickup".equals(deliveryStatus) && "Pickup".equals(deliveryOption);
+            boolean showMarkAsReceived = "outfordelivery".equals(deliveryStatus) && "Delivery".equals(deliveryOption);
+
+            if (showMarkAsPickedUp) {
+                primaryAction.setText("Mark as Picked Up");
+                secondaryAction.setText("Contact Owner");
+            } else if (showMarkAsReceived) {
+                primaryAction.setText("Mark as Received");
+                secondaryAction.setText("Contact Owner");
+            } else {
+                switch (status) {
+                    case "pending":
+                    case "confirmed":
+                        primaryAction.setText("View Booking");
+                        secondaryAction.setText("Contact Owner");
+                        break;
+                    case "onrent":
+                        primaryAction.setText("Start Return");
+                        secondaryAction.setText("Contact Owner");
+                        break;
+                    case "returnrequested":
+                        primaryAction.setText("View Return");
+                        secondaryAction.setText("Contact Owner");
+                        break;
+                    case "awaitinginspection":
+                        primaryAction.setText("Upload Proof");
+                        secondaryAction.setText("Contact Owner");
+                        break;
+                    case "completed":
+                        primaryAction.setText("Leave Review");
+                        secondaryAction.setText("Contact Owner");
+                        break;
+                    case "dispute":
+                        primaryAction.setText("View Dispute");
+                        secondaryAction.setText("Contact Owner");
+                        break;
+                    default:
+                        primaryAction.setText("View Details");
+                        secondaryAction.setText("Contact Owner");
+                        break;
+                }
             }
 
             // Set click listeners for action buttons
@@ -177,7 +199,19 @@ public class RentalAdapter extends RecyclerView.Adapter<RentalAdapter.RentalView
 
         private void handlePrimaryAction(Rental rental) {
             String status = rental.getStatus() != null ? rental.getStatus().toLowerCase() : "unknown";
+            String deliveryStatus = rental.getDeliveryStatus();
+            String deliveryOption = rental.getDeliveryOption();
 
+            // Check for borrower pickup/receive actions
+            if ("readyforpickup".equals(deliveryStatus) && "Pickup".equals(deliveryOption)) {
+                markAsPickedUp(rental);
+                return;
+            } else if ("outfordelivery".equals(deliveryStatus) && "Delivery".equals(deliveryOption)) {
+                markAsReceived(rental);
+                return;
+            }
+
+            // Default actions
             switch (status) {
                 case "pending":
                 case "confirmed":
@@ -239,12 +273,89 @@ public class RentalAdapter extends RecyclerView.Adapter<RentalAdapter.RentalView
                 ownerName = "Product Owner";
             }
 
+            // Check if chat exists, if not create it
+            checkAndCreateChat(chatId, currentUserId, ownerId, productId, ownerName, rental);
+        }
+
+        private void checkAndCreateChat(String chatId, String currentUserId, String ownerId, String productId, String ownerName, Rental rental) {
+            chatsRef.child(chatId).addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    if (!snapshot.exists()) {
+                        // Create new chat
+                        Map<String, Object> chatData = new HashMap<>();
+                        chatData.put("chatId", chatId);
+                        chatData.put("user1Id", currentUserId);
+                        chatData.put("user2Id", ownerId);
+                        chatData.put("user1Name", "You"); // Borrower name
+                        chatData.put("user2Name", ownerName);
+                        chatData.put("productId", productId);
+                        chatData.put("productName", rental.getProductName());
+                        chatData.put("lastMessage", "");
+                        chatData.put("lastMessageTime", System.currentTimeMillis());
+                        chatData.put("createdAt", System.currentTimeMillis());
+
+                        chatsRef.child(chatId).setValue(chatData)
+                                .addOnSuccessListener(aVoid -> {
+                                    openChatActivity(chatId, ownerId, productId, ownerName, rental);
+                                })
+                                .addOnFailureListener(e -> {
+                                    android.widget.Toast.makeText(itemView.getContext(), "Failed to create chat", android.widget.Toast.LENGTH_SHORT).show();
+                                });
+                    } else {
+                        openChatActivity(chatId, ownerId, productId, ownerName, rental);
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    android.widget.Toast.makeText(itemView.getContext(), "Failed to check chat", android.widget.Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        private void openChatActivity(String chatId, String ownerId, String productId, String ownerName, Rental rental) {
             Intent chatIntent = new Intent(itemView.getContext(), activity_chat_owner.class);
             chatIntent.putExtra("chatId", chatId);
             chatIntent.putExtra("ownerId", ownerId);
             chatIntent.putExtra("productId", productId);
             chatIntent.putExtra("ownerName", ownerName);
+            chatIntent.putExtra("bookingId", rental.getBookingId());
             itemView.getContext().startActivity(chatIntent);
+        }
+
+        private void markAsPickedUp(Rental rental) {
+            DatabaseReference bookingsRef = FirebaseDatabase.getInstance().getReference("bookings");
+            Map<String, Object> updates = new HashMap<>();
+            updates.put("status", "OnRent");
+            updates.put("pickupTime", System.currentTimeMillis());
+
+            bookingsRef.child(rental.getBookingId()).updateChildren(updates)
+                    .addOnSuccessListener(aVoid -> {
+                        android.widget.Toast.makeText(itemView.getContext(), "Item marked as picked up", android.widget.Toast.LENGTH_SHORT).show();
+                        // Refresh the data
+                        notifyDataSetChanged();
+                    })
+                    .addOnFailureListener(e -> {
+                        android.widget.Toast.makeText(itemView.getContext(), "Failed to update status", android.widget.Toast.LENGTH_SHORT).show();
+                    });
+        }
+
+        private void markAsReceived(Rental rental) {
+            DatabaseReference bookingsRef = FirebaseDatabase.getInstance().getReference("bookings");
+            Map<String, Object> updates = new HashMap<>();
+            updates.put("status", "OnRent");
+            updates.put("deliveryTime", System.currentTimeMillis());
+
+            bookingsRef.child(rental.getBookingId()).updateChildren(updates)
+                    .addOnSuccessListener(aVoid -> {
+                        android.widget.Toast.makeText(itemView.getContext(), "Item marked as received", android.widget.Toast.LENGTH_SHORT).show();
+                        // Refresh the data
+                        notifyDataSetChanged();
+                    })
+                    .addOnFailureListener(e -> {
+                        android.widget.Toast.makeText(itemView.getContext(), "Failed to update status", android.widget.Toast.LENGTH_SHORT).show();
+                    });
         }
 
         private String generateChatId(String userId1, String userId2) {

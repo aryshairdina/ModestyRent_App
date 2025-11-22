@@ -6,20 +6,38 @@
     android:gravity="center_vertical"
     android:paddingVertical="12dp">
 
-    <!-- Status Icon -->
-    <ImageView
-        android:id="@+id/statusIcon"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:layout_marginEnd="16dp"
-        android:src="@drawable/ic_check" />
+    <!-- Status Indicator and Connector Line Container -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal">
+
+        <!-- Status Icon -->
+        <ImageView
+            android:id="@+id/statusIcon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_check" />
+
+        <!-- Connector Line (for all except last item) -->
+        <View
+            android:id="@+id/connectorLine"
+            android:layout_width="2dp"
+            android:layout_height="24dp"
+            android:layout_marginTop="4dp"
+            android:background="@color/secondary" />
+
+    </LinearLayout>
 
     <!-- Status Text and Date -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
 
         <TextView
             android:id="@+id/statusText"
@@ -31,13 +49,22 @@
             android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/statusDescription"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Booking confirmed and payment received"
+            android:textColor="@color/textcolor"
+            android:textSize="12sp"
+            android:layout_marginTop="2dp" />
+
+        <TextView
             android:id="@+id/statusDate"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="21 Nov 2025, 15:39"
             android:textColor="@color/textcolor"
             android:textSize="12sp"
-            android:layout_marginTop="2dp" />
+            android:layout_marginTop="4dp" />
 
     </LinearLayout>
 
@@ -46,7 +73,6 @@
         android:id="@+id/statusIndicator"
         android:layout_width="12dp"
         android:layout_height="12dp"
-        android:background="@drawable/circle_completed"
-        android:layout_marginStart="8dp" />
+        android:background="@drawable/circle_completed" />
 
 </LinearLayout>

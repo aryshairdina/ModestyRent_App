@@ -39,7 +39,7 @@ public class activity_rentals_details extends AppCompatActivity {
     // Borrower Action Buttons
     private MaterialButton btnPrimaryAction, btnSecondaryAction, btnUploadProof, btnLeaveReview;
 
-    private DatabaseReference bookingsRef, productsRef, usersRef, disputesRef;
+    private DatabaseReference bookingsRef, productsRef, usersRef, disputesRef, chatsRef;
     private FirebaseAuth mAuth;
 
     @Override
@@ -111,6 +111,7 @@ public class activity_rentals_details extends AppCompatActivity {
         productsRef = FirebaseDatabase.getInstance().getReference("products");
         usersRef = FirebaseDatabase.getInstance().getReference("users");
         disputesRef = FirebaseDatabase.getInstance().getReference("disputes");
+        chatsRef = FirebaseDatabase.getInstance().getReference("chats");
     }
 
     private void checkUserRole() {
@@ -180,10 +181,8 @@ public class activity_rentals_details extends AppCompatActivity {
                             loadProductDetails(productId);
                         }
 
-                        // Load owner contact info
-                        if (ownerId != null && !ownerId.isEmpty()) {
-                            loadOwnerInfo(ownerId);
-                        }
+                        // Load delivery information based on delivery option
+                        loadDeliveryInformation(snapshot, ownerId);
 
                     } catch (Exception e) {
                         Toast.makeText(activity_rentals_details.this, "Error loading booking details", Toast.LENGTH_SHORT).show();
@@ -230,31 +229,84 @@ public class activity_rentals_details extends AppCompatActivity {
 
         // Delivery info
         String deliveryOpt = getStringValue(bookingSnapshot, "deliveryOption");
-        String deliveryAddr = getStringValue(bookingSnapshot, "deliveryAddress");
-
         deliveryOptionText.setText(deliveryOpt != null ? deliveryOpt : "Pickup");
-
-        // Show appropriate address based on delivery option
-        if ("Delivery".equals(deliveryOpt)) {
-            deliveryAddress.setText(deliveryAddr != null ? deliveryAddr : "Address not available");
-        } else {
-            // For pickup, show owner's address
-            loadOwnerAddressForPickup();
-        }
 
         // Status timeline - Different flows for Delivery vs Pickup
         String status = getStringValue(bookingSnapshot, "status");
-        String paymentStatus = getStringValue(bookingSnapshot, "paymentStatus");
-        Long bookingDate = getLongValue(bookingSnapshot, "bookingDate");
-        Long paymentDate = getLongValue(bookingSnapshot, "paymentDate");
+        String deliveryStatus = getStringValue(bookingSnapshot, "deliveryStatus");
 
         updateStatusTimeline(bookingSnapshot);
 
         // Update action buttons based on user role and status
         if (isOwner) {
-            updateOwnerActions(status, deliveryOpt);
+            updateOwnerActions(status, deliveryStatus, deliveryOpt);
         } else {
-            updateBorrowerActions(status, deliveryOpt);
+            updateBorrowerActions(status, deliveryStatus, deliveryOpt);
+        }
+    }
+
+    private void loadDeliveryInformation(DataSnapshot bookingSnapshot, String ownerId) {
+        String deliveryOpt = getStringValue(bookingSnapshot, "deliveryOption");
+
+        if ("Delivery".equals(deliveryOpt)) {
+            // For delivery, show borrower's address
+            String deliveryAddressText = getStringValue(bookingSnapshot, "deliveryAddress");
+            deliveryAddress.setText(deliveryAddressText != null ? deliveryAddressText : "Address not available");
+
+            // Load owner contact info
+            loadOwnerContactInfo(ownerId);
+        } else {
+            // For pickup, show owner's address and contact info
+            loadOwnerAddressForPickup(ownerId);
+            loadOwnerContactInfo(ownerId);
+        }
+    }
+
+    private void loadOwnerAddressForPickup(String ownerId) {
+        if (ownerId != null) {
+            usersRef.child(ownerId).child("address").addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    if (snapshot.exists()) {
+                        String ownerAddress = snapshot.getValue(String.class);
+                        deliveryAddress.setText(ownerAddress != null ? ownerAddress : "Address not available");
+                    } else {
+                        deliveryAddress.setText("Address not available");
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    deliveryAddress.setText("Address not available");
+                }
+            });
+        }
+    }
+
+    private void loadOwnerContactInfo(String ownerId) {
+        if (ownerId != null) {
+            usersRef.child(ownerId).addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    if (snapshot.exists()) {
+                        String ownerName = getStringValue(snapshot, "fullName");
+                        String ownerPhone = getStringValue(snapshot, "phone");
+
+                        if (ownerName != null && ownerPhone != null) {
+                            ownerContact.setText("Owner: " + ownerName + " (" + ownerPhone + ")");
+                        } else {
+                            ownerContact.setText("Owner information not available");
+                        }
+                    } else {
+                        ownerContact.setText("Owner information not available");
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    ownerContact.setText("Owner information not available");
+                }
+            });
         }
     }
 
@@ -264,62 +316,79 @@ public class activity_rentals_details extends AppCompatActivity {
         // Get all relevant dates
         Long bookingDate = getLongValue(bookingSnapshot, "bookingDate");
         Long paymentDate = getLongValue(bookingSnapshot, "paymentDate");
-        Long pickupTime = getLongValue(bookingSnapshot, "pickupTime");
-        Long deliveryLeaveTime = getLongValue(bookingSnapshot, "deliveryLeaveTime");
         String status = getStringValue(bookingSnapshot, "status");
         String deliveryStatus = getStringValue(bookingSnapshot, "deliveryStatus");
 
         // Different status flows for Delivery vs Pickup
         if ("Delivery".equals(deliveryOption)) {
-            // DELIVERY FLOW
-            String[] statusFlow = {"Confirmed", "PreparingDelivery", "OutForDelivery", "OnRent", "ReturnRequested", "AwaitingInspection", "Completed"};
+            // DELIVERY FLOW: Confirmed → Prepare Delivery → Out for Delivery → On Rent → Return → Inspection → Completed
+            String[] statusFlow = {"Confirmed", "Preparing Delivery", "Out for Delivery", "On Rent", "Return", "Inspection", "Completed"};
+            String[] statusDescriptions = {
+                    "Booking confirmed and payment received",
+                    "Owner is preparing the item for delivery",
+                    "Item is out for delivery to borrower",
+                    "Item is with borrower during rental period",
+                    "Borrower has returned the item",
+                    "Owner is inspecting the returned item",
+                    "Rental completed successfully"
+            };
             String[] statusIcons = {"ic_check", "ic_preparing", "ic_delivery", "ic_onrent", "ic_return", "ic_inspection", "ic_completed"};
             String[] statusDates = {
                     formatDateTime(paymentDate != null ? paymentDate : bookingDate),
                     formatDateTime(getLongValue(bookingSnapshot, "preparationTime")),
-                    formatDateTime(deliveryLeaveTime),
+                    formatDateTime(getLongValue(bookingSnapshot, "deliveryLeaveTime")),
                     formatDateTime(getLongValue(bookingSnapshot, "deliveryTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "returnRequestTime")),
                     formatDateTime(getLongValue(bookingSnapshot, "returnTime")),
+                    formatDateTime(getLongValue(bookingSnapshot, "inspectionTime")),
                     formatDateTime(getLongValue(bookingSnapshot, "completionTime"))
             };
 
             for (int i = 0; i < statusFlow.length; i++) {
                 String currentStatus = statusFlow[i];
-                View statusItem = createStatusItem(currentStatus, statusIcons[i], statusDates[i],
+                View statusItem = createStatusItem(currentStatus, statusDescriptions[i], statusIcons[i], statusDates[i],
                         status, deliveryStatus, i == statusFlow.length - 1);
                 statusTimeline.addView(statusItem);
             }
         } else {
-            // PICKUP FLOW
-            String[] statusFlow = {"Confirmed", "ReadyForPickup", "OnRent", "ReturnRequested", "AwaitingInspection", "Completed"};
+            // PICKUP FLOW: confirmed -> prepare -> ready for pickup -> onrent -> return -> inspection -> completed
+            String[] statusFlow = {"Confirmed", "Ready for Pickup", "On Rent", "Return", "Inspection", "Completed"};
+            String[] statusDescriptions = {
+                    "Booking confirmed and payment received",
+                    "Item is ready for pickup by borrower",
+                    "Item is with borrower during rental period",
+                    "Borrower has returned the item",
+                    "Owner is inspecting the returned item",
+                    "Rental completed successfully"
+            };
             String[] statusIcons = {"ic_check", "ic_ready_pickup", "ic_onrent", "ic_return", "ic_inspection", "ic_completed"};
             String[] statusDates = {
                     formatDateTime(paymentDate != null ? paymentDate : bookingDate),
                     formatDateTime(getLongValue(bookingSnapshot, "readyForPickupTime")),
-                    formatDateTime(pickupTime),
-                    formatDateTime(getLongValue(bookingSnapshot, "returnRequestTime")),
+                    formatDateTime(getLongValue(bookingSnapshot, "pickupTime")),
                     formatDateTime(getLongValue(bookingSnapshot, "returnTime")),
+                    formatDateTime(getLongValue(bookingSnapshot, "inspectionTime")),
                     formatDateTime(getLongValue(bookingSnapshot, "completionTime"))
             };
 
             for (int i = 0; i < statusFlow.length; i++) {
                 String currentStatus = statusFlow[i];
-                View statusItem = createStatusItem(currentStatus, statusIcons[i], statusDates[i],
+                View statusItem = createStatusItem(currentStatus, statusDescriptions[i], statusIcons[i], statusDates[i],
                         status, deliveryStatus, i == statusFlow.length - 1);
                 statusTimeline.addView(statusItem);
             }
         }
     }
 
-    private View createStatusItem(String statusText, String iconName, String date,
+    private View createStatusItem(String statusText, String description, String iconName, String date,
                                   String currentStatus, String deliveryStatus, boolean isLast) {
         View statusItem = LayoutInflater.from(this).inflate(R.layout.item_status_timeline, statusTimeline, false);
 
         ImageView statusIcon = statusItem.findViewById(R.id.statusIcon);
         TextView statusTextView = statusItem.findViewById(R.id.statusText);
+        TextView statusDescriptionView = statusItem.findViewById(R.id.statusDescription);
         TextView statusDateView = statusItem.findViewById(R.id.statusDate);
         View statusIndicator = statusItem.findViewById(R.id.statusIndicator);
+        View connectorLine = statusItem.findViewById(R.id.connectorLine);
 
         // Set icon based on status
         int iconResource = getResources().getIdentifier(iconName, "drawable", getPackageName());
@@ -329,7 +398,13 @@ public class activity_rentals_details extends AppCompatActivity {
         statusIcon.setImageResource(iconResource);
 
         statusTextView.setText(statusText);
+        statusDescriptionView.setText(description);
         statusDateView.setText(date != null ? date : "Pending");
+
+        // Hide connector line for last item
+        if (isLast) {
+            connectorLine.setVisibility(View.GONE);
+        }
 
         // Determine status state
         boolean isCompleted = isStatusCompleted(statusText, currentStatus, deliveryStatus);
@@ -337,15 +412,21 @@ public class activity_rentals_details extends AppCompatActivity {
 
         if (isCompleted) {
             statusIndicator.setBackgroundResource(R.drawable.circle_completed);
+            statusIcon.setColorFilter(getColor(R.color.primary));
             statusTextView.setTextColor(getColor(R.color.primary));
+            statusDescriptionView.setTextColor(getColor(R.color.textcolor));
             statusDateView.setTextColor(getColor(R.color.textcolor));
         } else if (isCurrent) {
             statusIndicator.setBackgroundResource(R.drawable.circle_current);
+            statusIcon.setColorFilter(getColor(R.color.primary));
             statusTextView.setTextColor(getColor(R.color.primary));
+            statusDescriptionView.setTextColor(getColor(R.color.primary));
             statusDateView.setTextColor(getColor(R.color.primary));
         } else {
             statusIndicator.setBackgroundResource(R.drawable.circle_pending);
+            statusIcon.setColorFilter(getColor(R.color.textcolor));
             statusTextView.setTextColor(getColor(R.color.textcolor));
+            statusDescriptionView.setTextColor(getColor(R.color.textcolor));
             statusDateView.setTextColor(getColor(R.color.textcolor));
             statusDateView.setText("Pending");
         }
@@ -359,26 +440,25 @@ public class activity_rentals_details extends AppCompatActivity {
             switch (timelineStatus) {
                 case "Confirmed":
                     return true; // Always completed since payment is made
-                case "PreparingDelivery":
+                case "Preparing Delivery":
                     return "PreparingDelivery".equals(currentStatus) ||
-                            "OutForDelivery".equals(currentStatus) ||
+                            "OutForDelivery".equals(deliveryStatus) ||
                             "OnRent".equals(currentStatus) ||
                             "Completed".equals(currentStatus);
-                case "OutForDelivery":
+                case "Out for Delivery":
                     return "OutForDelivery".equals(deliveryStatus) ||
                             "OnRent".equals(currentStatus) ||
                             "Completed".equals(currentStatus);
-                case "OnRent":
+                case "On Rent":
                     return "OnRent".equals(currentStatus) ||
                             "ReturnRequested".equals(currentStatus) ||
-                            "Completed".equals(currentStatus);
-                case "ReturnRequested":
-                    return "ReturnRequested".equals(currentStatus) ||
                             "AwaitingInspection".equals(currentStatus) ||
                             "Completed".equals(currentStatus);
-                case "AwaitingInspection":
+                case "Return":
                     return "AwaitingInspection".equals(currentStatus) ||
                             "Completed".equals(currentStatus);
+                case "Inspection":
+                    return "Completed".equals(currentStatus);
                 case "Completed":
                     return "Completed".equals(currentStatus);
                 default:
@@ -389,21 +469,20 @@ public class activity_rentals_details extends AppCompatActivity {
             switch (timelineStatus) {
                 case "Confirmed":
                     return true; // Always completed since payment is made
-                case "ReadyForPickup":
+                case "Ready for Pickup":
                     return "ReadyForPickup".equals(deliveryStatus) ||
                             "OnRent".equals(currentStatus) ||
                             "Completed".equals(currentStatus);
-                case "OnRent":
+                case "On Rent":
                     return "OnRent".equals(currentStatus) ||
                             "ReturnRequested".equals(currentStatus) ||
-                            "Completed".equals(currentStatus);
-                case "ReturnRequested":
-                    return "ReturnRequested".equals(currentStatus) ||
                             "AwaitingInspection".equals(currentStatus) ||
                             "Completed".equals(currentStatus);
-                case "AwaitingInspection":
+                case "Return":
                     return "AwaitingInspection".equals(currentStatus) ||
                             "Completed".equals(currentStatus);
+                case "Inspection":
+                    return "Completed".equals(currentStatus);
                 case "Completed":
                     return "Completed".equals(currentStatus);
                 default:
@@ -414,11 +493,18 @@ public class activity_rentals_details extends AppCompatActivity {
 
     private boolean isCurrentStatus(String timelineStatus, String currentStatus, String deliveryStatus) {
         if ("Delivery".equals(deliveryOption)) {
-            return timelineStatus.equals(currentStatus) ||
-                    (timelineStatus.equals("OutForDelivery") && "OutForDelivery".equals(deliveryStatus));
+            return (timelineStatus.equals("Preparing Delivery") && "PreparingDelivery".equals(currentStatus)) ||
+                    (timelineStatus.equals("Out for Delivery") && "OutForDelivery".equals(deliveryStatus)) ||
+                    (timelineStatus.equals("On Rent") && "OnRent".equals(currentStatus)) ||
+                    (timelineStatus.equals("Return") && "ReturnRequested".equals(currentStatus)) ||
+                    (timelineStatus.equals("Inspection") && "AwaitingInspection".equals(currentStatus)) ||
+                    (timelineStatus.equals("Completed") && "Completed".equals(currentStatus));
         } else {
-            return timelineStatus.equals(currentStatus) ||
-                    (timelineStatus.equals("ReadyForPickup") && "ReadyForPickup".equals(deliveryStatus));
+            return (timelineStatus.equals("Ready for Pickup") && "ReadyForPickup".equals(deliveryStatus)) ||
+                    (timelineStatus.equals("On Rent") && "OnRent".equals(currentStatus)) ||
+                    (timelineStatus.equals("Return") && "ReturnRequested".equals(currentStatus)) ||
+                    (timelineStatus.equals("Inspection") && "AwaitingInspection".equals(currentStatus)) ||
+                    (timelineStatus.equals("Completed") && "Completed".equals(currentStatus));
         }
     }
 
@@ -431,7 +517,7 @@ public class activity_rentals_details extends AppCompatActivity {
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Delivery preparation started", Toast.LENGTH_SHORT).show();
-                    loadBookingDetails(); // Refresh UI
+                    loadBookingDetails(); // Refresh UI to hide button
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to update status", Toast.LENGTH_SHORT).show();
@@ -446,7 +532,7 @@ public class activity_rentals_details extends AppCompatActivity {
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Marked as out for delivery", Toast.LENGTH_SHORT).show();
-                    loadBookingDetails();
+                    loadBookingDetails(); // Refresh UI to hide button
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to update delivery status", Toast.LENGTH_SHORT).show();
@@ -461,7 +547,7 @@ public class activity_rentals_details extends AppCompatActivity {
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Item ready for pickup", Toast.LENGTH_SHORT).show();
-                    loadBookingDetails();
+                    loadBookingDetails(); // Refresh UI to hide button
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to update status", Toast.LENGTH_SHORT).show();
@@ -484,7 +570,7 @@ public class activity_rentals_details extends AppCompatActivity {
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Rental completed successfully", Toast.LENGTH_SHORT).show();
-                    loadBookingDetails();
+                    loadBookingDetails(); // Refresh UI to hide button
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to complete rental", Toast.LENGTH_SHORT).show();
@@ -520,18 +606,19 @@ public class activity_rentals_details extends AppCompatActivity {
     private void refundDeposit() {
         Map<String, Object> updates = new HashMap<>();
         updates.put("depositReturnDate", System.currentTimeMillis());
+        updates.put("depositReturned", true);
 
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Deposit refund processed", Toast.LENGTH_SHORT).show();
-                    loadBookingDetails();
+                    loadBookingDetails(); // Refresh UI to hide button
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to process refund", Toast.LENGTH_SHORT).show();
                 });
     }
 
-    private void updateOwnerActions(String status, String deliveryOption) {
+    private void updateOwnerActions(String status, String deliveryStatus, String deliveryOption) {
         // Reset all buttons
         btnPrepareDelivery.setVisibility(View.GONE);
         btnMarkOutForDelivery.setVisibility(View.GONE);
@@ -560,11 +647,14 @@ public class activity_rentals_details extends AppCompatActivity {
 
                 case "AwaitingInspection":
                     btnInspectReturn.setVisibility(View.VISIBLE);
+                    btnCompleteRental.setVisibility(View.VISIBLE);
                     btnRaiseDispute.setVisibility(View.VISIBLE);
                     break;
 
                 case "Completed":
-                    btnRefundDeposit.setVisibility(View.VISIBLE);
+                    if (!isDepositReturned()) {
+                        btnRefundDeposit.setVisibility(View.VISIBLE);
+                    }
                     break;
             }
         } else {
@@ -580,18 +670,27 @@ public class activity_rentals_details extends AppCompatActivity {
 
                 case "AwaitingInspection":
                     btnInspectReturn.setVisibility(View.VISIBLE);
+                    btnCompleteRental.setVisibility(View.VISIBLE);
                     btnRaiseDispute.setVisibility(View.VISIBLE);
                     break;
 
                 case "Completed":
-                    btnRefundDeposit.setVisibility(View.VISIBLE);
+                    if (!isDepositReturned()) {
+                        btnRefundDeposit.setVisibility(View.VISIBLE);
+                    }
                     break;
             }
         }
     }
 
+    private boolean isDepositReturned() {
+        // Check if deposit is already returned
+        // This would typically check the booking data
+        return false;
+    }
+
     // BORROWER ACTIONS
-    private void updateBorrowerActions(String status, String deliveryOption) {
+    private void updateBorrowerActions(String status, String deliveryStatus, String deliveryOption) {
         btnPrimaryAction.setVisibility(View.GONE);
         btnSecondaryAction.setVisibility(View.GONE);
         btnUploadProof.setVisibility(View.GONE);
@@ -613,6 +712,7 @@ public class activity_rentals_details extends AppCompatActivity {
                     break;
 
                 case "AwaitingInspection":
+                    btnUploadProof.setText("Upload Return Proof");
                     btnUploadProof.setVisibility(View.VISIBLE);
                     break;
 
@@ -626,6 +726,8 @@ public class activity_rentals_details extends AppCompatActivity {
                 case "ReadyForPickup":
                     btnPrimaryAction.setText("Mark as Picked Up");
                     btnPrimaryAction.setVisibility(View.VISIBLE);
+                    // Show pickup instructions
+                    showPickupInstructions();
                     break;
 
                 case "OnRent":
@@ -634,6 +736,7 @@ public class activity_rentals_details extends AppCompatActivity {
                     break;
 
                 case "AwaitingInspection":
+                    btnUploadProof.setText("Upload Return Proof");
                     btnUploadProof.setVisibility(View.VISIBLE);
                     break;
 
@@ -641,6 +744,13 @@ public class activity_rentals_details extends AppCompatActivity {
                     btnLeaveReview.setVisibility(View.VISIBLE);
                     break;
             }
+        }
+    }
+
+    private void showPickupInstructions() {
+        // Show pickup instructions to borrower
+        if (!isOwner) {
+            Toast.makeText(this, "Please bring your ID for verification when picking up the item", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -674,7 +784,7 @@ public class activity_rentals_details extends AppCompatActivity {
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Item marked as picked up", Toast.LENGTH_SHORT).show();
-                    loadBookingDetails();
+                    loadBookingDetails(); // Refresh UI to hide button
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to update status", Toast.LENGTH_SHORT).show();
@@ -689,7 +799,7 @@ public class activity_rentals_details extends AppCompatActivity {
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Item marked as received", Toast.LENGTH_SHORT).show();
-                    loadBookingDetails();
+                    loadBookingDetails(); // Refresh UI to hide button
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to update status", Toast.LENGTH_SHORT).show();
@@ -730,7 +840,7 @@ public class activity_rentals_details extends AppCompatActivity {
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Return process started", Toast.LENGTH_SHORT).show();
-                    loadBookingDetails();
+                    loadBookingDetails(); // Refresh UI to hide button
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to start return process", Toast.LENGTH_SHORT).show();
@@ -738,30 +848,13 @@ public class activity_rentals_details extends AppCompatActivity {
     }
 
     private void uploadReturnProof() {
+        // Implement return proof upload
         Toast.makeText(this, "Upload return proof feature", Toast.LENGTH_SHORT).show();
     }
 
     private void leaveReview() {
+        // Implement review system
         Toast.makeText(this, "Leave review feature", Toast.LENGTH_SHORT).show();
-    }
-
-    private void loadOwnerAddressForPickup() {
-        if (ownerId != null) {
-            usersRef.child(ownerId).child("address").addListenerForSingleValueEvent(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot snapshot) {
-                    if (snapshot.exists()) {
-                        String ownerAddress = snapshot.getValue(String.class);
-                        deliveryAddress.setText(ownerAddress != null ? ownerAddress : "Address not available");
-                    }
-                }
-
-                @Override
-                public void onCancelled(@NonNull DatabaseError error) {
-                    // Silently fail
-                }
-            });
-        }
     }
 
     private void loadProductDetails(String productId) {
@@ -798,25 +891,6 @@ public class activity_rentals_details extends AppCompatActivity {
                 imagesContainer.addView(imageView);
             }
         }
-    }
-
-    private void loadOwnerInfo(String ownerId) {
-        usersRef.child(ownerId).addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (snapshot.exists()) {
-                    String ownerName = getStringValue(snapshot, "fullName");
-                    String ownerPhone = getStringValue(snapshot, "phone");
-
-                    if (ownerName != null && ownerPhone != null) {
-                        ownerContact.setText("Owner: " + ownerName + " (" + ownerPhone + ")");
-                    }
-                }
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {}
-        });
     }
 
     // Helper methods

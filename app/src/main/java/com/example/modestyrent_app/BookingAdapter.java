@@ -1,12 +1,10 @@
 package com.example.modestyrent_app;
 
-import android.content.Intent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
@@ -24,6 +22,7 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.BookingV
 
     public interface BookingActionListener {
         void onPrepareDelivery(Booking booking);
+        void onPreparePickup(Booking booking);
         void onConfirmReadyForPickup(Booking booking);
         void onContactRenter(Booking booking);
         void onInspectReturn(Booking booking);
@@ -115,9 +114,15 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.BookingV
             // Delivery info
             deliveryOption.setText(booking.getDeliveryOption() != null ? booking.getDeliveryOption() : "Pickup");
 
-            // Status chip
+            // Status chip - show delivery status for pickup flow
             String status = booking.getStatus();
-            statusChip.setText(getStatusDisplayText(status));
+            String deliveryStatus = booking.getDeliveryStatus();
+
+            if ("Pickup".equals(booking.getDeliveryOption()) && "ReadyForPickup".equals(deliveryStatus)) {
+                statusChip.setText("Ready for Pickup");
+            } else {
+                statusChip.setText(getStatusDisplayText(status));
+            }
             statusChip.setChipBackgroundColorResource(getStatusColor(status));
 
             // Setup action buttons based on status
@@ -151,8 +156,10 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.BookingV
 
             switch (status.toLowerCase()) {
                 case "confirmed": return "Confirmed";
-                case "preparingdelivery": return "Preparing";
+                case "preparingdelivery": return "Preparing Delivery";
+                case "preparingpickup": return "Preparing Pickup";
                 case "outfordelivery": return "Out for Delivery";
+                case "readyforpickup": return "Ready for Pickup";
                 case "onrent": return "On Rent";
                 case "returnrequested": return "Return Requested";
                 case "awaitinginspection": return "Awaiting Inspection";
@@ -168,7 +175,9 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.BookingV
             switch (status.toLowerCase()) {
                 case "confirmed": return R.color.primary;
                 case "preparingdelivery": return R.color.primary;
+                case "preparingpickup": return R.color.primary;
                 case "outfordelivery": return R.color.primary;
+                case "readyforpickup": return R.color.primary;
                 case "onrent": return R.color.primary;
                 case "returnrequested": return R.color.primary;
                 case "awaitinginspection": return R.color.primary;
@@ -181,121 +190,107 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.BookingV
         private void setupActionButtons(Booking booking) {
             String status = booking.getStatus() != null ? booking.getStatus().toLowerCase() : "unknown";
             String deliveryOption = booking.getDeliveryOption();
+            String deliveryStatus = booking.getDeliveryStatus();
 
             // Reset buttons
             primaryAction.setVisibility(View.VISIBLE);
             secondaryAction.setVisibility(View.VISIBLE);
 
-            switch (status) {
-                case "confirmed":
-                    if ("Delivery".equals(deliveryOption)) {
-                        primaryAction.setText("Prepare Delivery");
-                        primaryAction.setOnClickListener(v -> {
-                            if (actionListener != null) {
-                                actionListener.onPrepareDelivery(booking);
-                            }
-                        });
-                    } else {
-                        primaryAction.setText("Ready for Pickup");
-                        primaryAction.setOnClickListener(v -> {
-                            if (actionListener != null) {
-                                actionListener.onConfirmReadyForPickup(booking);
-                            }
-                        });
+            // Check if button should be shown based on current status
+            boolean showPrepareDelivery = "confirmed".equals(status) && "Delivery".equals(deliveryOption);
+            boolean showPreparePickup = "confirmed".equals(status) && "Pickup".equals(deliveryOption);
+            boolean showReadyForPickup = "preparingpickup".equals(status) && "Pickup".equals(deliveryOption);
+            boolean showMarkOutForDelivery = "preparingdelivery".equals(status) && "Delivery".equals(deliveryOption);
+
+            if (showPrepareDelivery) {
+                primaryAction.setText("Prepare Delivery");
+                primaryAction.setOnClickListener(v -> {
+                    if (actionListener != null) {
+                        actionListener.onPrepareDelivery(booking);
                     }
-                    secondaryAction.setText("Contact");
-                    secondaryAction.setOnClickListener(v -> {
-                        if (actionListener != null) {
-                            actionListener.onContactRenter(booking);
-                        }
-                    });
-                    break;
+                });
+            } else if (showPreparePickup) {
+                primaryAction.setText("Prepare Pickup");
+                primaryAction.setOnClickListener(v -> {
+                    if (actionListener != null) {
+                        actionListener.onPreparePickup(booking);
+                    }
+                });
+            } else if (showReadyForPickup) {
+                primaryAction.setText("Ready for Pickup");
+                primaryAction.setOnClickListener(v -> {
+                    if (actionListener != null) {
+                        actionListener.onConfirmReadyForPickup(booking);
+                    }
+                });
+            } else if (showMarkOutForDelivery) {
+                primaryAction.setText("Mark Out for Delivery");
+                primaryAction.setOnClickListener(v -> {
+                    // This will be handled in the details activity
+                    if (actionListener != null) {
+                        actionListener.onViewBookingDetails(booking);
+                    }
+                });
+            } else {
+                switch (status) {
+                    case "onrent":
+                        primaryAction.setText("Await Return");
+                        primaryAction.setOnClickListener(v -> {
+                            if (actionListener != null) {
+                                actionListener.onAwaitReturn(booking);
+                            }
+                        });
+                        break;
 
-                case "onrent":
-                    primaryAction.setText("Await Return");
-                    primaryAction.setOnClickListener(v -> {
-                        if (actionListener != null) {
-                            actionListener.onAwaitReturn(booking);
-                        }
-                    });
-                    secondaryAction.setText("Contact");
-                    secondaryAction.setOnClickListener(v -> {
-                        if (actionListener != null) {
-                            actionListener.onContactRenter(booking);
-                        }
-                    });
-                    break;
+                    case "returnrequested":
+                        primaryAction.setText("Arrange Return");
+                        primaryAction.setOnClickListener(v -> {
+                            if (actionListener != null) {
+                                actionListener.onArrangeReturn(booking);
+                            }
+                        });
+                        break;
 
-                case "returnrequested":
-                    primaryAction.setText("Arrange Return");
-                    primaryAction.setOnClickListener(v -> {
-                        if (actionListener != null) {
-                            actionListener.onArrangeReturn(booking);
-                        }
-                    });
-                    secondaryAction.setText("Contact");
-                    secondaryAction.setOnClickListener(v -> {
-                        if (actionListener != null) {
-                            actionListener.onContactRenter(booking);
-                        }
-                    });
-                    break;
+                    case "awaitinginspection":
+                        primaryAction.setText("Inspect Return");
+                        primaryAction.setOnClickListener(v -> {
+                            if (actionListener != null) {
+                                actionListener.onInspectReturn(booking);
+                            }
+                        });
+                        break;
 
-                case "awaitinginspection":
-                    primaryAction.setText("Inspect Return");
-                    primaryAction.setOnClickListener(v -> {
-                        if (actionListener != null) {
-                            actionListener.onInspectReturn(booking);
-                        }
-                    });
-                    secondaryAction.setText("Contact");
-                    secondaryAction.setOnClickListener(v -> {
-                        if (actionListener != null) {
-                            actionListener.onContactRenter(booking);
-                        }
-                    });
-                    break;
+                    case "completed":
+                        primaryAction.setText("Leave Review");
+                        primaryAction.setOnClickListener(v -> {
+                            if (actionListener != null) {
+                                actionListener.onLeaveReview(booking);
+                            }
+                        });
+                        break;
 
-                case "completed":
-                    primaryAction.setText("Leave Review");
-                    primaryAction.setOnClickListener(v -> {
-                        if (actionListener != null) {
-                            actionListener.onLeaveReview(booking);
-                        }
-                    });
-                    secondaryAction.setText("View Transaction");
-                    secondaryAction.setOnClickListener(v -> {
-                        if (actionListener != null) {
-                            actionListener.onViewTransaction(booking);
-                        }
-                    });
-                    break;
+                    case "dispute":
+                        primaryAction.setText("View Dispute");
+                        primaryAction.setOnClickListener(v -> {
+                            if (actionListener != null) {
+                                actionListener.onViewDispute(booking);
+                            }
+                        });
+                        break;
 
-                case "dispute":
-                    primaryAction.setText("View Dispute");
-                    primaryAction.setOnClickListener(v -> {
-                        if (actionListener != null) {
-                            actionListener.onViewDispute(booking);
-                        }
-                    });
-                    secondaryAction.setText("Contact");
-                    secondaryAction.setOnClickListener(v -> {
-                        if (actionListener != null) {
-                            actionListener.onContactRenter(booking);
-                        }
-                    });
-                    break;
-
-                default:
-                    primaryAction.setVisibility(View.GONE);
-                    secondaryAction.setText("Contact");
-                    secondaryAction.setOnClickListener(v -> {
-                        if (actionListener != null) {
-                            actionListener.onContactRenter(booking);
-                        }
-                    });
-                    break;
+                    default:
+                        primaryAction.setVisibility(View.GONE);
+                        break;
+                }
             }
+
+            // Secondary action (Contact) is always available
+            secondaryAction.setText("Contact");
+            secondaryAction.setOnClickListener(v -> {
+                if (actionListener != null) {
+                    actionListener.onContactRenter(booking);
+                }
+            });
         }
     }
 }
