@@ -50,9 +50,7 @@ public class activity_mylikes extends AppCompatActivity {
         adapter = new MyLikesAdapter(this, likedProducts);
         recycler.setAdapter(adapter);
 
-
         backIcon.setOnClickListener(v -> finish());
-
 
         mAuth = FirebaseAuth.getInstance();
         FirebaseUser u = mAuth.getCurrentUser();
@@ -149,13 +147,21 @@ public class activity_mylikes extends AppCompatActivity {
                         }
                     }
 
-                    // add product to list (you can filter by status if desired)
-                    likedProducts.add(p);
+                    // Check product status - only add if available
+                    String productStatus = p.getStatus();
+                    if (productStatus == null && ds.child("status").exists()) {
+                        productStatus = ds.child("status").getValue(String.class);
+                    }
+
+                    // Only add product if status is not "not available"
+                    if (productStatus == null || !productStatus.equalsIgnoreCase("unavailable")) {
+                        likedProducts.add(p);
+                    }
+                    // update adapter continuously
+                    adapter.setList(new ArrayList<>(likedProducts));
                 } else {
                     // product missing or removed — skip silently
                 }
-                // update adapter continuously
-                adapter.setList(new ArrayList<>(likedProducts));
             });
         }
     }
