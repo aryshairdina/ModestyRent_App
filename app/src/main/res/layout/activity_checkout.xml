@@ -69,7 +69,7 @@
                 app:cardCornerRadius="16dp"
                 app:cardElevation="4dp"
                 android:layout_marginBottom="16dp"
-                app:cardBackgroundColor="@color/secondary" >
+                app:cardBackgroundColor="@color/background" >
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -288,7 +288,7 @@
                 app:cardCornerRadius="16dp"
                 app:cardElevation="4dp"
                 android:layout_marginBottom="16dp"
-                app:cardBackgroundColor="@color/secondary" >
+                app:cardBackgroundColor="@color/background" >
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -314,7 +314,7 @@
                         app:boxCornerRadiusBottomStart="12dp"
                         app:boxCornerRadiusTopEnd="12dp"
                         app:boxCornerRadiusTopStart="12dp"
-                        app:boxBackgroundColor="@color/secondary"
+                        app:boxBackgroundColor="@color/background"
                         app:boxStrokeColor="@color/primary">
 
                         <com.google.android.material.textfield.TextInputEditText
@@ -322,8 +322,8 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:hint="Full Name"
-                            android:textColor="@color/neutral"
-                            android:textColorHint="@color/neutral"
+                            android:textColor="@color/textcolor"
+                            android:textColorHint="@color/textcolor"
                             android:alpha="0.7" />
 
                     </com.google.android.material.textfield.TextInputLayout>
@@ -337,7 +337,7 @@
                         app:boxCornerRadiusBottomStart="12dp"
                         app:boxCornerRadiusTopEnd="12dp"
                         app:boxCornerRadiusTopStart="12dp"
-                        app:boxBackgroundColor="@color/secondary"
+                        app:boxBackgroundColor="@color/background"
                         app:boxStrokeColor="@color/primary">
 
                         <com.google.android.material.textfield.TextInputEditText
@@ -346,8 +346,8 @@
                             android:layout_height="wrap_content"
                             android:hint="Phone Number"
                             android:inputType="phone"
-                            android:textColor="@color/neutral"
-                            android:textColorHint="@color/neutral"
+                            android:textColor="@color/textcolor"
+                            android:textColorHint="@color/textcolor"
                             android:alpha="0.7" />
 
                     </com.google.android.material.textfield.TextInputLayout>
@@ -361,7 +361,7 @@
                         app:boxCornerRadiusBottomStart="12dp"
                         app:boxCornerRadiusTopEnd="12dp"
                         app:boxCornerRadiusTopStart="12dp"
-                        app:boxBackgroundColor="@color/secondary"
+                        app:boxBackgroundColor="@color/background"
                         app:boxStrokeColor="@color/primary">
 
                         <com.google.android.material.textfield.TextInputEditText
@@ -371,8 +371,8 @@
                             android:hint="Delivery Address"
                             android:gravity="top"
                             android:inputType="textMultiLine"
-                            android:textColor="@color/neutral"
-                            android:textColorHint="@color/neutral"
+                            android:textColor="@color/textcolor"
+                            android:textColorHint="@color/textcolor"
                             android:alpha="0.7" />
 
                     </com.google.android.material.textfield.TextInputLayout>
@@ -403,7 +403,7 @@
                             android:layout_marginEnd="8dp"
                             android:text="Pickup"
                             android:buttonTint="@color/primary"
-                            android:textColor="@color/neutral"
+                            android:textColor="@color/textcolor"
                             android:padding="16dp"
                             android:gravity="center" />
 
@@ -415,7 +415,7 @@
                             android:layout_marginStart="8dp"
                             android:text="Delivery"
                             android:buttonTint="@color/primary"
-                            android:textColor="@color/neutral"
+                            android:textColor="@color/textcolor"
                             android:padding="16dp"
                             android:gravity="center" />
 
@@ -432,7 +432,7 @@
                 app:cardCornerRadius="16dp"
                 app:cardElevation="4dp"
                 android:layout_marginBottom="100dp"
-                app:cardBackgroundColor="@color/secondary" >
+                app:cardBackgroundColor="@color/background" >
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -462,7 +462,7 @@
                             android:layout_height="wrap_content"
                             android:text="QR Code Banking"
                             android:buttonTint="@color/primary"
-                            android:textColor="@color/neutral"
+                            android:textColor="@color/textcolor"
                             android:padding="16dp"
                             android:layout_marginBottom="8dp" />
 
@@ -472,7 +472,7 @@
                             android:layout_height="wrap_content"
                             android:text="Cash on Delivery (COD)"
                             android:buttonTint="@color/primary"
-                            android:textColor="@color/neutral"
+                            android:textColor="@color/textcolor"
                             android:padding="16dp" />
 
                     </RadioGroup>
@@ -493,7 +493,7 @@
         app:cardCornerRadius="0dp"
         app:cardElevation="8dp"
         android:background="@color/background"
-        app:cardBackgroundColor="@color/secondary" >
+        app:cardBackgroundColor="@color/background" >
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -513,7 +513,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Total Amount"
-                    android:textColor="@color/neutral"
+                    android:textColor="@color/textcolor"
                     android:textSize="12sp"
                     android:alpha="0.7" />
 

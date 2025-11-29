@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingVertical="12dp">
+
+    <!-- Timeline indicator -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:paddingEnd="16dp">
+
+        <View
+            android:id="@+id/timelineIndicator"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:background="@drawable/circle_timeline"
+            android:layout_marginTop="4dp" />
+
+        <View
+            android:id="@+id/timelineConnector"
+            android:layout_width="2dp"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="@color/secondary"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="4dp" />
+
+    </LinearLayout>
+
+    <!-- Timeline content -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvTimelineTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Timeline Title"
+            android:textColor="@color/neutral"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tvTimelineDescription"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Timeline description goes here"
+            android:textColor="@color/textcolor"
+            android:textSize="14sp"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tvTimelineDate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Date and time"
+            android:textColor="@color/textcolor"
+            android:textSize="12sp"
+            android:alpha="0.7" />
+
+    </LinearLayout>
+
+</LinearLayout>

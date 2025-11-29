@@ -26,7 +26,7 @@ public class activity_rentals_details extends AppCompatActivity {
     private String deliveryOption = "";
 
     private ImageView backButton;
-    private LinearLayout imagesContainer, statusTimeline;
+    private LinearLayout statusTimeline;
     private LinearLayout ownerActionsLayout, borrowerActionsLayout;
     private TextView productName, bookingNumber, rentalPeriod;
     private TextView rentalAmount, depositAmount, totalAmount;
@@ -70,7 +70,6 @@ public class activity_rentals_details extends AppCompatActivity {
 
     private void initializeViews() {
         backButton = findViewById(R.id.backButton);
-        imagesContainer = findViewById(R.id.imagesContainer);
         statusTimeline = findViewById(R.id.statusTimeline);
         ownerActionsLayout = findViewById(R.id.ownerActionsLayout);
         borrowerActionsLayout = findViewById(R.id.borrowerActionsLayout);
@@ -858,39 +857,18 @@ public class activity_rentals_details extends AppCompatActivity {
     }
 
     private void loadProductDetails(String productId) {
+        // Removed image loading functionality since imagesContainer was removed
+        // You can keep this method if you need to load other product details
+        // or remove it entirely if not needed
         productsRef.child(productId).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (snapshot.exists()) {
-                    DataSnapshot imageUrlsSnapshot = snapshot.child("imageUrls");
-                    if (imageUrlsSnapshot.exists()) {
-                        loadProductImages(imageUrlsSnapshot);
-                    }
-                }
+                // Product details loading without image functionality
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {}
         });
-    }
-
-    private void loadProductImages(DataSnapshot imageUrlsSnapshot) {
-        imagesContainer.removeAllViews();
-
-        for (DataSnapshot imageSnapshot : imageUrlsSnapshot.getChildren()) {
-            String imageUrl = imageSnapshot.getValue(String.class);
-            if (imageUrl != null) {
-                ImageView imageView = new ImageView(this);
-                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(300, 200);
-                params.setMargins(0, 0, 16, 0);
-                imageView.setLayoutParams(params);
-                imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                imageView.setBackgroundResource(R.drawable.rounded_corners);
-
-                Glide.with(this).load(imageUrl).placeholder(R.drawable.ic_image_placeholder).into(imageView);
-                imagesContainer.addView(imageView);
-            }
-        }
     }
 
     // Helper methods

@@ -47,26 +47,12 @@
             </LinearLayout>
         </com.google.android.material.appbar.AppBarLayout>
 
-        <!-- Product Images Section -->
-        <HorizontalScrollView
-            android:layout_width="match_parent"
-            android:layout_height="200dp"
-            android:paddingHorizontal="16dp"
-            android:layout_marginBottom="16dp">
-
-            <LinearLayout
-                android:id="@+id/imagesContainer"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:orientation="horizontal" />
-
-        </HorizontalScrollView>
-
         <!-- Main Content Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp"
             app:cardCornerRadius="16dp"
             app:cardElevation="2dp"
