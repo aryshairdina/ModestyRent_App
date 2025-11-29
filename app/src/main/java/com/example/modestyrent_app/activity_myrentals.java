@@ -172,6 +172,7 @@ public class activity_myrentals extends AppCompatActivity {
         rental.setTotalAmount(getDoubleValue(dataSnapshot, "totalAmount"));
         rental.setDeliveryOption(getStringValue(dataSnapshot, "deliveryOption"));
         rental.setStatus(getStringValue(dataSnapshot, "status"));
+        rental.setDeliveryStatus(getStringValue(dataSnapshot, "deliveryStatus"));
         rental.setPaymentStatus(getStringValue(dataSnapshot, "paymentStatus"));
         return rental;
     }

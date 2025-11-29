@@ -25,12 +25,14 @@ public class RentalAdapter extends RecyclerView.Adapter<RentalAdapter.RentalView
     private Map<String, String> productImageMap;
     private Map<String, String> ownerNameMap;
     private DatabaseReference chatsRef;
+    private DatabaseReference bookingsRef;
 
     public RentalAdapter(List<Rental> rentalList, Map<String, String> productImageMap, Map<String, String> ownerNameMap) {
         this.rentalList = rentalList;
         this.productImageMap = productImageMap;
         this.ownerNameMap = ownerNameMap;
         this.chatsRef = FirebaseDatabase.getInstance().getReference("chats");
+        this.bookingsRef = FirebaseDatabase.getInstance().getReference("bookings");
     }
 
     @NonNull
@@ -92,8 +94,9 @@ public class RentalAdapter extends RecyclerView.Adapter<RentalAdapter.RentalView
             rentalAmount.setText(String.format("RM %.2f", rental.getRentalAmount()));
             depositAmount.setText(String.format("RM %.2f", rental.getDepositAmount()));
 
-            // Set status and delivery indicators
-            statusIndicator.setText(getStatusDisplayText(rental.getStatus()));
+            // Set status and delivery indicators - FIXED: Show proper status
+            String statusText = getStatusDisplayText(rental.getStatus(), rental.getDeliveryStatus(), rental.getDeliveryOption());
+            statusIndicator.setText(statusText);
             deliveryIndicator.setText(rental.getDeliveryOption() != null ? rental.getDeliveryOption() : "Pickup");
 
             // Set action buttons based on status
@@ -124,8 +127,23 @@ public class RentalAdapter extends RecyclerView.Adapter<RentalAdapter.RentalView
             }
         }
 
-        private String getStatusDisplayText(String status) {
+        private String getStatusDisplayText(String status, String deliveryStatus, String deliveryOption) {
             if (status == null) return "Unknown";
+
+            // If status is OnRent, always show "On Rent"
+            if ("OnRent".equals(status)) {
+                return "On Rent";
+            }
+
+            // For pickup flow, show "Ready for Pickup" when deliveryStatus is ReadyForPickup
+            if ("Pickup".equals(deliveryOption) && "ReadyForPickup".equals(deliveryStatus)) {
+                return "Ready for Pickup";
+            }
+
+            // For delivery flow, show "Out for Delivery" when deliveryStatus is OutForDelivery
+            if ("Delivery".equals(deliveryOption) && "OutForDelivery".equals(deliveryStatus)) {
+                return "Out for Delivery";
+            }
 
             switch (status.toLowerCase()) {
                 case "confirmed": return "Confirmed";
@@ -155,39 +173,57 @@ public class RentalAdapter extends RecyclerView.Adapter<RentalAdapter.RentalView
             if (showMarkAsPickedUp) {
                 primaryAction.setText("Mark as Picked Up");
                 secondaryAction.setText("Contact Owner");
+                primaryAction.setVisibility(View.VISIBLE);
+                secondaryAction.setVisibility(View.VISIBLE);
             } else if (showMarkAsReceived) {
                 primaryAction.setText("Mark as Received");
                 secondaryAction.setText("Contact Owner");
+                primaryAction.setVisibility(View.VISIBLE);
+                secondaryAction.setVisibility(View.VISIBLE);
             } else {
                 switch (status) {
                     case "pending":
                     case "confirmed":
                         primaryAction.setText("View Booking");
                         secondaryAction.setText("Contact Owner");
+                        primaryAction.setVisibility(View.VISIBLE);
+                        secondaryAction.setVisibility(View.VISIBLE);
                         break;
                     case "onrent":
                         primaryAction.setText("Start Return");
                         secondaryAction.setText("Contact Owner");
+                        primaryAction.setVisibility(View.VISIBLE);
+                        secondaryAction.setVisibility(View.VISIBLE);
                         break;
                     case "returnrequested":
                         primaryAction.setText("View Return");
                         secondaryAction.setText("Contact Owner");
+                        primaryAction.setVisibility(View.VISIBLE);
+                        secondaryAction.setVisibility(View.VISIBLE);
                         break;
                     case "awaitinginspection":
                         primaryAction.setText("Upload Proof");
                         secondaryAction.setText("Contact Owner");
+                        primaryAction.setVisibility(View.VISIBLE);
+                        secondaryAction.setVisibility(View.VISIBLE);
                         break;
                     case "completed":
                         primaryAction.setText("Leave Review");
                         secondaryAction.setText("Contact Owner");
+                        primaryAction.setVisibility(View.VISIBLE);
+                        secondaryAction.setVisibility(View.VISIBLE);
                         break;
                     case "dispute":
                         primaryAction.setText("View Dispute");
                         secondaryAction.setText("Contact Owner");
+                        primaryAction.setVisibility(View.VISIBLE);
+                        secondaryAction.setVisibility(View.VISIBLE);
                         break;
                     default:
                         primaryAction.setText("View Details");
                         secondaryAction.setText("Contact Owner");
+                        primaryAction.setVisibility(View.VISIBLE);
+                        secondaryAction.setVisibility(View.VISIBLE);
                         break;
                 }
             }
@@ -211,34 +247,12 @@ public class RentalAdapter extends RecyclerView.Adapter<RentalAdapter.RentalView
                 return;
             }
 
-            // Default actions
-            switch (status) {
-                case "pending":
-                case "confirmed":
-                    // Open booking details
-                    Intent intent = new Intent(itemView.getContext(), activity_rentals_details.class);
-                    intent.putExtra("bookingId", rental.getBookingId());
-                    intent.putExtra("productId", rental.getProductId());
-                    intent.putExtra("ownerId", rental.getOwnerId());
-                    itemView.getContext().startActivity(intent);
-                    break;
-                case "onrent":
-                    // Start return process
-                    startReturnProcess(rental);
-                    break;
-                case "completed":
-                    // Leave review
-                    leaveReview(rental);
-                    break;
-                default:
-                    // Default action - view booking details
-                    Intent defaultIntent = new Intent(itemView.getContext(), activity_rentals_details.class);
-                    defaultIntent.putExtra("bookingId", rental.getBookingId());
-                    defaultIntent.putExtra("productId", rental.getProductId());
-                    defaultIntent.putExtra("ownerId", rental.getOwnerId());
-                    itemView.getContext().startActivity(defaultIntent);
-                    break;
-            }
+            // Default actions - Open borrower rental details
+            Intent intent = new Intent(itemView.getContext(), activity_rentals_details_borrower.class);
+            intent.putExtra("bookingId", rental.getBookingId());
+            intent.putExtra("productId", rental.getProductId());
+            intent.putExtra("ownerId", rental.getOwnerId());
+            itemView.getContext().startActivity(intent);
         }
 
         private void handleSecondaryAction(Rental rental) {
@@ -325,15 +339,15 @@ public class RentalAdapter extends RecyclerView.Adapter<RentalAdapter.RentalView
         }
 
         private void markAsPickedUp(Rental rental) {
-            DatabaseReference bookingsRef = FirebaseDatabase.getInstance().getReference("bookings");
             Map<String, Object> updates = new HashMap<>();
             updates.put("status", "OnRent");
+            updates.put("deliveryStatus", ""); // Clear delivery status when item is picked up
             updates.put("pickupTime", System.currentTimeMillis());
 
             bookingsRef.child(rental.getBookingId()).updateChildren(updates)
                     .addOnSuccessListener(aVoid -> {
                         android.widget.Toast.makeText(itemView.getContext(), "Item marked as picked up", android.widget.Toast.LENGTH_SHORT).show();
-                        // Refresh the data
+                        // Refresh the data by reloading
                         notifyDataSetChanged();
                     })
                     .addOnFailureListener(e -> {
@@ -342,15 +356,15 @@ public class RentalAdapter extends RecyclerView.Adapter<RentalAdapter.RentalView
         }
 
         private void markAsReceived(Rental rental) {
-            DatabaseReference bookingsRef = FirebaseDatabase.getInstance().getReference("bookings");
             Map<String, Object> updates = new HashMap<>();
             updates.put("status", "OnRent");
+            updates.put("deliveryStatus", ""); // Clear delivery status when item is received
             updates.put("deliveryTime", System.currentTimeMillis());
 
             bookingsRef.child(rental.getBookingId()).updateChildren(updates)
                     .addOnSuccessListener(aVoid -> {
                         android.widget.Toast.makeText(itemView.getContext(), "Item marked as received", android.widget.Toast.LENGTH_SHORT).show();
-                        // Refresh the data
+                        // Refresh the data by reloading
                         notifyDataSetChanged();
                     })
                     .addOnFailureListener(e -> {
@@ -370,18 +384,6 @@ public class RentalAdapter extends RecyclerView.Adapter<RentalAdapter.RentalView
             } else {
                 return userId2 + "_" + userId1;
             }
-        }
-
-        private void startReturnProcess(Rental rental) {
-            // Implement return process
-            android.widget.Toast.makeText(itemView.getContext(), "Return process started", android.widget.Toast.LENGTH_SHORT).show();
-            // This would typically open a return activity
-        }
-
-        private void leaveReview(Rental rental) {
-            // Implement review system
-            android.widget.Toast.makeText(itemView.getContext(), "Leave review feature", android.widget.Toast.LENGTH_SHORT).show();
-            // This would typically open a review activity
         }
     }
 }

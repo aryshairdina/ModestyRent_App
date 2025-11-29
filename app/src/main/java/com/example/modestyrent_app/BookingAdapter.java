@@ -23,15 +23,8 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.BookingV
     public interface BookingActionListener {
         void onPrepareDelivery(Booking booking);
         void onPreparePickup(Booking booking);
-        void onConfirmReadyForPickup(Booking booking);
         void onContactRenter(Booking booking);
-        void onInspectReturn(Booking booking);
         void onViewBookingDetails(Booking booking);
-        void onAwaitReturn(Booking booking);
-        void onArrangeReturn(Booking booking);
-        void onLeaveReview(Booking booking);
-        void onViewTransaction(Booking booking);
-        void onViewDispute(Booking booking);
     }
 
     public BookingAdapter(List<Booking> bookingList, Map<String, String> productImageMap,
@@ -114,18 +107,16 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.BookingV
             // Delivery info
             deliveryOption.setText(booking.getDeliveryOption() != null ? booking.getDeliveryOption() : "Pickup");
 
-            // Status chip - show delivery status for pickup flow
+            // Status chip - Show proper status based on both status and deliveryStatus
             String status = booking.getStatus();
             String deliveryStatus = booking.getDeliveryStatus();
+            String deliveryOption = booking.getDeliveryOption();
 
-            if ("Pickup".equals(booking.getDeliveryOption()) && "ReadyForPickup".equals(deliveryStatus)) {
-                statusChip.setText("Ready for Pickup");
-            } else {
-                statusChip.setText(getStatusDisplayText(status));
-            }
-            statusChip.setChipBackgroundColorResource(getStatusColor(status));
+            String displayStatus = getStatusDisplayText(status, deliveryStatus, deliveryOption);
+            statusChip.setText(displayStatus);
+            statusChip.setChipBackgroundColorResource(getStatusColor(status, deliveryStatus));
 
-            // Setup action buttons based on status
+            // Setup action buttons - ONLY show Prepare Delivery/Pickup for confirmed status
             setupActionButtons(booking);
 
             // Card click - open booking details
@@ -151,9 +142,33 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.BookingV
             }
         }
 
-        private String getStatusDisplayText(String status) {
+        private String getStatusDisplayText(String status, String deliveryStatus, String deliveryOption) {
             if (status == null) return "Unknown";
 
+            // If status is OnRent, always show "On Rent"
+            if ("OnRent".equals(status)) {
+                return "On Rent";
+            }
+
+            // For delivery flow
+            if ("Delivery".equals(deliveryOption)) {
+                if ("OutForDelivery".equals(deliveryStatus)) {
+                    return "Out for Delivery";
+                } else if ("PreparingDelivery".equals(status)) {
+                    return "Preparing Delivery";
+                }
+            }
+
+            // For pickup flow
+            if ("Pickup".equals(deliveryOption)) {
+                if ("ReadyForPickup".equals(deliveryStatus)) {
+                    return "Ready for Pickup";
+                } else if ("PreparingPickup".equals(status)) {
+                    return "Preparing Pickup";
+                }
+            }
+
+            // Fallback to status-based display
             switch (status.toLowerCase()) {
                 case "confirmed": return "Confirmed";
                 case "preparingdelivery": return "Preparing Delivery";
@@ -169,41 +184,50 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.BookingV
             }
         }
 
-        private int getStatusColor(String status) {
-            if (status == null) return R.color.secondary;
-
-            switch (status.toLowerCase()) {
-                case "confirmed": return R.color.primary;
-                case "preparingdelivery": return R.color.primary;
-                case "preparingpickup": return R.color.primary;
-                case "outfordelivery": return R.color.primary;
-                case "readyforpickup": return R.color.primary;
-                case "onrent": return R.color.primary;
-                case "returnrequested": return R.color.primary;
-                case "awaitinginspection": return R.color.primary;
-                case "completed": return R.color.secondary;
-                case "dispute": return R.color.primary;
-                default: return R.color.secondary;
+        private int getStatusColor(String status, String deliveryStatus) {
+            // Use primary color for active states, secondary for completed
+            if ("Completed".equals(status)) {
+                return R.color.secondary;
             }
+
+            // For OnRent status
+            if ("OnRent".equals(status)) {
+                return R.color.primary;
+            }
+
+            // For delivery flow active states
+            if ("OutForDelivery".equals(deliveryStatus) || "PreparingDelivery".equals(status)) {
+                return R.color.primary;
+            }
+
+            // For pickup flow active states
+            if ("ReadyForPickup".equals(deliveryStatus) || "PreparingPickup".equals(status)) {
+                return R.color.primary;
+            }
+
+            // Default to primary for active statuses
+            if (status != null && !"completed".equals(status.toLowerCase())) {
+                return R.color.primary;
+            }
+
+            return R.color.secondary;
         }
 
         private void setupActionButtons(Booking booking) {
             String status = booking.getStatus() != null ? booking.getStatus().toLowerCase() : "unknown";
             String deliveryOption = booking.getDeliveryOption();
-            String deliveryStatus = booking.getDeliveryStatus();
 
             // Reset buttons
-            primaryAction.setVisibility(View.VISIBLE);
-            secondaryAction.setVisibility(View.VISIBLE);
+            primaryAction.setVisibility(View.GONE);
+            secondaryAction.setVisibility(View.VISIBLE); // Contact button always visible
 
-            // Check if button should be shown based on current status
+            // ONLY show Prepare Delivery/Pickup buttons for confirmed status
             boolean showPrepareDelivery = "confirmed".equals(status) && "Delivery".equals(deliveryOption);
             boolean showPreparePickup = "confirmed".equals(status) && "Pickup".equals(deliveryOption);
-            boolean showReadyForPickup = "preparingpickup".equals(status) && "Pickup".equals(deliveryOption);
-            boolean showMarkOutForDelivery = "preparingdelivery".equals(status) && "Delivery".equals(deliveryOption);
 
             if (showPrepareDelivery) {
                 primaryAction.setText("Prepare Delivery");
+                primaryAction.setVisibility(View.VISIBLE);
                 primaryAction.setOnClickListener(v -> {
                     if (actionListener != null) {
                         actionListener.onPrepareDelivery(booking);
@@ -211,77 +235,15 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.BookingV
                 });
             } else if (showPreparePickup) {
                 primaryAction.setText("Prepare Pickup");
+                primaryAction.setVisibility(View.VISIBLE);
                 primaryAction.setOnClickListener(v -> {
                     if (actionListener != null) {
                         actionListener.onPreparePickup(booking);
                     }
                 });
-            } else if (showReadyForPickup) {
-                primaryAction.setText("Ready for Pickup");
-                primaryAction.setOnClickListener(v -> {
-                    if (actionListener != null) {
-                        actionListener.onConfirmReadyForPickup(booking);
-                    }
-                });
-            } else if (showMarkOutForDelivery) {
-                primaryAction.setText("Mark Out for Delivery");
-                primaryAction.setOnClickListener(v -> {
-                    // This will be handled in the details activity
-                    if (actionListener != null) {
-                        actionListener.onViewBookingDetails(booking);
-                    }
-                });
             } else {
-                switch (status) {
-                    case "onrent":
-                        primaryAction.setText("Await Return");
-                        primaryAction.setOnClickListener(v -> {
-                            if (actionListener != null) {
-                                actionListener.onAwaitReturn(booking);
-                            }
-                        });
-                        break;
-
-                    case "returnrequested":
-                        primaryAction.setText("Arrange Return");
-                        primaryAction.setOnClickListener(v -> {
-                            if (actionListener != null) {
-                                actionListener.onArrangeReturn(booking);
-                            }
-                        });
-                        break;
-
-                    case "awaitinginspection":
-                        primaryAction.setText("Inspect Return");
-                        primaryAction.setOnClickListener(v -> {
-                            if (actionListener != null) {
-                                actionListener.onInspectReturn(booking);
-                            }
-                        });
-                        break;
-
-                    case "completed":
-                        primaryAction.setText("Leave Review");
-                        primaryAction.setOnClickListener(v -> {
-                            if (actionListener != null) {
-                                actionListener.onLeaveReview(booking);
-                            }
-                        });
-                        break;
-
-                    case "dispute":
-                        primaryAction.setText("View Dispute");
-                        primaryAction.setOnClickListener(v -> {
-                            if (actionListener != null) {
-                                actionListener.onViewDispute(booking);
-                            }
-                        });
-                        break;
-
-                    default:
-                        primaryAction.setVisibility(View.GONE);
-                        break;
-                }
+                // For all other statuses, NO primary action button
+                primaryAction.setVisibility(View.GONE);
             }
 
             // Secondary action (Contact) is always available

@@ -89,18 +89,8 @@ public class activity_booking_requests extends AppCompatActivity {
             }
 
             @Override
-            public void onConfirmReadyForPickup(Booking booking) {
-                confirmReadyForPickup(booking);
-            }
-
-            @Override
             public void onContactRenter(Booking booking) {
                 contactRenter(booking);
-            }
-
-            @Override
-            public void onInspectReturn(Booking booking) {
-                inspectReturn(booking);
             }
 
             @Override
@@ -108,31 +98,7 @@ public class activity_booking_requests extends AppCompatActivity {
                 viewBookingDetails(booking);
             }
 
-            @Override
-            public void onAwaitReturn(Booking booking) {
-                // No action needed, just show message
-                Toast.makeText(activity_booking_requests.this, "Awaiting return of " + booking.getProductName(), Toast.LENGTH_SHORT).show();
-            }
-
-            @Override
-            public void onArrangeReturn(Booking booking) {
-                arrangeReturn(booking);
-            }
-
-            @Override
-            public void onLeaveReview(Booking booking) {
-                leaveReview(booking);
-            }
-
-            @Override
-            public void onViewTransaction(Booking booking) {
-                viewTransaction(booking);
-            }
-
-            @Override
-            public void onViewDispute(Booking booking) {
-                viewDispute(booking);
-            }
+            // REMOVED: All other action methods like onInspectReturn, onAwaitReturn, etc.
         });
         bookingsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         bookingsRecyclerView.setAdapter(bookingAdapter);
@@ -388,21 +354,6 @@ public class activity_booking_requests extends AppCompatActivity {
                 });
     }
 
-    private void confirmReadyForPickup(Booking booking) {
-        Map<String, Object> updates = new HashMap<>();
-        updates.put("deliveryStatus", "ReadyForPickup");
-        updates.put("readyForPickupTime", System.currentTimeMillis());
-
-        bookingsRef.child(booking.getBookingId()).updateChildren(updates)
-                .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(this, "Item ready for pickup", Toast.LENGTH_SHORT).show();
-                    // Button will disappear automatically due to status change
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Failed to update status", Toast.LENGTH_SHORT).show();
-                });
-    }
-
     private void contactRenter(Booking booking) {
         String currentUserId = mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : null;
 
@@ -487,7 +438,7 @@ public class activity_booking_requests extends AppCompatActivity {
     private void openChatActivity(String chatId, String renterId, String productId, String renterName, Booking booking) {
         Intent chatIntent = new Intent(this, activity_chat_owner.class);
         chatIntent.putExtra("chatId", chatId);
-        chatIntent.putExtra("ownerId", renterId); // In this context, the renter becomes the "owner" for the chat activity
+        chatIntent.putExtra("ownerId", renterId);
         chatIntent.putExtra("productId", productId);
         chatIntent.putExtra("ownerName", renterName);
         chatIntent.putExtra("bookingId", booking.getBookingId());
@@ -503,7 +454,7 @@ public class activity_booking_requests extends AppCompatActivity {
     }
 
     private void viewBookingDetails(Booking booking) {
-        Intent intent = new Intent(this, activity_rentals_details.class);
+        Intent intent = new Intent(this, activity_rentals_details_owner.class);
         intent.putExtra("bookingId", booking.getBookingId());
         intent.putExtra("productId", booking.getProductId());
         intent.putExtra("ownerId", booking.getOwnerId());
@@ -511,11 +462,8 @@ public class activity_booking_requests extends AppCompatActivity {
     }
 
     private void arrangeReturn(Booking booking) {
-        Intent intent = new Intent(this, activity_arrange_return.class);
-        intent.putExtra("bookingId", booking.getBookingId());
-        intent.putExtra("productId", booking.getProductId());
-        intent.putExtra("renterId", booking.getRenterId());
-        this.startActivity(intent);
+        // This is for owner to arrange return when borrower requests pickup
+        Toast.makeText(this, "Arrange return pickup for " + booking.getProductName(), Toast.LENGTH_SHORT).show();
     }
 
     private void leaveReview(Booking booking) {
