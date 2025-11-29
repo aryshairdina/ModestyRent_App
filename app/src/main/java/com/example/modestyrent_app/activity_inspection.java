@@ -2,15 +2,15 @@ package com.example.modestyrent_app;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
 import android.widget.*;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.slider.Slider;
-import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.*;
+
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -23,13 +23,16 @@ public class activity_inspection extends AppCompatActivity {
     private RadioGroup rgItemCondition;
     private RadioButton rbExcellent, rbGood, rbFair, rbPoor;
     private EditText etDamageNotes;
-    private SwitchMaterial switchCleaningRequired;
     private Slider sliderRepairCost;
     private TextView tvRepairCost, tvOriginalDeposit, tvDeductions, tvRefundAmount, tvFinalRefund;
     private MaterialButton btnCompleteInspection;
 
     private DatabaseReference bookingsRef, usersRef, productsRef;
     private FirebaseAuth mAuth;
+
+    // New fields
+    private double originalDepositAmount = 50.0;   // default, will be overridden by DB
+    private boolean needsRefundPayment = false;    // true if refundAmount > 0
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,7 +73,6 @@ public class activity_inspection extends AppCompatActivity {
         rbPoor = findViewById(R.id.rbPoor);
 
         etDamageNotes = findViewById(R.id.etDamageNotes);
-        switchCleaningRequired = findViewById(R.id.switchCleaningRequired);
         sliderRepairCost = findViewById(R.id.sliderRepairCost);
         tvRepairCost = findViewById(R.id.tvRepairCost);
         tvOriginalDeposit = findViewById(R.id.tvOriginalDeposit);
@@ -95,18 +97,34 @@ public class activity_inspection extends AppCompatActivity {
             calculateRefundAmount();
         });
 
-        // Item condition radio group listener
-        rgItemCondition.setOnCheckedChangeListener((group, checkedId) -> {
-            calculateRefundAmount();
-        });
+        // Ensure ONLY ONE condition radio is selected at a time
+        CompoundButton.OnCheckedChangeListener conditionListener = (buttonView, isChecked) -> {
+            if (!isChecked) return;
 
-        // Cleaning required switch listener
-        switchCleaningRequired.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            calculateRefundAmount();
-        });
+            if (buttonView != rbExcellent) rbExcellent.setChecked(false);
+            if (buttonView != rbGood) rbGood.setChecked(false);
+            if (buttonView != rbFair) rbFair.setChecked(false);
+            if (buttonView != rbPoor) rbPoor.setChecked(false);
 
-        // Complete inspection button
-        btnCompleteInspection.setOnClickListener(v -> completeInspection());
+            rgItemCondition.check(buttonView.getId());
+        };
+
+        rbExcellent.setOnCheckedChangeListener(conditionListener);
+        rbGood.setOnCheckedChangeListener(conditionListener);
+        rbFair.setOnCheckedChangeListener(conditionListener);
+        rbPoor.setOnCheckedChangeListener(conditionListener);
+
+        // Main action button
+        btnCompleteInspection.setOnClickListener(v -> {
+            if (!validateItemCondition()) return;
+
+            // Decide: pay refund OR complete rental directly
+            if (needsRefundPayment) {
+                openRefundPaymentPage();
+            } else {
+                completeInspectionWithoutPayment();
+            }
+        });
     }
 
     private void loadBookingDetails() {
@@ -156,11 +174,18 @@ public class activity_inspection extends AppCompatActivity {
             tvReturnMethod.setText("Not specified");
         }
 
-        // Set original deposit
+        // Deposit from booking
         Double depositAmount = getDoubleValue(bookingSnapshot, "depositAmount");
         if (depositAmount != null) {
+            originalDepositAmount = depositAmount;
             tvOriginalDeposit.setText(String.format("RM %.2f", depositAmount));
+        } else {
+            originalDepositAmount = 50.0;
+            tvOriginalDeposit.setText("RM 50.00");
         }
+
+        // Initial calculation
+        calculateRefundAmount();
     }
 
     private void loadBorrowerInfo() {
@@ -178,69 +203,66 @@ public class activity_inspection extends AppCompatActivity {
 
                 @Override
                 public void onCancelled(@NonNull DatabaseError error) {
-                    // Handle error
+                    // ignore
                 }
             });
         }
     }
 
     private void calculateRefundAmount() {
-        // Get original deposit amount
-        double originalDeposit = 50.00; // Default, should come from booking data
-
-        // Calculate deductions
+        // Only use repair cost as deduction
         double repairCost = (double) sliderRepairCost.getValue();
-        double cleaningCost = switchCleaningRequired.isChecked() ? 10.00 : 0.00;
 
-        // Additional deductions based on item condition
-        int checkedId = rgItemCondition.getCheckedRadioButtonId();
-        double conditionDeduction = 0.00;
+        double totalDeductions = repairCost;
+        double refundAmount = Math.max(0, originalDepositAmount - totalDeductions);
 
-        if (checkedId == R.id.rbPoor) {
-            conditionDeduction = 20.00;
-        } else if (checkedId == R.id.rbFair) {
-            conditionDeduction = 10.00;
-        }
-
-        double totalDeductions = repairCost + cleaningCost + conditionDeduction;
-        double refundAmount = Math.max(0, originalDeposit - totalDeductions);
-
-        // Update UI
         tvDeductions.setText(String.format("RM %.2f", totalDeductions));
         tvRefundAmount.setText(String.format("RM %.2f", refundAmount));
         tvFinalRefund.setText(String.format("RM %.2f", refundAmount));
+
+        // Decide which action is needed
+        if (refundAmount > 0) {
+            needsRefundPayment = true;
+            btnCompleteInspection.setText("Pay Refund");
+        } else {
+            needsRefundPayment = false;
+            btnCompleteInspection.setText("Complete Rental");
+        }
     }
 
-    private void completeInspection() {
+    private boolean validateItemCondition() {
         int checkedId = rgItemCondition.getCheckedRadioButtonId();
-
         if (checkedId == -1) {
             Toast.makeText(this, "Please select item condition", Toast.LENGTH_SHORT).show();
-            return;
+            return false;
         }
+        return true;
+    }
 
-        String itemCondition = "";
-        if (checkedId == R.id.rbExcellent) {
-            itemCondition = "Excellent";
-        } else if (checkedId == R.id.rbGood) {
-            itemCondition = "Good";
-        } else if (checkedId == R.id.rbFair) {
-            itemCondition = "Fair";
-        } else if (checkedId == R.id.rbPoor) {
-            itemCondition = "Poor";
-        }
+    private String getSelectedCondition() {
+        int checkedId = rgItemCondition.getCheckedRadioButtonId();
+        if (checkedId == R.id.rbExcellent) return "Excellent";
+        if (checkedId == R.id.rbGood) return "Good";
+        if (checkedId == R.id.rbFair) return "Fair";
+        if (checkedId == R.id.rbPoor) return "Poor";
+        return "";
+    }
 
+    /**
+     * Case 1: No refund (refundAmount == 0) – directly complete rental.
+     */
+    private void completeInspectionWithoutPayment() {
+        String itemCondition = getSelectedCondition();
         String damageNotes = etDamageNotes.getText().toString().trim();
-        boolean cleaningRequired = switchCleaningRequired.isChecked();
         double repairCost = (double) sliderRepairCost.getValue();
-        double refundAmount = Double.parseDouble(tvFinalRefund.getText().toString().replace("RM ", ""));
+
+        double refundAmount = 0.0; // by definition in this case
 
         Map<String, Object> updates = new HashMap<>();
         updates.put("status", "Completed");
         updates.put("inspectionTime", System.currentTimeMillis());
         updates.put("itemCondition", itemCondition);
         updates.put("damageNotes", damageNotes);
-        updates.put("cleaningRequired", cleaningRequired);
         updates.put("repairCost", repairCost);
         updates.put("refundAmount", refundAmount);
         updates.put("depositReturned", true);
@@ -248,9 +270,8 @@ public class activity_inspection extends AppCompatActivity {
 
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(this, "Inspection completed successfully", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Rental completed successfully", Toast.LENGTH_SHORT).show();
 
-                    // Navigate back to rental details
                     Intent intent = new Intent(this, activity_rentals_details_owner.class);
                     intent.putExtra("bookingId", bookingId);
                     intent.putExtra("productId", productId);
@@ -259,8 +280,34 @@ public class activity_inspection extends AppCompatActivity {
                     finish();
                 })
                 .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Failed to complete inspection", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Failed to complete rental", Toast.LENGTH_SHORT).show();
                 });
+    }
+
+    /**
+     * Case 2: Refund > 0 – go to dummy payment page.
+     */
+    private void openRefundPaymentPage() {
+        String itemCondition = getSelectedCondition();
+        String damageNotes = etDamageNotes.getText().toString().trim();
+        double repairCost = (double) sliderRepairCost.getValue();
+
+        // Parse refund amount from UI
+        String refundText = tvFinalRefund.getText().toString().replace("RM ", "").trim();
+        double refundAmount = 0.0;
+        try {
+            refundAmount = Double.parseDouble(refundText);
+        } catch (NumberFormatException ignored) {}
+
+        Intent intent = new Intent(this, activity_refund_payment.class);
+        intent.putExtra("bookingId", bookingId);
+        intent.putExtra("productId", productId);
+        intent.putExtra("renterId", renterId);
+        intent.putExtra("itemCondition", itemCondition);
+        intent.putExtra("damageNotes", damageNotes);
+        intent.putExtra("repairCost", repairCost);
+        intent.putExtra("refundAmount", refundAmount);
+        startActivity(intent);
     }
 
     // Helper methods
@@ -296,7 +343,7 @@ public class activity_inspection extends AppCompatActivity {
 
     private String formatDate(Long timestamp) {
         if (timestamp == null) return "N/A";
-        SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy", Locale.getDefault());
-        return sdf.format(new Date(timestamp));
+        SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault());
+        return sdf.format(new java.util.Date(timestamp));
     }
 }

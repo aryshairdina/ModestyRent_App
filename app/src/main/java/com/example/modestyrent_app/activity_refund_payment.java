@@ -1,0 +1,155 @@
+package com.example.modestyrent_app;
+
+import android.content.Intent;
+import android.os.Bundle;
+import android.widget.*;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.google.android.material.button.MaterialButton;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.*;
+
+import java.text.SimpleDateFormat;
+import java.util.HashMap;
+import java.util.Map;
+
+public class activity_refund_payment extends AppCompatActivity {
+
+    private String bookingId, productId, renterId;
+    private String itemCondition, damageNotes;
+    private double repairCost, refundAmount;
+
+    private ImageView backButton;
+    private TextView tvRefundAmount, tvPaymentSummary, tvPaymentMethodLabel, tvBottomRefundAmount;
+    private RadioGroup rgPaymentMethod;
+    private RadioButton rbOnlineBanking, rbCard, rbEwallet;
+    private MaterialButton btnConfirmPayment;
+
+    private DatabaseReference bookingsRef;
+    private FirebaseAuth mAuth;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_refund_payment);
+
+        // Get data from inspection screen
+        Intent intent = getIntent();
+        bookingId = intent.getStringExtra("bookingId");
+        productId = intent.getStringExtra("productId");
+        renterId = intent.getStringExtra("renterId");
+        itemCondition = intent.getStringExtra("itemCondition");
+        damageNotes = intent.getStringExtra("damageNotes");
+        repairCost = intent.getDoubleExtra("repairCost", 0.0);
+        refundAmount = intent.getDoubleExtra("refundAmount", 0.0);
+
+        if (bookingId == null) {
+            Toast.makeText(this, "Booking ID not provided", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        mAuth = FirebaseAuth.getInstance();
+        bookingsRef = FirebaseDatabase.getInstance().getReference("bookings");
+
+        initializeViews();
+        setupUI();
+        setupListeners();
+    }
+
+    private void initializeViews() {
+        backButton = findViewById(R.id.backButton);
+        tvRefundAmount = findViewById(R.id.tvRefundAmount);
+        tvPaymentSummary = findViewById(R.id.tvPaymentSummary);
+        tvPaymentMethodLabel = findViewById(R.id.tvPaymentMethodLabel);
+        rgPaymentMethod = findViewById(R.id.rgPaymentMethod);
+        rbOnlineBanking = findViewById(R.id.rbOnlineBanking);
+        rbCard = findViewById(R.id.rbCard);
+        rbEwallet = findViewById(R.id.rbEwallet);
+        btnConfirmPayment = findViewById(R.id.btnConfirmPayment);
+        tvBottomRefundAmount = findViewById(R.id.tvBottomRefundAmount);
+
+        backButton.setOnClickListener(v -> finish());
+    }
+
+    private void setupUI() {
+        tvRefundAmount.setText(String.format("RM %.2f", refundAmount));
+        tvBottomRefundAmount.setText(String.format("RM %.2f", refundAmount));
+        tvPaymentSummary.setText(
+                String.format(
+                        "You will refund RM %.2f to the borrower.\nDamage/repair cost: RM %.2f",
+                        refundAmount, repairCost
+                )
+        );
+    }
+
+    private void setupListeners() {
+        // 🔒 Make sure ONLY ONE payment method can be selected at a time
+        CompoundButton.OnCheckedChangeListener paymentListener = (buttonView, isChecked) -> {
+            if (!isChecked) return;
+
+            // Manually uncheck others
+            if (buttonView != rbOnlineBanking) rbOnlineBanking.setChecked(false);
+            if (buttonView != rbCard) rbCard.setChecked(false);
+            if (buttonView != rbEwallet) rbEwallet.setChecked(false);
+
+            // Sync with RadioGroup so getCheckedRadioButtonId() works
+            rgPaymentMethod.check(buttonView.getId());
+        };
+
+        rbOnlineBanking.setOnCheckedChangeListener(paymentListener);
+        rbCard.setOnCheckedChangeListener(paymentListener);
+        rbEwallet.setOnCheckedChangeListener(paymentListener);
+
+        btnConfirmPayment.setOnClickListener(v -> {
+            if (!validatePaymentMethod()) return;
+            processRefundPayment();
+        });
+    }
+
+    private boolean validatePaymentMethod() {
+        int checkedId = rgPaymentMethod.getCheckedRadioButtonId();
+        if (checkedId == -1) {
+            Toast.makeText(this, "Please select a payment method", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+        return true;
+    }
+
+    private void processRefundPayment() {
+        // Simulate successful refund payment
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("status", "Completed");
+        updates.put("inspectionTime", System.currentTimeMillis());
+        updates.put("itemCondition", itemCondition);
+        updates.put("damageNotes", damageNotes);
+        updates.put("repairCost", repairCost);
+        updates.put("refundAmount", refundAmount);
+        updates.put("depositReturned", true);
+        updates.put("depositReturnDate", System.currentTimeMillis());
+
+        bookingsRef.child(bookingId).updateChildren(updates)
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(this, "Refund paid and rental completed", Toast.LENGTH_SHORT).show();
+
+                    Intent intent = new Intent(this, activity_rentals_details_owner.class);
+                    intent.putExtra("bookingId", bookingId);
+                    intent.putExtra("productId", productId);
+                    intent.putExtra("ownerId",
+                            mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : null);
+                    startActivity(intent);
+                    finish();
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, "Failed to process refund", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    // Optional helper
+    private String formatDate(Long timestamp) {
+        if (timestamp == null) return "N/A";
+        SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault());
+        return sdf.format(new java.util.Date(timestamp));
+    }
+}
