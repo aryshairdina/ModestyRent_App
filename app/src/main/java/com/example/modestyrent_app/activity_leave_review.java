@@ -7,8 +7,11 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.widget.*;
-import android.view.View;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.EditText;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -19,7 +22,11 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.*;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 
@@ -101,6 +108,7 @@ public class activity_leave_review extends AppCompatActivity {
         // Initial star state
         updateStarColors();
         tvRatingText.setText("Tap to rate");
+        tvCharacterCount.setText("0/500 characters");
     }
 
     private void setupFirebase() {
@@ -146,7 +154,7 @@ public class activity_leave_review extends AppCompatActivity {
                 if (snapshot.exists()) {
                     try {
                         updateBookingUI(snapshot);
-                        loadProductDetails();   // load product image
+                        loadProductDetails();   // load product image from products table
                         loadOwnerInfo();
                     } catch (Exception e) {
                         Toast.makeText(activity_leave_review.this, "Error loading booking details", Toast.LENGTH_SHORT).show();
@@ -165,8 +173,11 @@ public class activity_leave_review extends AppCompatActivity {
     }
 
     private void updateBookingUI(DataSnapshot bookingSnapshot) {
-        // Product name
-        tvProductName.setText(getStringValue(bookingSnapshot, "productName"));
+        // Product name from booking (if exists)
+        String nameFromBooking = getStringValue(bookingSnapshot, "productName");
+        if (nameFromBooking != null && !nameFromBooking.isEmpty()) {
+            tvProductName.setText(nameFromBooking);
+        }
 
         // Try to load product image directly from booking if available
         String bookingImageUrl = getStringValue(bookingSnapshot, "productImageUrl");
@@ -182,59 +193,80 @@ public class activity_leave_review extends AppCompatActivity {
         }
     }
 
+    /**
+     * Load product image from "products" table.
+     * Your add product code saves images under "imageUrls" (List<String>).
+     * So here we take the first image in that list.
+     */
     private void loadProductDetails() {
-        if (productId != null) {
-            productsRef.child(productId).addListenerForSingleValueEvent(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot snapshot) {
-                    if (snapshot.exists()) {
-                        // Try multiple possible keys for image URL
-                        String imageUrl = null;
+        if (productId == null) return;
 
-                        if (snapshot.child("imageUrl").exists()) {
-                            imageUrl = snapshot.child("imageUrl").getValue(String.class);
-                        } else if (snapshot.child("image").exists()) {
-                            imageUrl = snapshot.child("image").getValue(String.class);
-                        } else if (snapshot.child("productImage").exists()) {
-                            imageUrl = snapshot.child("productImage").getValue(String.class);
-                        }
+        productsRef.child(productId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (!snapshot.exists()) return;
 
-                        if (imageUrl != null && !imageUrl.isEmpty()) {
-                            Glide.with(activity_leave_review.this)
-                                    .load(imageUrl)
-                                    .placeholder(R.drawable.ic_image_placeholder)
-                                    .into(ivProductImage);
-                        }
+                // If productName in booking is empty, use name from product
+                String productName = snapshot.child("name").getValue(String.class);
+                if (productName != null && !productName.isEmpty()) {
+                    tvProductName.setText(productName);
+                }
+
+                // Get first image from imageUrls list
+                String imageUrl = null;
+                DataSnapshot imageUrlsSnap = snapshot.child("imageUrls");
+                if (imageUrlsSnap.exists() && imageUrlsSnap.getChildrenCount() > 0) {
+                    for (DataSnapshot child : imageUrlsSnap.getChildren()) {
+                        imageUrl = child.getValue(String.class);
+                        break; // only need first one
                     }
                 }
 
-                @Override
-                public void onCancelled(@NonNull DatabaseError error) {
-                    // ignore
+                // Fallback: other possible single fields (just in case)
+                if ((imageUrl == null || imageUrl.isEmpty()) && snapshot.child("imageUrl").exists()) {
+                    imageUrl = snapshot.child("imageUrl").getValue(String.class);
                 }
-            });
-        }
+                if ((imageUrl == null || imageUrl.isEmpty()) && snapshot.child("image").exists()) {
+                    imageUrl = snapshot.child("image").getValue(String.class);
+                }
+                if ((imageUrl == null || imageUrl.isEmpty()) && snapshot.child("productImage").exists()) {
+                    imageUrl = snapshot.child("productImage").getValue(String.class);
+                }
+
+                if (imageUrl != null && !imageUrl.isEmpty()) {
+                    Glide.with(activity_leave_review.this)
+                            .load(imageUrl)
+                            .placeholder(R.drawable.ic_image_placeholder)
+                            .into(ivProductImage);
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                // ignore
+            }
+        });
     }
 
     private void loadOwnerInfo() {
-        if (ownerId != null) {
-            usersRef.child(ownerId).addListenerForSingleValueEvent(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot snapshot) {
-                    if (snapshot.exists()) {
-                        String ownerName = getStringValue(snapshot, "fullName");
-                        if (ownerName != null) {
-                            tvOwnerName.setText("Owner: " + ownerName);
-                        }
-                    }
-                }
+        if (ownerId == null) return;
 
-                @Override
-                public void onCancelled(@NonNull DatabaseError error) {
-                    // ignore
+        usersRef.child(ownerId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (!snapshot.exists()) return;
+
+                String ownerName = getStringValue(snapshot, "fullName");
+                if (ownerName != null) {
+                    tvOwnerName.setText("Owner: " + ownerName);
                 }
-            });
-        }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                // ignore
+            }
+        });
     }
 
     private void setRating(int rating) {
@@ -356,11 +388,15 @@ public class activity_leave_review extends AppCompatActivity {
         }
 
         if (selectedPhotoUri != null) {
-            // Upload photo to Firebase Storage first
+            // IMPORTANT: must follow Storage rules:
+            // match /products/{userId}/{allPaths=**} with userId == auth.uid
+            // So we upload to: products/{currentUserId}/{productId}/reviews/{reviewId}.jpg
             StorageReference photoRef = FirebaseStorage.getInstance()
                     .getReference()
-                    .child("review_photos")
-                    .child(bookingId)
+                    .child("products")
+                    .child(currentUserId)             // <-- userId = current logged in user
+                    .child(productId != null ? productId : "no_product")
+                    .child("reviews")
                     .child(reviewId + ".jpg");
 
             photoRef.putFile(selectedPhotoUri)
@@ -375,7 +411,7 @@ public class activity_leave_review extends AppCompatActivity {
                                     })
                     )
                     .addOnFailureListener(e -> {
-                        Toast.makeText(activity_leave_review.this, "Failed to upload photo", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(activity_leave_review.this, "Failed to upload photo: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                     });
 
         } else {

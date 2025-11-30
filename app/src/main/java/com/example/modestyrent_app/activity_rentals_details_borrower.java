@@ -1,8 +1,7 @@
 package com.example.modestyrent_app;
 
-import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -10,13 +9,25 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+
+import com.bumptech.glide.Glide;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.*;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 
 public class activity_rentals_details_borrower extends AppCompatActivity {
 
@@ -33,7 +44,15 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
     private MaterialButton btnPrimaryAction, btnSecondaryAction, btnLeaveReview;
     private LinearLayout borrowerActionsLayout;
 
-    private DatabaseReference bookingsRef, productsRef, usersRef;
+    // Review summary views
+    private MaterialCardView reviewSummaryCard;
+    private TextView tvReviewText, tvReviewDate;
+    private ImageView ivReviewPhoto;
+
+    // ⭐ 5 review stars
+    private ImageView reviewStar1, reviewStar2, reviewStar3, reviewStar4, reviewStar5;
+
+    private DatabaseReference bookingsRef, productsRef, usersRef, reviewsRef;
     private FirebaseAuth mAuth;
 
     @Override
@@ -83,6 +102,19 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         btnLeaveReview = findViewById(R.id.btnLeaveReview);
         borrowerActionsLayout = findViewById(R.id.borrowerActionsLayout);
 
+        // Review summary views
+        reviewSummaryCard = findViewById(R.id.reviewSummaryCard);
+        tvReviewText = findViewById(R.id.tvReviewText);
+        tvReviewDate = findViewById(R.id.tvReviewDate);
+        ivReviewPhoto = findViewById(R.id.ivReviewPhoto);
+
+        // ⭐ find review stars
+        reviewStar1 = findViewById(R.id.reviewStar1);
+        reviewStar2 = findViewById(R.id.reviewStar2);
+        reviewStar3 = findViewById(R.id.reviewStar3);
+        reviewStar4 = findViewById(R.id.reviewStar4);
+        reviewStar5 = findViewById(R.id.reviewStar5);
+
         backButton.setOnClickListener(v -> finish());
         setupButtonListeners();
     }
@@ -91,12 +123,12 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         bookingsRef = FirebaseDatabase.getInstance().getReference("bookings");
         productsRef = FirebaseDatabase.getInstance().getReference("products");
         usersRef = FirebaseDatabase.getInstance().getReference("users");
+        reviewsRef = FirebaseDatabase.getInstance().getReference("reviews"); // reviews/{bookingId}/{reviewId}
     }
 
     private void setupButtonListeners() {
-        // Borrower Action Listeners
         btnPrimaryAction.setOnClickListener(v -> handleBorrowerPrimaryAction());
-        btnSecondaryAction.setOnClickListener(v -> startReturnProcess()); // Directly go to arrange return
+        btnSecondaryAction.setOnClickListener(v -> startReturnProcess());
         btnLeaveReview.setOnClickListener(v -> leaveReview());
     }
 
@@ -106,15 +138,11 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (snapshot.exists()) {
                     try {
-                        // Parse booking data
                         String productId = getStringValue(snapshot, "productId");
                         String ownerId = getStringValue(snapshot, "ownerId");
                         deliveryOption = getStringValue(snapshot, "deliveryOption");
 
-                        // Update UI with booking data
                         updateBookingUI(snapshot);
-
-                        // Load delivery information based on delivery option
                         loadDeliveryInformation(snapshot, ownerId);
 
                     } catch (Exception e) {
@@ -134,11 +162,9 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
     }
 
     private void updateBookingUI(DataSnapshot bookingSnapshot) {
-        // Basic booking info
         productName.setText(getStringValue(bookingSnapshot, "productName"));
         bookingNumber.setText("#" + getStringValue(bookingSnapshot, "bookingNumber"));
 
-        // Rental period
         Long startDate = getLongValue(bookingSnapshot, "startDate");
         Long endDate = getLongValue(bookingSnapshot, "endDate");
         Integer rentalDays = getIntegerValue(bookingSnapshot, "rentalDays");
@@ -151,7 +177,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
             rentalPeriod.setText(periodText);
         }
 
-        // Price breakdown
         Double rentalAmt = getDoubleValue(bookingSnapshot, "rentalAmount");
         Double depositAmt = getDoubleValue(bookingSnapshot, "depositAmount");
         Double totalAmt = getDoubleValue(bookingSnapshot, "totalAmount");
@@ -160,32 +185,36 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         if (depositAmt != null) depositAmount.setText(String.format("RM %.2f", depositAmt));
         if (totalAmt != null) totalAmount.setText(String.format("RM %.2f", totalAmt));
 
-        // Delivery info
         String deliveryOpt = getStringValue(bookingSnapshot, "deliveryOption");
         deliveryOptionText.setText(deliveryOpt != null ? deliveryOpt : "Pickup");
 
-        // Status timeline - Different flows for Delivery vs Pickup
         String status = getStringValue(bookingSnapshot, "status");
         String deliveryStatus = getStringValue(bookingSnapshot, "deliveryStatus");
 
-        updateStatusTimeline(bookingSnapshot);
+        // Check review flag on booking
+        Boolean reviewedFlag = bookingSnapshot.child("reviewed").getValue(Boolean.class);
+        boolean hasReview = reviewedFlag != null && reviewedFlag;
 
-        // Update action buttons based on status
-        updateBorrowerActions(status, deliveryStatus, deliveryOption);
+        updateStatusTimeline(bookingSnapshot);
+        updateBorrowerActions(status, deliveryStatus, deliveryOption, hasReview);
+
+        if (hasReview) {
+            loadReviewSummary();
+        } else {
+            if (reviewSummaryCard != null) {
+                reviewSummaryCard.setVisibility(View.GONE);
+            }
+        }
     }
 
     private void loadDeliveryInformation(DataSnapshot bookingSnapshot, String ownerId) {
         String deliveryOpt = getStringValue(bookingSnapshot, "deliveryOption");
 
         if ("Delivery".equals(deliveryOpt)) {
-            // For delivery, show borrower's address
             String deliveryAddressText = getStringValue(bookingSnapshot, "deliveryAddress");
             deliveryAddress.setText(deliveryAddressText != null ? deliveryAddressText : "Address not available");
-
-            // Load owner contact info
             loadOwnerContactInfo(ownerId);
         } else {
-            // For pickup, show owner's address and contact info
             loadOwnerAddressForPickup(ownerId);
             loadOwnerContactInfo(ownerId);
         }
@@ -242,15 +271,12 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
     private void updateStatusTimeline(DataSnapshot bookingSnapshot) {
         statusTimeline.removeAllViews();
 
-        // Get all relevant dates
         Long bookingDate = getLongValue(bookingSnapshot, "bookingDate");
         Long paymentDate = getLongValue(bookingSnapshot, "paymentDate");
         String status = getStringValue(bookingSnapshot, "status");
         String deliveryStatus = getStringValue(bookingSnapshot, "deliveryStatus");
 
-        // Different status flows for Delivery vs Pickup
         if ("Delivery".equals(deliveryOption)) {
-            // DELIVERY FLOW: Confirmed → Preparing Delivery → Out for Delivery → On Rent → Return → Inspection → Completed
             String[] statusFlow = {"Confirmed", "Preparing Delivery", "Out for Delivery", "On Rent", "Return", "Inspection", "Completed"};
             String[] statusDescriptions = {
                     "Booking confirmed and payment received",
@@ -279,7 +305,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
                 statusTimeline.addView(statusItem);
             }
         } else {
-            // PICKUP FLOW: Confirmed → Preparing Pickup → Ready for Pickup → On Rent → Return → Inspection → Completed
             String[] statusFlow = {"Confirmed", "Preparing Pickup", "Ready for Pickup", "On Rent", "Return", "Inspection", "Completed"};
             String[] statusDescriptions = {
                     "Booking confirmed and payment received",
@@ -321,10 +346,9 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         View statusIndicator = statusItem.findViewById(R.id.statusIndicator);
         View connectorLine = statusItem.findViewById(R.id.connectorLine);
 
-        // Set icon based on status
         int iconResource = getResources().getIdentifier(iconName, "drawable", getPackageName());
         if (iconResource == 0) {
-            iconResource = R.drawable.ic_check; // Fallback icon
+            iconResource = R.drawable.ic_check;
         }
         statusIcon.setImageResource(iconResource);
 
@@ -332,12 +356,10 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         statusDescriptionView.setText(description);
         statusDateView.setText(date != null ? date : "Pending");
 
-        // Hide connector line for last item
         if (isLast) {
             connectorLine.setVisibility(View.GONE);
         }
 
-        // Determine status state
         boolean isCompleted = isStatusCompleted(statusText, currentStatus, deliveryStatus);
         boolean isCurrent = isCurrentStatus(statusText, currentStatus, deliveryStatus);
 
@@ -367,10 +389,9 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
 
     private boolean isStatusCompleted(String timelineStatus, String currentStatus, String deliveryStatus) {
         if ("Delivery".equals(deliveryOption)) {
-            // DELIVERY FLOW
             switch (timelineStatus) {
                 case "Confirmed":
-                    return true; // Always completed since payment is made
+                    return true;
                 case "Preparing Delivery":
                     return "PreparingDelivery".equals(currentStatus) ||
                             "OutForDelivery".equals(deliveryStatus) ||
@@ -400,10 +421,9 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
                     return false;
             }
         } else {
-            // PICKUP FLOW
             switch (timelineStatus) {
                 case "Confirmed":
-                    return true; // Always completed since payment is made
+                    return true;
                 case "Preparing Pickup":
                     return "PreparingPickup".equals(currentStatus) ||
                             "ReadyForPickup".equals(deliveryStatus) ||
@@ -453,9 +473,8 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         }
     }
 
-    // BORROWER ACTIONS - FIXED VERSION
-    private void updateBorrowerActions(String status, String deliveryStatus, String deliveryOption) {
-        // Reset all buttons first
+    // Borrower actions (with hasReview)
+    private void updateBorrowerActions(String status, String deliveryStatus, String deliveryOption, boolean hasReview) {
         btnPrimaryAction.setVisibility(View.GONE);
         btnSecondaryAction.setVisibility(View.GONE);
         btnLeaveReview.setVisibility(View.GONE);
@@ -463,61 +482,40 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
 
         if (status == null) return;
 
-        // Debug logging - Check what values we're getting
-        System.out.println("DEBUG BORROWER - Status: " + status + ", DeliveryStatus: " + deliveryStatus + ", DeliveryOption: " + deliveryOption);
-
         boolean hasAction = false;
 
         if ("Delivery".equals(deliveryOption)) {
-            // DELIVERY FLOW BORROWER ACTIONS
             if ("OutForDelivery".equals(deliveryStatus) && !"OnRent".equals(status)) {
-                // Show "Mark as Received" when item is out for delivery and not yet received
                 btnPrimaryAction.setText("Mark as Received");
                 btnPrimaryAction.setVisibility(View.VISIBLE);
                 hasAction = true;
-                System.out.println("DEBUG: Showing Mark as Received for Delivery");
             } else if ("OnRent".equals(status)) {
-                // Show "Start Return" during rental period
                 btnSecondaryAction.setText("Start Return");
                 btnSecondaryAction.setVisibility(View.VISIBLE);
                 hasAction = true;
-                System.out.println("DEBUG: Showing Start Return for OnRent");
-            } else if ("Completed".equals(status)) {
-                // Show "Leave Review" after completion
+            } else if ("Completed".equals(status) && !hasReview) {
                 btnLeaveReview.setText("Leave Review");
                 btnLeaveReview.setVisibility(View.VISIBLE);
                 hasAction = true;
-                System.out.println("DEBUG: Showing Leave Review for Completed");
             }
         } else if ("Pickup".equals(deliveryOption)) {
-            // PICKUP FLOW BORROWER ACTIONS
             if ("ReadyForPickup".equals(deliveryStatus) && !"OnRent".equals(status)) {
-                // Show "Mark as Picked Up" when item is ready for pickup and not yet picked up
                 btnPrimaryAction.setText("Mark as Picked Up");
                 btnPrimaryAction.setVisibility(View.VISIBLE);
                 hasAction = true;
-                System.out.println("DEBUG: Showing Mark as Picked Up for Pickup");
             } else if ("OnRent".equals(status)) {
-                // Show "Start Return" during rental period
                 btnSecondaryAction.setText("Start Return");
                 btnSecondaryAction.setVisibility(View.VISIBLE);
                 hasAction = true;
-                System.out.println("DEBUG: Showing Start Return for OnRent");
-            } else if ("Completed".equals(status)) {
-                // Show "Leave Review" after completion
+            } else if ("Completed".equals(status) && !hasReview) {
                 btnLeaveReview.setText("Leave Review");
                 btnLeaveReview.setVisibility(View.VISIBLE);
                 hasAction = true;
-                System.out.println("DEBUG: Showing Leave Review for Completed");
             }
         }
 
-        // Show borrower actions layout if any action is available
         if (hasAction) {
             borrowerActionsLayout.setVisibility(View.VISIBLE);
-            System.out.println("DEBUG: Borrower actions layout is VISIBLE");
-        } else {
-            System.out.println("DEBUG: Borrower actions layout is GONE - No actions available");
         }
     }
 
@@ -528,8 +526,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
                 String status = getStringValue(snapshot, "status");
                 String deliveryOption = getStringValue(snapshot, "deliveryOption");
                 String deliveryStatus = getStringValue(snapshot, "deliveryStatus");
-
-                System.out.println("DEBUG ACTION - Status: " + status + ", DeliveryStatus: " + deliveryStatus + ", DeliveryOption: " + deliveryOption);
 
                 if ("Delivery".equals(deliveryOption) && "OutForDelivery".equals(deliveryStatus)) {
                     markAsReceived();
@@ -550,13 +546,13 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
     private void markAsPickedUp() {
         Map<String, Object> updates = new HashMap<>();
         updates.put("status", "OnRent");
-        updates.put("deliveryStatus", ""); // Clear delivery status when item is picked up
+        updates.put("deliveryStatus", "");
         updates.put("pickupTime", System.currentTimeMillis());
 
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Item marked as picked up", Toast.LENGTH_SHORT).show();
-                    loadBookingDetails(); // Refresh UI to hide button
+                    loadBookingDetails();
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to update status", Toast.LENGTH_SHORT).show();
@@ -566,13 +562,13 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
     private void markAsReceived() {
         Map<String, Object> updates = new HashMap<>();
         updates.put("status", "OnRent");
-        updates.put("deliveryStatus", ""); // Clear delivery status when item is received
+        updates.put("deliveryStatus", "");
         updates.put("deliveryTime", System.currentTimeMillis());
 
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Item marked as received", Toast.LENGTH_SHORT).show();
-                    loadBookingDetails(); // Refresh UI to hide button
+                    loadBookingDetails();
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to update status", Toast.LENGTH_SHORT).show();
@@ -580,7 +576,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
     }
 
     private void startReturnProcess() {
-        // Directly navigate to arrange return activity without changing status
         Intent intent = new Intent(this, activity_arrange_return.class);
         intent.putExtra("bookingId", bookingId);
         intent.putExtra("productId", productId);
@@ -596,7 +591,99 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         startActivity(intent);
     }
 
-    // Helper methods
+    // Load review summary from /reviews/{bookingId}/{reviewId}
+    private void loadReviewSummary() {
+        if (reviewsRef == null || bookingId == null || currentUserId == null) return;
+
+        reviewsRef.child(bookingId)
+                .orderByChild("renterId")
+                .equalTo(currentUserId)
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        if (!snapshot.exists()) {
+                            if (reviewSummaryCard != null) reviewSummaryCard.setVisibility(View.GONE);
+                            return;
+                        }
+
+                        DataSnapshot reviewSnap = null;
+                        for (DataSnapshot child : snapshot.getChildren()) {
+                            reviewSnap = child;
+                            break;
+                        }
+                        if (reviewSnap == null) {
+                            if (reviewSummaryCard != null) reviewSummaryCard.setVisibility(View.GONE);
+                            return;
+                        }
+
+                        Long ratingLong = reviewSnap.child("rating").getValue(Long.class);
+                        Long ratingScoreLong = reviewSnap.child("ratingScore").getValue(Long.class);
+                        String reviewText = reviewSnap.child("reviewText").getValue(String.class);
+                        Long reviewDateMillis = reviewSnap.child("reviewDate").getValue(Long.class);
+                        String photoUrl = reviewSnap.child("photoUrl").getValue(String.class);
+
+                        int rating = ratingLong != null ? ratingLong.intValue() : 0;
+                        int ratingScore = ratingScoreLong != null ? ratingScoreLong.intValue() : rating * 20;
+
+                        // ⭐ update stars + text
+                        updateReviewStars(rating);
+
+                        if (tvReviewText != null) {
+                            tvReviewText.setText(reviewText != null ? reviewText : "-");
+                        }
+                        if (tvReviewDate != null) {
+                            if (reviewDateMillis != null) {
+                                tvReviewDate.setText("Reviewed on " + formatDateTime(reviewDateMillis));
+                            } else {
+                                tvReviewDate.setText("");
+                            }
+                        }
+
+                        if (ivReviewPhoto != null) {
+                            if (photoUrl != null && !photoUrl.isEmpty()) {
+                                ivReviewPhoto.setVisibility(View.VISIBLE);
+                                Glide.with(activity_rentals_details_borrower.this)
+                                        .load(photoUrl)
+                                        .placeholder(R.drawable.ic_image_placeholder)
+                                        .into(ivReviewPhoto);
+                            } else {
+                                ivReviewPhoto.setVisibility(View.GONE);
+                            }
+                        }
+
+                        if (reviewSummaryCard != null) {
+                            reviewSummaryCard.setVisibility(View.VISIBLE);
+                        }
+
+                        btnLeaveReview.setVisibility(View.GONE);
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {
+                        if (reviewSummaryCard != null) reviewSummaryCard.setVisibility(View.GONE);
+                    }
+                });
+    }
+
+    // ⭐ helper to color 5 stars based on rating
+    private void updateReviewStars(int rating) {
+        ImageView[] stars = new ImageView[]{reviewStar1, reviewStar2, reviewStar3, reviewStar4, reviewStar5};
+
+        for (int i = 0; i < stars.length; i++) {
+            ImageView star = stars[i];
+            if (star == null) continue;
+
+            if (i < rating) {
+                // filled (gold)
+                star.setColorFilter(Color.parseColor("#FFD700"));
+            } else {
+                // grey / inactive
+                star.setColorFilter(Color.parseColor("#D6D3CF"));
+            }
+        }
+    }
+
+    // Helpers
     private String getStringValue(DataSnapshot snapshot, String key) {
         DataSnapshot child = snapshot.child(key);
         return child.exists() && child.getValue() != null ? child.getValue().toString() : null;
@@ -608,7 +695,11 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
             Object value = child.getValue();
             if (value instanceof Long) return (Long) value;
             if (value instanceof String) {
-                try { return Long.parseLong((String) value); } catch (NumberFormatException e) { return null; }
+                try {
+                    return Long.parseLong((String) value);
+                } catch (NumberFormatException e) {
+                    return null;
+                }
             }
         }
         return null;
@@ -621,7 +712,11 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
             if (value instanceof Double) return (Double) value;
             if (value instanceof Long) return ((Long) value).doubleValue();
             if (value instanceof String) {
-                try { return Double.parseDouble((String) value); } catch (NumberFormatException e) { return null; }
+                try {
+                    return Double.parseDouble((String) value);
+                } catch (NumberFormatException e) {
+                    return null;
+                }
             }
         }
         return null;
@@ -634,7 +729,11 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
             if (value instanceof Integer) return (Integer) value;
             if (value instanceof Long) return ((Long) value).intValue();
             if (value instanceof String) {
-                try { return Integer.parseInt((String) value); } catch (NumberFormatException e) { return null; }
+                try {
+                    return Integer.parseInt((String) value);
+                } catch (NumberFormatException e) {
+                    return null;
+                }
             }
         }
         return null;

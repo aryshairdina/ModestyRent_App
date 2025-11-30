@@ -268,7 +268,122 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Action Buttons for Owner -->
+        <!-- ⭐ Review Summary Card (shown after review submitted) -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/reviewSummaryCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginBottom="16dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="@color/background"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Your Review"
+                    android:textColor="@color/neutral"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="4dp">
+
+                    <ImageView
+                        android:id="@+id/reviewStar1"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_star_filled"
+                        app:tint="@color/secondary"
+                        android:layout_marginEnd="2dp" />
+
+                    <ImageView
+                        android:id="@+id/reviewStar2"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_star_filled"
+                        app:tint="@color/secondary"
+                        android:layout_marginEnd="2dp" />
+
+                    <ImageView
+                        android:id="@+id/reviewStar3"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_star_filled"
+                        app:tint="@color/secondary"
+                        android:layout_marginEnd="2dp" />
+
+                    <ImageView
+                        android:id="@+id/reviewStar4"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_star_filled"
+                        app:tint="@color/secondary"
+                        android:layout_marginEnd="2dp" />
+
+                    <ImageView
+                        android:id="@+id/reviewStar5"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_star_filled"
+                        app:tint="@color/secondary"
+                        android:layout_marginEnd="8dp" />
+
+                    <TextView
+                        android:id="@+id/tvReviewRating"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="5/5"
+                        android:textColor="@color/neutral"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                </LinearLayout>
+
+
+                <TextView
+                    android:id="@+id/tvReviewDate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Reviewed on 21 Nov 2025, 18:32"
+                    android:textColor="@color/textcolor"
+                    android:textSize="12sp"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/tvReviewText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="The dress is beautiful and fits well."
+                    android:textColor="@color/textcolor"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="8dp" />
+
+                <ImageView
+                    android:id="@+id/ivReviewPhoto"
+                    android:layout_width="match_parent"
+                    android:layout_height="140dp"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_image_placeholder"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Action Buttons for Owner (kept as in your original) -->
         <LinearLayout
             android:id="@+id/ownerActionsLayout"
             android:layout_width="match_parent"
@@ -287,7 +402,6 @@
                 android:textStyle="bold"
                 android:layout_marginBottom="12dp" />
 
-            <!-- Delivery Flow Actions -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnPrepareDelivery"
                 android:layout_width="match_parent"
@@ -321,7 +435,6 @@
                 android:layout_marginBottom="8dp"
                 android:visibility="gone" />
 
-            <!-- Return Flow Actions -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnInspectReturn"
                 android:layout_width="match_parent"
@@ -363,6 +476,7 @@
                 android:textColor="@color/background"
                 android:backgroundTint="@color/primary"
                 app:cornerRadius="24dp"
+                android:layout_marginBottom="8dp"
                 android:visibility="gone" />
 
         </LinearLayout>

@@ -23,12 +23,14 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
+import java.util.Locale;
+
 public class activity_profile extends AppCompatActivity {
 
     private MaterialButton signOutButton, btnEditProfile;
     private View btnMyListings, btnMyLikes, btnMyRentals, btnBookingRequest;
     private FirebaseAuth mAuth;
-    private DatabaseReference userRef, productsRef, bookingsRef;
+    private DatabaseReference userRef, productsRef, bookingsRef, reviewsRef;
 
     private TextView fullNameText, initialsText, userEmailText;
     private TextView statListing, statRentals, statRating;
@@ -55,9 +57,11 @@ public class activity_profile extends AppCompatActivity {
         }
 
         currentUserId = currentUser.getUid();
-        userRef = FirebaseDatabase.getInstance().getReference("users").child(currentUserId);
-        productsRef = FirebaseDatabase.getInstance().getReference("products");
-        bookingsRef = FirebaseDatabase.getInstance().getReference("bookings");
+        FirebaseDatabase db = FirebaseDatabase.getInstance();
+        userRef = db.getReference("users").child(currentUserId);
+        productsRef = db.getReference("products");
+        bookingsRef = db.getReference("bookings");
+        reviewsRef = db.getReference("reviews");   // ⭐ reviews root
 
         Log.d(TAG, "Current User ID: " + currentUserId);
 
@@ -90,6 +94,7 @@ public class activity_profile extends AppCompatActivity {
         // Set initial values
         statListing.setText("0");
         statRentals.setText("0");
+        statRating.setText("0.0");   // default rating
     }
 
     private void setupBottomNavigation() {
@@ -197,6 +202,7 @@ public class activity_profile extends AppCompatActivity {
     private void loadUserStats() {
         loadListingsCount();
         loadRentalsCount();
+        loadRatingSummary();   // ⭐ NEW: rating summary
     }
 
     private void loadListingsCount() {
@@ -307,6 +313,65 @@ public class activity_profile extends AppCompatActivity {
         });
     }
 
+    // ⭐ NEW: load rating summary from /reviews
+    private void loadRatingSummary() {
+        Log.d(TAG, "Loading rating summary for owner: " + currentUserId);
+
+        if (reviewsRef == null) {
+            statRating.setText("0.0");
+            return;
+        }
+
+        reviewsRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                double totalRating = 0.0;
+                int reviewCount = 0;
+
+                // reviews/{bookingId}/{reviewId}
+                for (DataSnapshot bookingSnap : snapshot.getChildren()) {
+                    for (DataSnapshot reviewSnap : bookingSnap.getChildren()) {
+                        String ownerId = reviewSnap.child("ownerId").getValue(String.class);
+
+                        if (ownerId != null && ownerId.equals(currentUserId)) {
+                            // rating can be stored as Long or Double
+                            Double ratingDouble = reviewSnap.child("rating").getValue(Double.class);
+                            Long ratingLong = reviewSnap.child("rating").getValue(Long.class);
+
+                            double ratingValue;
+                            if (ratingDouble != null) {
+                                ratingValue = ratingDouble;
+                            } else if (ratingLong != null) {
+                                ratingValue = ratingLong.doubleValue();
+                            } else {
+                                continue;
+                            }
+
+                            totalRating += ratingValue;
+                            reviewCount++;
+                        }
+                    }
+                }
+
+                if (reviewCount > 0) {
+                    double avg = totalRating / reviewCount;
+                    String avgText = String.format(Locale.US, "%.1f", avg);
+                    statRating.setText(avgText);
+                    Log.d(TAG, "Rating summary: avg=" + avgText + " from " + reviewCount + " reviews");
+                } else {
+                    statRating.setText("0.0");
+                    Log.d(TAG, "No reviews found for this owner. Rating = 0.0");
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Failed to load rating summary: " + error.getMessage());
+                statRating.setText("0.0");
+            }
+        });
+    }
+
     private void debugPrintAllProducts(DataSnapshot snapshot) {
         Log.d(TAG, "=== DEBUG: All Products in Database ===");
         for (DataSnapshot productSnapshot : snapshot.getChildren()) {
@@ -394,13 +459,11 @@ public class activity_profile extends AppCompatActivity {
         }
 
         if (id == R.id.nav_live) {
-            // Placeholder - adjust when live page is ready
             Toast.makeText(this, "Live feature coming soon", Toast.LENGTH_SHORT).show();
             return true;
         }
 
         if (id == R.id.nav_chat) {
-            // Placeholder - adjust when chat page is ready
             Toast.makeText(this, "Chat feature coming soon", Toast.LENGTH_SHORT).show();
             return true;
         }
