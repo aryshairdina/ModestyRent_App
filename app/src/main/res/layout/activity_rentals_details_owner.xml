@@ -358,62 +358,6 @@
 
         </LinearLayout>
 
-        <!-- Action Buttons for Borrower -->
-        <LinearLayout
-            android:id="@+id/borrowerActionsLayout"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp"
-            android:layout_marginBottom="16dp"
-            android:visibility="gone">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnPrimaryAction"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:text="Mark as Picked Up"
-                android:textColor="@color/background"
-                android:backgroundTint="@color/primary"
-                app:cornerRadius="24dp"
-                android:layout_marginBottom="12dp"
-                android:visibility="gone" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnSecondaryAction"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:text="Start Return"
-                android:textColor="@color/primary"
-                android:backgroundTint="@color/background"
-                app:cornerRadius="24dp"
-                android:layout_marginBottom="12dp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:visibility="gone" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnUploadProof"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:text="Upload Return Proof"
-                android:textColor="@color/primary"
-                android:backgroundTint="@color/background"
-                app:cornerRadius="24dp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:visibility="gone" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnLeaveReview"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:text="Leave Review"
-                android:textColor="@color/background"
-                android:backgroundTint="@color/primary"
-                app:cornerRadius="24dp"
-                android:visibility="gone" />
-
-        </LinearLayout>
-
     </LinearLayout>
 
 </ScrollView>

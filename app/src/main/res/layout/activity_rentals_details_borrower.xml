@@ -515,17 +515,6 @@
                 android:visibility="gone" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnUploadProof"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:text="Upload Return Proof"
-                android:textColor="@color/primary"
-                android:backgroundTint="@color/background"
-                app:cornerRadius="24dp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:visibility="gone" />
-
-            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnLeaveReview"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
