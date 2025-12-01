@@ -7,9 +7,11 @@ import android.view.View;
 import android.widget.*;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.*;
+
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 import java.util.Random;
@@ -80,13 +82,12 @@ public class activity_checkout extends AppCompatActivity {
         btnConfirmCheckout = findViewById(R.id.btnConfirmCheckout);
         backIcon = findViewById(R.id.backIcon);
 
-        // Set default selections - This will now work properly
+        // Default selections
         rbPickup.setChecked(true);
         rbQRBanking.setChecked(true);
 
-        // Add listeners to ensure mutual exclusivity
+        // Ensure mutual exclusivity is fine (RadioGroup already ensures this, but keep your logic)
         rgDeliveryOption.setOnCheckedChangeListener((group, checkedId) -> {
-            // This ensures only one option can be selected
             if (checkedId == R.id.rbPickup) {
                 rbDelivery.setChecked(false);
             } else if (checkedId == R.id.rbDelivery) {
@@ -95,7 +96,6 @@ public class activity_checkout extends AppCompatActivity {
         });
 
         rgPaymentMethod.setOnCheckedChangeListener((group, checkedId) -> {
-            // This ensures only one option can be selected
             if (checkedId == R.id.rbQRBanking) {
                 rbCOD.setChecked(false);
             } else if (checkedId == R.id.rbCOD) {
@@ -152,7 +152,7 @@ public class activity_checkout extends AppCompatActivity {
             });
         }
 
-        // Load product details
+        // Load product size
         if (productId != null) {
             productsRef.child(productId).addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
@@ -175,7 +175,6 @@ public class activity_checkout extends AppCompatActivity {
 
     private void setupClickListeners() {
         backIcon.setOnClickListener(v -> finish());
-
         btnConfirmCheckout.setOnClickListener(v -> confirmBooking());
     }
 
@@ -183,11 +182,9 @@ public class activity_checkout extends AppCompatActivity {
         String startStr = startDateMillis > 0 ? DATE_FORMAT.format(startDateMillis) : "—";
         String endStr = endDateMillis > 0 ? DATE_FORMAT.format(endDateMillis) : "—";
 
-        // Update product info
         tvProductName.setText(productName != null ? productName : "Product");
         tvRentalPeriod.setText("Rental Period: " + startStr + " to " + endStr);
 
-        // Update pricing
         tvTotalPrice.setText(String.format(Locale.US, "RM %.2f", subtotalAmount));
         tvRentalFee.setText(String.format(Locale.US, "RM %.2f", totalAmount));
         tvDaysCount.setText(days + " days");
@@ -198,12 +195,11 @@ public class activity_checkout extends AppCompatActivity {
     }
 
     private String generateBookingNumber() {
-        // Generate a proper booking number: MR + timestamp + random digits
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyMMddHHmmss", Locale.getDefault());
         String timestamp = dateFormat.format(System.currentTimeMillis());
 
         Random random = new Random();
-        int randomDigits = random.nextInt(900) + 100; // 100-999
+        int randomDigits = random.nextInt(900) + 100; // 100–999
 
         return "MR" + timestamp + randomDigits;
     }
@@ -211,17 +207,19 @@ public class activity_checkout extends AppCompatActivity {
     private void updateProductStatusToUnavailable() {
         if (productId != null) {
             productsRef.child(productId).child("status").setValue("Unavailable")
-                    .addOnSuccessListener(aVoid -> {
-                        // Product status updated successfully
-                        Log.d("Checkout", "Product status updated to Unavailable for product: " + productId);
-                    })
-                    .addOnFailureListener(e -> {
-                        // Handle the error but don't block the booking process
-                        Log.e("Checkout", "Failed to update product status: " + e.getMessage());
-                    });
+                    .addOnSuccessListener(aVoid ->
+                            Log.d("Checkout", "Product status updated to Unavailable: " + productId))
+                    .addOnFailureListener(e ->
+                            Log.e("Checkout", "Failed to update product status: " + e.getMessage()));
         }
     }
 
+    /**
+     * New logic:
+     * - For QR Banking (online banking): DO NOT insert booking here. Go to dummy payment,
+     *   and booking will be created AFTER user taps Pay Now.
+     * - For COD: Insert booking now and go directly to confirmation.
+     */
     private void confirmBooking() {
         // Validate input fields
         String fullName = etFullName.getText().toString().trim();
@@ -243,31 +241,60 @@ public class activity_checkout extends AppCompatActivity {
             return;
         }
 
-        // Validate radio button selections
+        // Delivery option must be selected
         if (!rbPickup.isChecked() && !rbDelivery.isChecked()) {
             Toast.makeText(this, "Please select a delivery option", Toast.LENGTH_SHORT).show();
             return;
         }
 
+        // Payment method must be selected
         if (!rbQRBanking.isChecked() && !rbCOD.isChecked()) {
             Toast.makeText(this, "Please select a payment method", Toast.LENGTH_SHORT).show();
             return;
         }
-
-        // Get selected options
-        String deliveryOption = rbPickup.isChecked() ? "Pickup" : "Delivery";
-        String paymentMethod = rbQRBanking.isChecked() ? "QR Banking" : "COD";
 
         if (currentUserId == null) {
             Toast.makeText(this, "Please login to continue", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // Generate booking ID and booking number
+        String deliveryOption = rbPickup.isChecked() ? "Pickup" : "Delivery";
+        boolean isOnlineBanking = rbQRBanking.isChecked();   // 👈 use this flag
+        String paymentMethod = isOnlineBanking ? "QR Banking" : "COD";
+
+        // 🔹 CASE 1: ONLINE BANKING (QR BANKING) – DO NOT INSERT BOOKING HERE
+        if (isOnlineBanking) {
+            Intent intent = new Intent(activity_checkout.this, activity_dummy_payment.class);
+            intent.putExtra("productId", productId);
+            intent.putExtra("ownerId", ownerId);
+            intent.putExtra("productName", productName);
+            intent.putExtra("renterName", fullName);
+            intent.putExtra("renterPhone", phone);
+            intent.putExtra("deliveryAddress", address);
+            intent.putExtra("deliveryOption", deliveryOption);
+            intent.putExtra("paymentMethod", paymentMethod);
+            intent.putExtra("startDateMillis", startDateMillis);
+            intent.putExtra("endDateMillis", endDateMillis);
+            intent.putExtra("days", days);
+            intent.putExtra("unitPrice", unitPrice);
+            intent.putExtra("rentalAmount", totalAmount);
+            intent.putExtra("depositAmount", depositAmount);
+            intent.putExtra("totalAmount", subtotalAmount);
+            startActivity(intent);
+
+            // ⚠️ IMPORTANT: DO NOT WRITE TO bookingsRef HERE
+            return;
+        }
+
+        // 🔹 CASE 2: COD – CREATE BOOKING NOW
         String bookingId = bookingsRef.push().getKey();
+        if (bookingId == null) {
+            Toast.makeText(this, "Failed to create booking", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         String bookingNumber = generateBookingNumber();
 
-        // Create booking object
         Booking booking = new Booking();
         booking.setBookingId(bookingId);
         booking.setBookingNumber(bookingNumber);
@@ -289,32 +316,21 @@ public class activity_checkout extends AppCompatActivity {
         booking.setTotalAmount(subtotalAmount);
         booking.setStatus("Confirmed");
         booking.setBookingDate(System.currentTimeMillis());
+        booking.setPaymentStatus("cod_pending");
 
-        // Save to Firebase and update product status
         bookingsRef.child(bookingId).setValue(booking)
                 .addOnSuccessListener(aVoid -> {
-                    // Update product status to "Unavailable" in Realtime Database
                     updateProductStatusToUnavailable();
 
-                    // Check payment method and navigate accordingly
-                    if (paymentMethod.equals("QR Banking")) {
-                        // Navigate to dummy payment page
-                        Intent intent = new Intent(activity_checkout.this, activity_dummy_payment.class);
-                        intent.putExtra("bookingId", bookingId);
-                        intent.putExtra("bookingNumber", bookingNumber);
-                        intent.putExtra("paymentMethod", paymentMethod);
-                        intent.putExtra("totalAmount", subtotalAmount);
-                        startActivity(intent);
-                    } else {
-                        // COD - directly go to booking confirmation
-                        Intent intent = new Intent(activity_checkout.this, activity_booking.class);
-                        intent.putExtra("bookingId", bookingId);
-                        startActivity(intent);
-                    }
+                    Intent intent = new Intent(activity_checkout.this, activity_booking.class);
+                    intent.putExtra("bookingId", bookingId);
+                    startActivity(intent);
                     finish();
                 })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(activity_checkout.this, "Failed to confirm booking: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                });
+                .addOnFailureListener(e ->
+                        Toast.makeText(activity_checkout.this,
+                                "Failed to confirm booking: " + e.getMessage(),
+                                Toast.LENGTH_SHORT).show());
     }
+
 }

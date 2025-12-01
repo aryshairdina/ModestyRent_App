@@ -187,7 +187,7 @@ public class BookingAdapter extends RecyclerView.Adapter<BookingAdapter.BookingV
         private int getStatusColor(String status, String deliveryStatus) {
             // Use primary color for active states, secondary for completed
             if ("Completed".equals(status)) {
-                return R.color.secondary;
+                return R.color.primary;
             }
 
             // For OnRent status

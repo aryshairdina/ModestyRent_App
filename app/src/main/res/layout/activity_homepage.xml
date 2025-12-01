@@ -6,9 +6,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/secondary"
-    tools:context=".activity_home">
+    tools:context=".activity_homepage">
 
-    <!-- ========== Top Bar ========== -->
+    <!-- Top Bar -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -37,7 +37,7 @@
             android:src="@drawable/ic_notifications" />
     </LinearLayout>
 
-    <!-- ========== Welcome Text ========== -->
+    <!-- Welcome Text -->
     <TextView
         android:id="@+id/welcomeText"
         android:layout_width="match_parent"
@@ -86,13 +86,15 @@
                 android:inputType="text" />
 
             <ImageView
+                android:id="@+id/btnFilter"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:src="@drawable/ic_filter" />
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
-    <!-- ========== Category Chips ========== -->
+
+    <!-- Category Chips -->
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -118,38 +120,36 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:checked="true"
-                    android:text="All"
-                    android:textColor="@android:color/white"
-                    app:chipBackgroundColor="@color/primary" />
+                    android:text="All" />
 
                 <com.google.android.material.chip.Chip
                     style="@style/Widget.MaterialComponents.Chip.Choice"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Women" />
+                    android:text="Baju Kurung" />
 
                 <com.google.android.material.chip.Chip
                     style="@style/Widget.MaterialComponents.Chip.Choice"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Men" />
+                    android:text="Jubah" />
 
                 <com.google.android.material.chip.Chip
                     style="@style/Widget.MaterialComponents.Chip.Choice"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Footwear" />
+                    android:text="Dress" />
 
                 <com.google.android.material.chip.Chip
                     style="@style/Widget.MaterialComponents.Chip.Choice"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Accessories" />
+                    android:text="Shawl" />
             </com.google.android.material.chip.ChipGroup>
         </LinearLayout>
     </HorizontalScrollView>
 
-    <!-- ========== Section Header ========== -->
+    <!-- Section Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -169,7 +169,7 @@
 
     </LinearLayout>
 
-    <!-- ========== Product Grid ========== -->
+    <!-- Product Grid -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerProducts"
         android:layout_width="match_parent"
@@ -180,7 +180,7 @@
         android:scrollbars="none"
         tools:listitem="@layout/product_card" />
 
-    <!-- ========== Bottom Navigation ========== -->
+    <!-- Bottom Navigation -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottomNavigation"
         android:layout_width="match_parent"

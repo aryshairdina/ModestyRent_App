@@ -3,24 +3,32 @@ package com.example.modestyrent_app;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.slider.RangeSlider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
@@ -28,15 +36,15 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
-/**
- * activity_homepage - shows welcome text + product grid (only products with status == "available")
- * Keeps your original welcomeText & Firebase Auth logic and bottom navigation behavior.
- * Added: onResume refresh so newly-added products appear automatically and love/like button functionality.
- */
 public class activity_homepage extends AppCompatActivity {
 
     private static final String TAG = "activity_homepage";
@@ -44,31 +52,46 @@ public class activity_homepage extends AppCompatActivity {
     private TextView welcomeText;
     private FirebaseAuth mAuth;
 
-    // Product grid fields
     private RecyclerView recyclerProducts;
     private ProductAdapter adapter;
-    private final List<Product> products = new ArrayList<>();
+
+    private final List<Product> allProducts = new ArrayList<>();
     private DatabaseReference productsRef;
+
+    private EditText searchBar;
+    private ImageView btnFilter;
+
+    // Filter state
+    private String selectedCategory = "All";
+    private String selectedSize = "All";
+    private String selectedColor = "All";
+    private String selectedPriceSort = "None";
+
+    private float allProductsMinPrice = 0f;
+    private float allProductsMaxPrice = 0f;
+
+    private float filterMinPrice = 0f;
+    private float filterMaxPrice = 0f;
+
+    // Store color per productId (from database "color" field)
+    private final Map<String, String> productColorMap = new HashMap<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_homepage);
 
-        // Initialize views
         welcomeText = findViewById(R.id.welcomeText);
         BottomNavigationView bottomNav = findViewById(R.id.bottomNavigation);
+        searchBar = findViewById(R.id.searchBar);
+        btnFilter = findViewById(R.id.btnFilter);
 
-        // Initialize Firebase Auth
         mAuth = FirebaseAuth.getInstance();
-
-        // Check current user and set welcome text (preserve your original logic)
         FirebaseUser currentUser = mAuth.getCurrentUser();
+
         if (currentUser != null) {
-            // Display email first
             welcomeText.setText("Welcome, " + currentUser.getEmail());
 
-            // Try to get full name from Realtime Database
             String uid = currentUser.getUid();
             DatabaseReference userRef = FirebaseDatabase.getInstance()
                     .getReference("users")
@@ -94,87 +117,315 @@ public class activity_homepage extends AppCompatActivity {
             return;
         }
 
-        // ========== Bottom Navigation Setup (preserve your logic) ==========
         if (bottomNav == null) {
             Toast.makeText(this, "BottomNavigationView not found (check layout id)", Toast.LENGTH_LONG).show();
             return;
         }
 
-        // Set default selected item (home)
         Menu menu = bottomNav.getMenu();
         MenuItem homeItem = menu.findItem(R.id.nav_home);
         if (homeItem != null) {
             bottomNav.setSelectedItemId(R.id.nav_home);
         }
+        bottomNav.setOnItemSelectedListener(this::handleNavItemSelected);
 
-        // Handle navigation item selection
-        bottomNav.setOnItemSelectedListener(item -> handleNavItemSelected(item));
-
-        // ---------- NEW: setup product grid ----------
         setupProductGrid();
+        setupSearchAndFilters();
     }
 
-    /**
-     * onResume will refresh the products list so newly added products appear immediately.
-     */
     @Override
     protected void onResume() {
         super.onResume();
-        // if productsRef is null, setupProductGrid() will set it and call loadProducts anyway.
-        // Otherwise just reload to pick up any new items.
         try {
             if (productsRef != null) {
                 loadProducts();
             } else {
-                setupProductGrid(); // safe guard - will set productsRef then load
+                setupProductGrid();
             }
         } catch (Exception e) {
             Log.w(TAG, "onResume refresh failed: " + e.getMessage(), e);
         }
     }
 
-    /**
-     * Handle bottom navigation selections
-     */
     private boolean handleNavItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
 
         if (id == R.id.nav_home) {
-            // Already on Home
             return true;
         }
-
         if (id == R.id.nav_add_item) {
-            // Go to Add Product page
-            Intent intent = new Intent(activity_homepage.this, activity_add_product.class);
-            startActivity(intent);
+            startActivity(new Intent(this, activity_add_product.class));
             return true;
         }
-
         if (id == R.id.nav_profile) {
-            // Go to Profile page
-            Intent intent = new Intent(activity_homepage.this, activity_profile.class);
-            startActivity(intent);
+            startActivity(new Intent(this, activity_profile.class));
             return true;
         }
-
         if (id == R.id.nav_live) {
-            // Go to Live Stream or profile placeholder
-            Intent intent = new Intent(activity_homepage.this, activity_profile.class);
-            startActivity(intent);
+            startActivity(new Intent(this, activity_profile.class));
             return true;
         }
-
         if (id == R.id.nav_chat) {
-            // Go to Chat or profile placeholder
-            Intent intent = new Intent(activity_homepage.this, activity_chat_list.class);
-            startActivity(intent);
+            startActivity(new Intent(this, activity_chat_list.class));
             return true;
         }
         return true;
     }
 
-    // ---------------- Product grid setup & loading ----------------
+    // ---------------- Search + Filter ----------------
+
+    private void setupSearchAndFilters() {
+        if (searchBar != null) {
+            searchBar.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override
+                public void afterTextChanged(Editable s) {
+                    applySearchAndFilters();
+                }
+            });
+        }
+
+        if (btnFilter != null) {
+            btnFilter.setOnClickListener(v -> openFilterDialog());
+        }
+    }
+
+    private void openFilterDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View view = LayoutInflater.from(this)
+                .inflate(R.layout.dialog_filter_products, null, false);
+        builder.setView(view);
+        AlertDialog dialog = builder.create();
+
+        ChipGroup categoryGroup = view.findViewById(R.id.filterCategoryGroup);
+        ChipGroup sizeGroup = view.findViewById(R.id.filterSizeGroup);
+        ChipGroup colorGroup = view.findViewById(R.id.filterColorGroup);
+        ChipGroup priceSortGroup = view.findViewById(R.id.filterPriceSortGroup);
+
+        TextView tvMinPrice = view.findViewById(R.id.tvMinPrice);
+        TextView tvMaxPrice = view.findViewById(R.id.tvMaxPrice);
+        RangeSlider priceRangeSlider = view.findViewById(R.id.priceRangeSlider);
+
+        MaterialButton btnReset = view.findViewById(R.id.btnResetFilter);
+        MaterialButton btnApply = view.findViewById(R.id.btnApplyFilter);
+        TextView tvClearAll = view.findViewById(R.id.tvClearAll);
+
+        // Price bounds from all products
+        float rawMinAll = allProductsMinPrice;
+        float rawMaxAll = allProductsMaxPrice;
+
+        if (rawMinAll <= 0 || rawMaxAll <= 0 || rawMinAll >= rawMaxAll) {
+            rawMinAll = 0f;
+            rawMaxAll = 1000f;
+        }
+
+        final float minAll = rawMinAll;
+        final float maxAll = rawMaxAll;
+
+        priceRangeSlider.setValueFrom(minAll);
+        priceRangeSlider.setValueTo(maxAll);
+
+        float currentMin = (filterMinPrice <= 0) ? minAll : filterMinPrice;
+        float currentMax = (filterMaxPrice <= 0) ? maxAll : filterMaxPrice;
+        if (currentMin < minAll) currentMin = minAll;
+        if (currentMax > maxAll) currentMax = maxAll;
+
+        List<Float> initialValues = new ArrayList<>();
+        initialValues.add(currentMin);
+        initialValues.add(currentMax);
+        priceRangeSlider.setValues(initialValues);
+
+        tvMinPrice.setText(String.format(Locale.getDefault(), "RM %.0f", currentMin));
+        tvMaxPrice.setText(String.format(Locale.getDefault(), "RM %.0f", currentMax));
+
+        priceRangeSlider.addOnChangeListener((slider, value, fromUser) -> {
+            List<Float> values = slider.getValues();
+            float vMin = values.get(0);
+            float vMax = values.get(1);
+            tvMinPrice.setText(String.format(Locale.getDefault(), "RM %.0f", vMin));
+            tvMaxPrice.setText(String.format(Locale.getDefault(), "RM %.0f", vMax));
+        });
+
+        // restore chip selection
+        restoreChipSelectionByText(categoryGroup, selectedCategory);
+        restoreChipSelectionByText(sizeGroup, selectedSize);
+        restoreChipSelectionByText(colorGroup, selectedColor);
+
+        switch (selectedPriceSort) {
+            case "LowToHigh":
+                checkChipById(priceSortGroup, R.id.chipPriceSortLowHigh);
+                break;
+            case "HighToLow":
+                checkChipById(priceSortGroup, R.id.chipPriceSortHighLow);
+                break;
+            default:
+                checkChipById(priceSortGroup, R.id.chipPriceSortNone);
+                break;
+        }
+
+        // reset / clear
+        View.OnClickListener resetListener = v -> {
+            selectedCategory = "All";
+            selectedSize = "All";
+            selectedColor = "All";
+            selectedPriceSort = "None";
+
+            checkChipById(categoryGroup, R.id.chipCategoryAll);
+            checkChipById(sizeGroup, R.id.chipSizeAll);
+            checkChipById(colorGroup, R.id.chipColorAll);
+            checkChipById(priceSortGroup, R.id.chipPriceSortNone);
+
+            List<Float> resetValues = new ArrayList<>();
+            resetValues.add(minAll);
+            resetValues.add(maxAll);
+            priceRangeSlider.setValues(resetValues);
+
+            tvMinPrice.setText(String.format(Locale.getDefault(), "RM %.0f", minAll));
+            tvMaxPrice.setText(String.format(Locale.getDefault(), "RM %.0f", maxAll));
+
+            filterMinPrice = minAll;
+            filterMaxPrice = maxAll;
+        };
+        btnReset.setOnClickListener(resetListener);
+        tvClearAll.setOnClickListener(resetListener);
+
+        // apply
+        btnApply.setOnClickListener(v -> {
+            selectedCategory = getSelectedChipText(categoryGroup, "All");
+            selectedSize = getSelectedChipText(sizeGroup, "All");
+            selectedColor = getSelectedChipText(colorGroup, "All");
+
+            int checkedSortId = priceSortGroup.getCheckedChipId();
+            if (checkedSortId == R.id.chipPriceSortLowHigh) {
+                selectedPriceSort = "LowToHigh";
+            } else if (checkedSortId == R.id.chipPriceSortHighLow) {
+                selectedPriceSort = "HighToLow";
+            } else {
+                selectedPriceSort = "None";
+            }
+
+            List<Float> values = priceRangeSlider.getValues();
+            if (values.size() >= 2) {
+                filterMinPrice = values.get(0);
+                filterMaxPrice = values.get(1);
+            } else {
+                filterMinPrice = minAll;
+                filterMaxPrice = maxAll;
+            }
+
+            applySearchAndFilters();
+            dialog.dismiss();
+        });
+
+        dialog.show();
+    }
+
+    private void restoreChipSelectionByText(ChipGroup group, String text) {
+        if (group == null || text == null) return;
+        for (int i = 0; i < group.getChildCount(); i++) {
+            View child = group.getChildAt(i);
+            if (child instanceof Chip) {
+                Chip chip = (Chip) child;
+                if (text.equalsIgnoreCase(chip.getText().toString())) {
+                    chip.setChecked(true);
+                    return;
+                }
+            }
+        }
+    }
+
+    private void checkChipById(ChipGroup group, int chipId) {
+        if (group == null) return;
+        Chip chip = group.findViewById(chipId);
+        if (chip != null) chip.setChecked(true);
+    }
+
+    private String getSelectedChipText(ChipGroup group, String defaultValue) {
+        if (group == null) return defaultValue;
+        int id = group.getCheckedChipId();
+        if (id == View.NO_ID) return defaultValue;
+        View v = group.findViewById(id);
+        if (v instanceof Chip) {
+            CharSequence t = ((Chip) v).getText();
+            if (t != null) return t.toString();
+        }
+        return defaultValue;
+    }
+
+    private void applySearchAndFilters() {
+        String search = "";
+        if (searchBar != null && searchBar.getText() != null) {
+            search = searchBar.getText().toString().trim().toLowerCase(Locale.getDefault());
+        }
+
+        List<Product> filtered = new ArrayList<>();
+        for (Product p : allProducts) {
+            if (p == null) continue;
+
+            // search
+            if (!search.isEmpty()) {
+                String name = p.getName() != null ? p.getName().toLowerCase(Locale.getDefault()) : "";
+                String desc = p.getDescription() != null ? p.getDescription().toLowerCase(Locale.getDefault()) : "";
+                String cat = p.getCategory() != null ? p.getCategory().toLowerCase(Locale.getDefault()) : "";
+                if (!name.contains(search) && !desc.contains(search) && !cat.contains(search)) {
+                    continue;
+                }
+            }
+
+            // category filter
+            if (!"All".equalsIgnoreCase(selectedCategory)) {
+                String cat = p.getCategory() != null ? p.getCategory() : "";
+                if (!cat.equalsIgnoreCase(selectedCategory)) {
+                    continue;
+                }
+            }
+
+            // size filter
+            if (!"All".equalsIgnoreCase(selectedSize)) {
+                String size = p.getSize() != null ? p.getSize() : "";
+                if (!size.equalsIgnoreCase(selectedSize)) {
+                    continue;
+                }
+            }
+
+            // color filter (using productColorMap instead of getColor())
+            if (!"All".equalsIgnoreCase(selectedColor)) {
+                String color = "";
+                if (p.getId() != null && productColorMap.containsKey(p.getId())) {
+                    color = productColorMap.get(p.getId());
+                }
+                if (color == null) color = "";
+                if (!color.equalsIgnoreCase(selectedColor)) {
+                    continue;
+                }
+            }
+
+            // price range
+            double price = p.getPrice();
+            if (filterMinPrice > 0 || filterMaxPrice > 0) {
+                if (price < filterMinPrice || price > filterMaxPrice) {
+                    continue;
+                }
+            }
+
+            filtered.add(p);
+        }
+
+        // sort
+        if ("LowToHigh".equals(selectedPriceSort)) {
+            Collections.sort(filtered, Comparator.comparingDouble(Product::getPrice));
+        } else if ("HighToLow".equals(selectedPriceSort)) {
+            Collections.sort(filtered, (a, b) -> Double.compare(b.getPrice(), a.getPrice()));
+        }
+
+        if (adapter != null) {
+            adapter.setList(filtered);
+        }
+    }
+
+    // ---------------- Product grid ----------------
+
     private void setupProductGrid() {
         recyclerProducts = findViewById(R.id.recyclerProducts);
         if (recyclerProducts == null) {
@@ -182,12 +433,10 @@ public class activity_homepage extends AppCompatActivity {
             return;
         }
 
-        // Use 2 columns grid to match item_product card style
         recyclerProducts.setLayoutManager(new GridLayoutManager(this, 2));
-        adapter = new ProductAdapter(this, products);
+        adapter = new ProductAdapter(this, new ArrayList<>());
         recyclerProducts.setAdapter(adapter);
 
-        // Resolve database path: try "ModestyRent - App/products" then fallback to "products"
         DatabaseReference rootRef = FirebaseDatabase.getInstance().getReference();
         DatabaseReference candidate = rootRef.child("ModestyRent - App").child("products");
 
@@ -210,39 +459,40 @@ public class activity_homepage extends AppCompatActivity {
             return;
         }
 
-        // get currently signed-in user's uid so we can exclude their products
         String currentUid = null;
         try {
             FirebaseUser cu = mAuth.getCurrentUser();
             if (cu != null) currentUid = cu.getUid();
         } catch (Exception ignored) {}
-
         final String finalCurrentUid = currentUid;
 
         productsRef.get().addOnCompleteListener(task -> {
             if (!task.isSuccessful() || task.getResult() == null) {
-                Toast.makeText(activity_homepage.this, "Failed loading products: " + (task.getException() != null ? task.getException().getMessage() : "unknown"), Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Failed loading products: " +
+                                (task.getException() != null ? task.getException().getMessage() : "unknown"),
+                        Toast.LENGTH_LONG).show();
                 return;
             }
 
             DataSnapshot snapshot = task.getResult();
-            products.clear();
+            allProducts.clear();
+            productColorMap.clear();
+
+            float minPrice = Float.MAX_VALUE;
+            float maxPrice = Float.MIN_VALUE;
 
             if (snapshot.exists()) {
                 for (DataSnapshot child : snapshot.getChildren()) {
                     try {
-                        // Try mapping automatically
                         Product p = child.getValue(Product.class);
                         if (p == null) p = new Product();
 
-                        // Ensure id is set
                         if (p.getId() == null || p.getId().isEmpty()) {
                             p.setId(child.getKey());
                         }
 
-                        // Defensive: read owner/userId from common DB keys if model not filled
                         String ownerId = p.getUserId();
-                        if ((ownerId == null || ownerId.isEmpty())) {
+                        if (ownerId == null || ownerId.isEmpty()) {
                             if (child.child("userId").exists()) {
                                 Object v = child.child("userId").getValue();
                                 ownerId = v != null ? String.valueOf(v) : null;
@@ -256,24 +506,19 @@ public class activity_homepage extends AppCompatActivity {
                             if (ownerId != null) p.setUserId(ownerId);
                         }
 
-                        // If ownerId matches current user, skip this product (do not show)
                         if (finalCurrentUid != null && ownerId != null && finalCurrentUid.equals(ownerId)) {
-                            // skip products created by current user
-                            continue;
+                            continue; // don’t show own products
                         }
 
-                        // Read status if missing
                         String status = p.getStatus();
                         if (status == null && child.child("status").exists()) {
                             Object sObj = child.child("status").getValue();
                             status = sObj != null ? String.valueOf(sObj) : null;
                             p.setStatus(status);
                         }
-
                         if (status == null) continue;
                         if (!"available".equalsIgnoreCase(status.trim())) continue;
 
-                        // Price fallback handling (price / day or price)
                         if (p.getPrice() == 0.0) {
                             if (child.child("price / day").exists()) {
                                 Object priceObj = child.child("price / day").getValue();
@@ -292,8 +537,8 @@ public class activity_homepage extends AppCompatActivity {
                             }
                         }
 
-                        // Image fallback
-                        if ((p.getImageUrls() == null || p.getImageUrls().isEmpty())) {
+                        // image urls fallback
+                        if (p.getImageUrls() == null || p.getImageUrls().isEmpty()) {
                             if (child.child("imageUrls").exists()) {
                                 ArrayList<String> urls = new ArrayList<>();
                                 for (DataSnapshot img : child.child("imageUrls").getChildren()) {
@@ -318,8 +563,19 @@ public class activity_homepage extends AppCompatActivity {
                             }
                         }
 
-                        // Add product (it passed all filters)
-                        products.add(p);
+                        // Read color from DB "color" field and store in map
+                        String colorDb = child.child("color").getValue(String.class);
+                        if (colorDb != null && p.getId() != null) {
+                            productColorMap.put(p.getId(), colorDb);
+                        }
+
+                        allProducts.add(p);
+
+                        float price = (float) p.getPrice();
+                        if (price > 0) {
+                            if (price < minPrice) minPrice = price;
+                            if (price > maxPrice) maxPrice = price;
+                        }
 
                     } catch (Exception ex) {
                         Log.e(TAG, "Skipping product node due to error", ex);
@@ -327,29 +583,39 @@ public class activity_homepage extends AppCompatActivity {
                 }
             }
 
-            adapter.setList(products);
+            if (minPrice == Float.MAX_VALUE || maxPrice == Float.MIN_VALUE) {
+                allProductsMinPrice = 0f;
+                allProductsMaxPrice = 1000f;
+            } else {
+                allProductsMinPrice = minPrice;
+                allProductsMaxPrice = maxPrice;
+            }
 
-            if (products.isEmpty()) {
-                Toast.makeText(activity_homepage.this, "No available products found.", Toast.LENGTH_SHORT).show();
+            if (filterMinPrice == 0f && filterMaxPrice == 0f) {
+                filterMinPrice = allProductsMinPrice;
+                filterMaxPrice = allProductsMaxPrice;
+            }
+
+            applySearchAndFilters();
+
+            if (allProducts.isEmpty()) {
+                Toast.makeText(this, "No available products found.", Toast.LENGTH_SHORT).show();
             }
         }).addOnFailureListener(e -> {
-            Toast.makeText(activity_homepage.this, "Error loading products: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Error loading products: " + e.getMessage(), Toast.LENGTH_LONG).show();
         });
     }
 
+    // ---------------- Adapter ----------------
 
-    // ---------------- Inner Adapter (with love button support) ----------------
     private static class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
         private final Context ctx;
         private List<Product> list;
 
-        // Firebase helpers
         private final FirebaseAuth auth = FirebaseAuth.getInstance();
         private final DatabaseReference usersRootRef = FirebaseDatabase.getInstance().getReference("users");
         private final DatabaseReference globalRootRef = FirebaseDatabase.getInstance().getReference();
         private String uid;
-
-        // cache of liked product ids for quick UI state
         private final Set<String> likedIds = new HashSet<>();
 
         ProductAdapter(Context ctx, List<Product> list) {
@@ -380,7 +646,6 @@ public class activity_homepage extends AppCompatActivity {
                     for (DataSnapshot child : snap.getChildren()) {
                         likedIds.add(child.getKey());
                     }
-                    // refresh UI on main thread
                     try {
                         ((android.app.Activity) ctx).runOnUiThread(this::notifyDataSetChanged);
                     } catch (Exception ignored) {
@@ -401,19 +666,14 @@ public class activity_homepage extends AppCompatActivity {
         public void onBindViewHolder(@NonNull VH holder, int position) {
             Product p = list.get(position);
 
-            // Title
             String title = (p.getName() != null && !p.getName().isEmpty()) ? p.getName() : "No title";
             if (holder.tvTitle != null) holder.tvTitle.setText(title);
 
-            // Price formatting
             double priceVal = p.getPrice();
-            String priceText = priceVal > 0 ? String.format(java.util.Locale.getDefault(), "%.2f", priceVal) : "-";
+            String priceText = priceVal > 0 ? String.format(Locale.getDefault(), "%.2f", priceVal) : "-";
             if (holder.tvPrice != null) holder.tvPrice.setText(priceText);
-
-            // Per day label
             if (holder.tvPerDay != null) holder.tvPerDay.setVisibility(View.VISIBLE);
 
-            // Image
             String img = null;
             if (p.getImageUrls() != null && !p.getImageUrls().isEmpty()) img = p.getImageUrls().get(0);
             if (holder.imgProduct != null) {
@@ -428,7 +688,6 @@ public class activity_homepage extends AppCompatActivity {
                 }
             }
 
-            // Set love icon state (requires product_card to have ImageButton with id btnLove)
             boolean isLiked = p.getId() != null && likedIds.contains(p.getId());
             if (holder.btnLove != null) {
                 holder.btnLove.setImageResource(isLiked ? R.drawable.ic_favorite : R.drawable.ic_favorite_border);
@@ -441,7 +700,6 @@ public class activity_homepage extends AppCompatActivity {
                 });
             }
 
-            // Click -> ProductDetailActivity
             holder.itemView.setOnClickListener(v -> {
                 Context c = v.getContext();
                 if (p.getId() != null && !p.getId().isEmpty()) {
@@ -459,11 +717,6 @@ public class activity_homepage extends AppCompatActivity {
             return list != null ? list.size() : 0;
         }
 
-        /**
-         * Toggle like/unlike in Realtime DB for current user.
-         * Write under users/{uid}/likes/{productId} = payload (timestamp, productId, name, price, image)
-         * Also write inverse under likes/{productId}/{uid} = true (optional)
-         */
         private void toggleLike(Product product) {
             if (uid == null || product == null || product.getId() == null) return;
 
@@ -472,7 +725,6 @@ public class activity_homepage extends AppCompatActivity {
             DatabaseReference inverseRef = globalRootRef.child("likes").child(pid).child(uid);
 
             if (likedIds.contains(pid)) {
-                // remove like
                 likeRef.removeValue().addOnCompleteListener(task -> {
                     if (task.isSuccessful()) {
                         likedIds.remove(pid);
@@ -484,13 +736,13 @@ public class activity_homepage extends AppCompatActivity {
                 });
                 inverseRef.removeValue();
             } else {
-                // add like (store small snapshot)
                 java.util.Map<String, Object> payload = new java.util.HashMap<>();
                 payload.put("addedAt", System.currentTimeMillis());
                 payload.put("productId", pid);
                 payload.put("name", product.getName() != null ? product.getName() : "");
                 payload.put("price", product.getPrice());
-                String image0 = (product.getImageUrls() != null && !product.getImageUrls().isEmpty()) ? product.getImageUrls().get(0) : "";
+                String image0 = (product.getImageUrls() != null && !product.getImageUrls().isEmpty())
+                        ? product.getImageUrls().get(0) : "";
                 payload.put("image", image0);
 
                 likeRef.setValue(payload).addOnCompleteListener(task -> {
@@ -529,7 +781,6 @@ public class activity_homepage extends AppCompatActivity {
 
             VH(@NonNull View itemView) {
                 super(itemView);
-                // defensive findViewById
                 try { imgProduct = itemView.findViewById(R.id.imgProduct); } catch (Exception e) { imgProduct = null; }
                 try { tvTitle = itemView.findViewById(R.id.tvTitle); } catch (Exception e) { tvTitle = null; }
                 try { tvPrice = itemView.findViewById(R.id.tvPrice); } catch (Exception e) { tvPrice = null; }

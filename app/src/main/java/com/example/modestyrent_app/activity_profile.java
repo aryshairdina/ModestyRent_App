@@ -464,8 +464,8 @@ public class activity_profile extends AppCompatActivity {
         }
 
         if (id == R.id.nav_chat) {
-            Toast.makeText(this, "Chat feature coming soon", Toast.LENGTH_SHORT).show();
-            return true;
+            Intent intent = new Intent(activity_profile.this, activity_chat_list.class);
+            startActivity(intent);
         }
 
         return false;

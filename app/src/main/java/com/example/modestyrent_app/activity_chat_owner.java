@@ -27,11 +27,9 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
-import com.google.firebase.storage.UploadTask;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,16 +45,18 @@ public class activity_chat_owner extends AppCompatActivity {
     private TextInputEditText etMessage;
     private FloatingActionButton btnSend;
     private ImageView backButton, btnAttachLeft;
-    private TextView tvOwnerName, tvOnlineStatus;
+    private TextView tvOwnerName;
     private ProgressBar progressBar;
 
     private ChatAdapter chatAdapter;
-    private List<ChatMessage> chatMessages;
+    private final List<ChatMessage> chatMessages = new ArrayList<>();
 
     private String chatId, ownerId, productId;
     private String currentUserId;
     private DatabaseReference chatRoomRef, messagesRef, usersRef;
     private StorageReference storageRef;
+
+    private ChildEventListener messagesListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,6 +73,14 @@ public class activity_chat_owner extends AppCompatActivity {
         initializeChatRoom();
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (messagesRef != null && messagesListener != null) {
+            messagesRef.removeEventListener(messagesListener);
+        }
+    }
+
     private void initializeViews() {
         rvChatMessages = findViewById(R.id.rvChatMessages);
         etMessage = findViewById(R.id.etMessage);
@@ -81,8 +89,6 @@ public class activity_chat_owner extends AppCompatActivity {
         btnAttachLeft = findViewById(R.id.btnAttachLeft);
         tvOwnerName = findViewById(R.id.tvOwnerName);
         progressBar = findViewById(R.id.progressBar);
-
-        chatMessages = new ArrayList<>();
     }
 
     private void getIntentData() {
@@ -117,13 +123,18 @@ public class activity_chat_owner extends AppCompatActivity {
         storageRef = FirebaseStorage.getInstance().getReference("chat_files");
     }
 
+    /**
+     * Make sure chat room exists and has participants/current user + owner.
+     * This helps activity_chat_list detect the chat reliably.
+     */
     private void initializeChatRoom() {
         chatRoomRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (!snapshot.exists()) {
+                    // Create new chat
                     Map<String, Object> chatRoomData = new HashMap<>();
-                    Map<String, Boolean> participants = new HashMap<>();
+                    Map<String, Object> participants = new HashMap<>();
                     participants.put(currentUserId, true);
                     participants.put(ownerId, true);
 
@@ -131,13 +142,23 @@ public class activity_chat_owner extends AppCompatActivity {
                     chatRoomData.put("createdAt", System.currentTimeMillis());
                     chatRoomData.put("productId", productId);
                     chatRoomData.put("lastMessage", "");
-                    chatRoomData.put("lastMessageTime", 0);
+                    chatRoomData.put("lastMessageTime", 0L);
+                    chatRoomData.put("lastMessageSender", "");
 
                     chatRoomRef.setValue(chatRoomData)
                             .addOnSuccessListener(aVoid -> Log.d(TAG, "Chat room created"))
                             .addOnFailureListener(e -> Log.e(TAG, "Failed to create chat room: " + e.getMessage()));
                 } else {
-                    Log.d(TAG, "Chat room already exists");
+                    // Chat exists → ensure participants map and productId are set
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("participants/" + currentUserId, true);
+                    updates.put("participants/" + ownerId, true);
+                    if (!snapshot.hasChild("productId") && productId != null) {
+                        updates.put("productId", productId);
+                    }
+                    chatRoomRef.updateChildren(updates)
+                            .addOnSuccessListener(aVoid -> Log.d(TAG, "Chat room participants ensured"))
+                            .addOnFailureListener(e -> Log.e(TAG, "Failed to ensure participants: " + e.getMessage()));
                 }
             }
 
@@ -154,7 +175,6 @@ public class activity_chat_owner extends AppCompatActivity {
         layoutManager.setStackFromEnd(true);
         rvChatMessages.setLayoutManager(layoutManager);
         rvChatMessages.setAdapter(chatAdapter);
-
         rvChatMessages.setHasFixedSize(false);
         rvChatMessages.setNestedScrollingEnabled(true);
     }
@@ -162,7 +182,7 @@ public class activity_chat_owner extends AppCompatActivity {
     private void loadChatMessages() {
         Log.d(TAG, "Loading messages from: messages");
 
-        // Load existing messages once
+        // 1) Load existing messages once
         messagesRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
@@ -177,7 +197,7 @@ public class activity_chat_owner extends AppCompatActivity {
                 Log.d(TAG, "Total messages loaded (singleValue): " + chatMessages.size());
                 chatAdapter.notifyDataSetChanged();
 
-                if (chatMessages.size() > 0) {
+                if (!chatMessages.isEmpty()) {
                     rvChatMessages.post(() -> rvChatMessages.scrollToPosition(chatMessages.size() - 1));
                 }
             }
@@ -188,8 +208,8 @@ public class activity_chat_owner extends AppCompatActivity {
             }
         });
 
-        // Listen for new messages
-        messagesRef.addChildEventListener(new ChildEventListener() {
+        // 2) Listen for new messages in realtime
+        messagesListener = new ChildEventListener() {
             @Override
             public void onChildAdded(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
                 ChatMessage message = snapshot.getValue(ChatMessage.class);
@@ -209,7 +229,9 @@ public class activity_chat_owner extends AppCompatActivity {
             @Override public void onCancelled(@NonNull DatabaseError error) {
                 Log.e(TAG, "Failed to listen for new messages: " + error.getMessage());
             }
-        });
+        };
+
+        messagesRef.addChildEventListener(messagesListener);
     }
 
     private boolean messageExists(String messageId) {
@@ -225,20 +247,20 @@ public class activity_chat_owner extends AppCompatActivity {
     private void setupClickListeners() {
         backButton.setOnClickListener(v -> finish());
 
-        // Attach icons open image picker
+        // Attach icon → pick image (image only)
         btnAttachLeft.setOnClickListener(v -> openImagePicker());
 
-        // Send button sends text ONLY
+        // Send button → send text
         btnSend.setOnClickListener(v -> sendTextMessage());
 
         etMessage.setOnClickListener(v -> {
-            if (chatMessages.size() > 0) {
+            if (!chatMessages.isEmpty()) {
                 rvChatMessages.smoothScrollToPosition(chatMessages.size() - 1);
             }
         });
     }
 
-    // opens image-only picker
+    // Open image picker
     private void openImagePicker() {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("image/*"); // only images
@@ -247,7 +269,7 @@ public class activity_chat_owner extends AppCompatActivity {
         startActivityForResult(chooser, PICK_IMAGE_REQUEST);
     }
 
-    // handle activity result for image picker
+    // Handle image picker result
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -255,7 +277,7 @@ public class activity_chat_owner extends AppCompatActivity {
         if (requestCode == PICK_IMAGE_REQUEST && resultCode == RESULT_OK && data != null) {
             Uri fileUri = data.getData();
             if (fileUri != null) {
-                Log.d(TAG, "Image selected: " + fileUri.toString());
+                Log.d(TAG, "Image selected: " + fileUri);
                 uploadImage(fileUri);
             } else {
                 Toast.makeText(this, "Failed to get image", Toast.LENGTH_SHORT).show();
@@ -263,7 +285,7 @@ public class activity_chat_owner extends AppCompatActivity {
         }
     }
 
-    // upload image to Firebase Storage and send as message
+    // Upload image to Storage and send as message
     private void uploadImage(Uri imageUri) {
         ProgressDialog progressDialog = new ProgressDialog(this);
         progressDialog.setTitle("Uploading Image");
@@ -275,18 +297,18 @@ public class activity_chat_owner extends AppCompatActivity {
         StorageReference fileRef = storageRef.child(chatId).child(fileName + ".jpg");
 
         fileRef.putFile(imageUri)
-                .addOnSuccessListener(taskSnapshot -> {
-                    fileRef.getDownloadUrl().addOnSuccessListener(uri -> {
-                        progressDialog.dismiss();
-                        String downloadUrl = uri.toString();
-                        Log.d(TAG, "Image uploaded successfully: " + downloadUrl);
-                        sendImageMessage(downloadUrl);
-                    }).addOnFailureListener(e -> {
-                        progressDialog.dismiss();
-                        Log.e(TAG, "Failed to get download URL: " + e.getMessage());
-                        Toast.makeText(this, "Failed to get image URL", Toast.LENGTH_SHORT).show();
-                    });
-                })
+                .addOnSuccessListener(taskSnapshot ->
+                        fileRef.getDownloadUrl().addOnSuccessListener(uri -> {
+                            progressDialog.dismiss();
+                            String downloadUrl = uri.toString();
+                            Log.d(TAG, "Image uploaded: " + downloadUrl);
+                            sendImageMessage(downloadUrl);
+                        }).addOnFailureListener(e -> {
+                            progressDialog.dismiss();
+                            Log.e(TAG, "Failed to get download URL: " + e.getMessage());
+                            Toast.makeText(this, "Failed to get image URL", Toast.LENGTH_SHORT).show();
+                        })
+                )
                 .addOnFailureListener(e -> {
                     progressDialog.dismiss();
                     Log.e(TAG, "Upload failed: " + e.getMessage());
@@ -311,14 +333,13 @@ public class activity_chat_owner extends AppCompatActivity {
         message.setFileUrl(imageUrl);
         message.setFileType("image");
         message.setTimestamp(System.currentTimeMillis());
-        message.setType("image"); // explicitly mark as image
+        message.setType("image");
         message.setMessage(""); // no text
 
         messagesRef.child(messageId).setValue(message)
                 .addOnSuccessListener(aVoid -> {
                     updateLastMessage("[Image]");
-                    Log.d(TAG, "Image message sent successfully with ID: " + messageId);
-                    // ensure scroll after sending
+                    Log.d(TAG, "Image message sent: " + messageId);
                     rvChatMessages.post(() -> rvChatMessages.scrollToPosition(chatMessages.size() - 1));
                 })
                 .addOnFailureListener(e -> {
@@ -327,9 +348,9 @@ public class activity_chat_owner extends AppCompatActivity {
                 });
     }
 
-    // New: send text message when btnSend clicked
+    // Send text message
     private void sendTextMessage() {
-        String messageText = etMessage.getText().toString().trim();
+        String messageText = etMessage.getText() != null ? etMessage.getText().toString().trim() : "";
         if (TextUtils.isEmpty(messageText)) {
             Toast.makeText(this, "Message cannot be empty", Toast.LENGTH_SHORT).show();
             return;
@@ -354,7 +375,7 @@ public class activity_chat_owner extends AppCompatActivity {
                 .addOnSuccessListener(aVoid -> {
                     etMessage.setText("");
                     updateLastMessage(messageText);
-                    Log.d(TAG, "Text message sent successfully with ID: " + messageId);
+                    Log.d(TAG, "Text message sent: " + messageId);
                     rvChatMessages.post(() -> rvChatMessages.scrollToPosition(chatMessages.size() - 1));
                 })
                 .addOnFailureListener(e -> {
@@ -363,9 +384,15 @@ public class activity_chat_owner extends AppCompatActivity {
                 });
     }
 
-    private void updateLastMessage(String lastMessage) {
+    private void updateLastMessage(String lastMessageRaw) {
+        // Optional: shorten preview for chat list
+        String preview = lastMessageRaw;
+        if (preview != null && preview.length() > 60) {
+            preview = preview.substring(0, 57) + "...";
+        }
+
         Map<String, Object> updates = new HashMap<>();
-        updates.put("lastMessage", lastMessage);
+        updates.put("lastMessage", preview != null ? preview : "");
         updates.put("lastMessageTime", System.currentTimeMillis());
         updates.put("lastMessageSender", currentUserId);
 
@@ -380,7 +407,7 @@ public class activity_chat_owner extends AppCompatActivity {
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (snapshot.exists()) {
                     String ownerName = snapshot.child("fullName").getValue(String.class);
-                    if (ownerName != null) {
+                    if (ownerName != null && !ownerName.isEmpty()) {
                         tvOwnerName.setText(ownerName);
                     } else {
                         tvOwnerName.setText("Owner");
