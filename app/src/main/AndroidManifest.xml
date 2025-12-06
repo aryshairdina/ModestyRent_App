@@ -47,13 +47,7 @@
             android:name=".activity_rating_review"
             android:exported="false" />
         <activity
-            android:name=".activtiy_return_rentals"
-            android:exported="false" />
-        <activity
             android:name=".activity_rentals_details"
-            android:exported="false" />
-        <activity
-            android:name=".activity_live_stream"
             android:exported="false" />
         <activity
             android:name=".activity_chat_list"

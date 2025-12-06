@@ -8,7 +8,6 @@
     android:background="@color/background"
     android:fitsSystemWindows="true">
 
-    <!-- AppBar with custom design -->
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -33,7 +32,7 @@
                 android:layout_height="24dp"
                 android:src="@drawable/ic_arrow_back"
                 android:layout_gravity="center"
-                android:backgroundTint="@color/neutral"
+                app:tint="@color/neutral"
                 android:contentDescription="Back" />
 
             <TextView
@@ -42,16 +41,15 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:fontFamily="sans-serif-medium"
-                android:letterSpacing="0.02"
-                android:text="Product Details"
+                android:letterSpacing="0.08"
+                android:text=""
                 android:textAlignment="center"
                 android:textColor="@color/neutral"
                 android:textSize="18sp"
-                android:textStyle="bold" />
-        </LinearLayout>
+                android:textStyle="bold"
+                android:visibility="invisible"/> </LinearLayout>
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- Main content -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scrollView"
         android:layout_width="match_parent"
@@ -67,28 +65,24 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Fashion-style image slider -->
             <RelativeLayout
                 android:layout_width="match_parent"
-                android:layout_height="420dp"
-                android:background="@color/secondary">
+                android:layout_height="480dp"
+                android:background="@color/secondary"> <androidx.viewpager2.widget.ViewPager2
+                android:id="@+id/viewPagerImages"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
 
-                <androidx.viewpager2.widget.ViewPager2
-                    android:id="@+id/viewPagerImages"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent" />
-
-                <!-- Image indicator -->
                 <com.google.android.material.tabs.TabLayout
                     android:id="@+id/tabLayoutIndicator"
-                    android:layout_width="20dp"
+                    android:layout_width="match_parent"
                     android:layout_height="10dp"
                     android:layout_alignParentBottom="true"
-                    android:layout_marginBottom="16dp"
+                    android:layout_marginBottom="24dp"
                     android:layout_centerHorizontal="true"
                     android:background="@android:color/transparent"
                     app:tabGravity="center"
-                    app:tabMode="fixed"
+                    app:tabMode="scrollable"
                     app:tabIndicator="@null"
                     app:tabIndicatorHeight="0dp"
                     app:tabRippleColor="@android:color/transparent"
@@ -98,7 +92,6 @@
                     app:tabPaddingStart="4dp"
                     app:tabPaddingEnd="4dp"/>
 
-                <!-- Fashion tag (empty for now) -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="wrap_content"
                     android:layout_height="28dp"
@@ -108,114 +101,198 @@
                     android:layout_alignParentEnd="true"
                     app:cardCornerRadius="14dp"
                     app:cardBackgroundColor="@color/primary"
-                    app:cardElevation="2dp">
+                    app:cardElevation="2dp"
+                    android:visibility="gone">
                 </com.google.android.material.card.MaterialCardView>
 
             </RelativeLayout>
 
-            <!-- Product info card -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_margin="16dp"
+                android:layout_marginStart="24dp"
+                android:layout_marginEnd="24dp"
                 android:layout_marginTop="-60dp"
-                app:cardCornerRadius="20dp"
-                app:cardElevation="8dp"
-                app:cardUseCompatPadding="true"
-                app:cardBackgroundColor="@color/secondary" >
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="24dp"
+                app:cardElevation="10dp"
+                app:cardUseCompatPadding="false"
+                app:cardBackgroundColor="@color/background" > <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="20dp">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="8dp">
 
-                    <!-- Title and category -->
                     <TextView
-                        android:id="@+id/tvItemTitle"
-                        android:layout_width="match_parent"
+                        android:id="@+id/tvPricePerDay"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
                         android:layout_height="wrap_content"
-                        android:text="Designer Dress Collection"
-                        android:textSize="22sp"
+                        android:text="RM 45 / day"
+                        android:textSize="26sp"
+                        android:fontFamily="sans-serif-black"
+                        android:textColor="@color/primary"/>
+
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvItemTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Designer Dress Collection"
+                    android:textSize="22sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/neutral"
+                    android:lineSpacingMultiplier="1.1"/>
+
+                <TextView
+                    android:id="@+id/tvCategory"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Evening Dress • Size M"
+                    android:textSize="14sp"
+                    android:textColor="@color/textcolor"
+                    android:alpha="0.7"
+                    android:layout_marginTop="4dp"
+                    android:textStyle="normal"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/secondary"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="16dp"/>
+
+                <TextView
+                    android:id="@+id/tvShortDesc"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Elegant evening dress perfect for special occasions. Features delicate embroidery and premium fabric that drapes beautifully."
+                    android:textColor="@color/neutral"
+                    android:alpha="0.8"
+                    android:lineSpacingMultiplier="1.4"
+                    android:textSize="15sp"/>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="20dp"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Size: "
                         android:textStyle="bold"
                         android:textColor="@color/neutral"
-                        android:lineSpacingMultiplier="1.1"/>
+                        android:textSize="16sp"/>
 
                     <TextView
-                        android:id="@+id/tvCategory"
-                        android:layout_width="match_parent"
+                        android:id="@+id/tvSize"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Evening Dress • Size M"
-                        android:textSize="16sp"
-                        android:textColor="@color/textcolor"
-                        android:alpha="0.6"
-                        android:layout_marginTop="4dp"/>
+                        android:text="M"
+                        android:layout_marginStart="4dp"
+                        android:textColor="@color/primary"
+                        android:textStyle="bold"
+                        android:textSize="16sp"/>
 
-                    <!-- Price section -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:layout_marginTop="12dp">
+                </LinearLayout>
+
+            </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="4dp"
+                app:cardUseCompatPadding="true"
+                app:cardBackgroundColor="@color/secondary" >
+
+                <LinearLayout
+                    android:padding="20dp"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        app:cardCornerRadius="28dp"
+                        app:cardElevation="0dp"
+                        app:cardBackgroundColor="@color/primary">
 
                         <TextView
-                            android:id="@+id/tvPricePerDay"
-                            android:layout_width="0dp"
-                            android:layout_weight="1"
-                            android:layout_height="wrap_content"
-                            android:text="RM 45 / day"
-                            android:textSize="20sp"
+                            android:id="@+id/tvOwnerAvatar"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:textColor="@color/background"
+                            android:textSize="16sp"
                             android:textStyle="bold"
-                            android:textColor="@color/primary"/>
+                            android:text="SJ" /> </com.google.android.material.card.MaterialCardView>
+
+                    <LinearLayout
+                        android:layout_marginStart="16dp"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvOwnerName"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Sarah Johnson"
+                            android:textStyle="bold"
+                            android:textColor="@color/neutral"
+                            android:textSize="17sp"/>
+
+                        <TextView
+                            android:id="@+id/tvOwnerBio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="4.8 ⭐ | Verified Owner"
+                            android:textSize="13sp"
+                            android:alpha="0.8"
+                            android:textColor="@color/textcolor"
+                            android:layout_marginTop="2dp"/>
 
                     </LinearLayout>
 
-                    <!-- Description -->
-                    <TextView
-                        android:id="@+id/tvShortDesc"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="Elegant evening dress perfect for special occasions. Features delicate embroidery and premium fabric that drapes beautifully."
-                        android:layout_marginTop="12dp"
-                        android:textColor="@color/neutral"
-                        android:alpha="0.8"
-                        android:lineSpacingMultiplier="1.2"
-                        android:textSize="14sp"/>
-
-                    <!-- Size section -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:layout_marginTop="20dp">
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Size and Fit"
-                            android:textStyle="bold"
-                            android:textColor="@color/neutral"
-                            android:textSize="16sp"/>
-
-                        <TextView
-                            android:id="@+id/tvSize"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="M"
-                            android:layout_marginTop="6dp"
-                            android:textColor="@color/neutral"
-                            android:alpha="0.7"
-                            android:lineSpacingMultiplier="1.3"
-                            android:textSize="13sp"/>
-
-                    </LinearLayout>
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnViewProfile"
+                        android:layout_width="wrap_content"
+                        android:layout_height="40dp"
+                        android:text="Profile"
+                        android:backgroundTint="@android:color/transparent"
+                        android:textColor="@color/primary"
+                        android:textSize="13sp"
+                        app:strokeColor="@color/primary"
+                        app:strokeWidth="1dp"
+                        app:cornerRadius="20dp"
+                        android:paddingStart="16dp"
+                        android:paddingEnd="16dp"
+                        style="@style/Widget.Material3.Button.OutlinedButton"/>
 
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Date selection card -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -236,10 +313,10 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Select Rental Period"
+                        android:text="Availability &amp; Rental Period"
                         android:textStyle="bold"
                         android:textColor="@color/neutral"
-                        android:textSize="16sp"/>
+                        android:textSize="17sp"/>
 
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="match_parent"
@@ -247,7 +324,7 @@
                         android:layout_marginTop="12dp"
                         app:cardCornerRadius="12dp"
                         app:cardElevation="2dp"
-                        app:cardUseCompatPadding="true"
+                        app:cardUseCompatPadding="false"
                         android:clipToPadding="false"
                         android:clipToOutline="true">
 
@@ -255,19 +332,25 @@
                             android:id="@+id/calendarAvailability"
                             android:layout_width="match_parent"
                             android:layout_height="330dp"
-                            android:background="@color/background" />
+                            android:background="@color/background"
+                            android:focusedMonthDateColor="@color/primary"
+                            android:selectedDateVerticalBar="@color/primary"
+                            android:weekSeparatorLineColor="@color/secondary"
+                            android:dateTextAppearance="@style/TextAppearance.AppCompat.Medium"
+                            android:weekDayTextAppearance="@style/TextAppearance.AppCompat.Small"
+                            />
 
                     </com.google.android.material.card.MaterialCardView>
 
-                    <!-- Date summary -->
                     <LinearLayout
                         android:layout_marginTop="16dp"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:background="@drawable/date_summary_bg"
-                        android:padding="16dp">
+                        android:background="@color/primary"
+                        android:padding="16dp"
+                        android:id="@+id/dateSummaryContainer">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -280,9 +363,8 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="START DATE"
-                                android:textColor="@color/neutral"
+                                android:textColor="@color/secondary"
                                 android:textSize="10sp"
-                                android:alpha="0.6"
                                 android:textStyle="bold"
                                 android:letterSpacing="0.05"/>
 
@@ -291,10 +373,10 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="—"
-                                android:textColor="@color/neutral"
+                                android:textColor="@color/background"
                                 android:textStyle="bold"
                                 android:layout_marginTop="2dp"
-                                android:textSize="14sp"/>
+                                android:textSize="15sp"/>
 
                         </LinearLayout>
 
@@ -302,8 +384,7 @@
                             android:layout_width="16dp"
                             android:layout_height="16dp"
                             android:src="@drawable/ic_arrow_forward"
-                            android:backgroundTint="@color/neutral"
-                            android:alpha="0.5"
+                            app:tint="@color/background"
                             android:layout_marginStart="8dp"
                             android:layout_marginEnd="8dp"/>
 
@@ -319,9 +400,8 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="END DATE"
-                                android:textColor="@color/neutral"
+                                android:textColor="@color/secondary"
                                 android:textSize="10sp"
-                                android:alpha="0.6"
                                 android:textStyle="bold"
                                 android:letterSpacing="0.05"/>
 
@@ -330,10 +410,10 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="—"
-                                android:textColor="@color/neutral"
+                                android:textColor="@color/background"
                                 android:textStyle="bold"
                                 android:layout_marginTop="2dp"
-                                android:textSize="14sp"/>
+                                android:textSize="15sp"/>
 
                         </LinearLayout>
 
@@ -355,9 +435,8 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="DAYS"
-                                android:textColor="@color/neutral"
+                                android:textColor="@color/secondary"
                                 android:textSize="10sp"
-                                android:alpha="0.6"
                                 android:textStyle="bold"
                                 android:letterSpacing="0.05"/>
 
@@ -366,9 +445,9 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="0"
-                                android:textColor="@color/primary"
+                                android:textColor="@color/background"
                                 android:textStyle="bold"
-                                android:textSize="16sp"
+                                android:textSize="18sp"
                                 android:layout_marginTop="2dp"/>
 
                         </LinearLayout>
@@ -379,97 +458,13 @@
 
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Owner card -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
-                android:layout_marginBottom="20dp"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="4dp"
-                app:cardUseCompatPadding="true"
-                app:cardBackgroundColor="@color/secondary" >
-
-                <LinearLayout
-                    android:padding="20dp"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <!-- Avatar with initials -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:layout_width="60dp"
-                        android:layout_height="60dp"
-                        app:cardCornerRadius="30dp"
-                        app:cardElevation="2dp"
-                        app:cardBackgroundColor="@color/primary">
-
-                        <TextView
-                            android:id="@+id/tvOwnerAvatar"
-                            android:layout_width="60dp"
-                            android:layout_height="60dp"
-                            android:gravity="center"
-                            android:textColor="@color/background"
-                            android:textSize="18sp"
-                            android:textStyle="bold"
-                            android:text="OO" />
-
-                    </com.google.android.material.card.MaterialCardView>
-
-                    <LinearLayout
-                        android:layout_marginStart="16dp"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:id="@+id/tvOwnerName"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Sarah Johnson"
-                            android:textStyle="bold"
-                            android:textColor="@color/neutral"
-                            android:textSize="16sp"/>
-
-                        <TextView
-                            android:id="@+id/tvOwnerBio"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="4.8 ⭐"
-                            android:textSize="13sp"
-                            android:alpha="0.7"
-                            android:textColor="@color/neutral"
-                            android:layout_marginTop="2dp"/>
-
-                    </LinearLayout>
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnViewProfile"
-                        android:layout_width="wrap_content"
-                        android:layout_height="36dp"
-                        android:text="View"
-                        android:backgroundTint="@color/primary"
-                        android:textColor="@color/background"
-                        android:textSize="12sp"
-                        android:insetTop="0dp"
-                        android:insetBottom="0dp"
-                        app:cornerRadius="18dp"/>
-
-                </LinearLayout>
-
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- ⭐ Reviews card -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/reviewsCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="16dp"
                 android:layout_marginEnd="16dp"
-                android:layout_marginBottom="20dp"
+                android:layout_marginBottom="35dp"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="4dp"
                 app:cardUseCompatPadding="true"
@@ -485,13 +480,12 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Reviews"
+                        android:text="Customer Reviews"
                         android:textStyle="bold"
                         android:textColor="@color/neutral"
-                        android:textSize="16sp"
+                        android:textSize="17sp"
                         android:layout_marginBottom="4dp"/>
 
-                    <!-- Average + count -->
                     <TextView
                         android:id="@+id/tvReviewSummary"
                         android:layout_width="match_parent"
@@ -499,20 +493,19 @@
                         android:text="⭐ 0.0 (0 reviews)"
                         android:textColor="@color/neutral"
                         android:textSize="14sp"
+                        android:alpha="0.8"
                         android:layout_marginBottom="8dp"/>
 
-                    <!-- No reviews message -->
                     <TextView
                         android:id="@+id/tvNoReviews"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="No reviews yet. Be the first to rent and review! 😊"
                         android:textColor="@color/textcolor"
-                        android:textSize="13sp"
+                        android:textSize="14sp"
                         android:visibility="gone"
                         android:layout_marginBottom="8dp"/>
 
-                    <!-- Container for reviews -->
                     <LinearLayout
                         android:id="@+id/reviewsContainer"
                         android:layout_width="match_parent"
@@ -526,82 +519,94 @@
 
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Floating Chat Button -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabChat"
         android:layout_width="56dp"
         android:layout_height="56dp"
         app:srcCompat="@drawable/ic_chat"
-        android:tint="@android:color/white"
+        android:tint="@color/background"
         app:backgroundTint="@color/primary"
         android:layout_margin="16dp"
         android:layout_gravity="bottom|end"
         app:elevation="8dp"
-        android:contentDescription="Chat" />
+        android:contentDescription="Chat"
+        android:visibility="gone" /> <com.google.android.material.card.MaterialCardView
+    android:id="@+id/bottomBookingBar"
+    android:layout_width="match_parent"
+    android:layout_height="90dp"
+    android:layout_marginStart="16dp"
+    android:layout_marginEnd="16dp"
+    android:layout_marginBottom="16dp"
+    android:layout_gravity="bottom"
+    app:cardCornerRadius="24dp"
+    app:cardElevation="16dp"
+    app:cardBackgroundColor="@color/background">
 
-    <!-- Bottom Action Bar -->
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/bottomBookingBar"
+    <LinearLayout
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
         android:layout_width="match_parent"
-        android:layout_height="80dp"
-        android:layout_margin="16dp"
-        android:layout_gravity="bottom"
-        app:cardCornerRadius="20dp"
-        app:cardElevation="12dp"
-        app:cardBackgroundColor="@color/background">
+        android:layout_height="match_parent">
 
         <LinearLayout
-            android:paddingStart="20dp"
-            android:paddingEnd="20dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent">
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
 
-            <LinearLayout
-                android:layout_width="0dp"
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
+                android:text="TOTAL RENTAL PRICE"
+                android:textSize="10sp"
+                android:textColor="@color/textcolor"
+                android:alpha="0.7"
+                android:letterSpacing="0.05"/>
 
-                <TextView
-                    android:id="@+id/tvTotalPrice"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="RM 0"
-                    android:textColor="@color/primary"
-                    android:textSize="18sp"
-                    android:textStyle="bold"/>
-
-            </LinearLayout>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnChatOwner"
+            <TextView
+                android:id="@+id/tvTotalPrice"
                 android:layout_width="wrap_content"
-                android:layout_height="48dp"
-                android:text="Chat"
+                android:layout_height="wrap_content"
+                android:text="RM 0"
                 android:textColor="@color/primary"
-                android:backgroundTint="@android:color/transparent"
-                android:layout_marginEnd="8dp"
-                app:strokeColor="@color/primary"
-                app:strokeWidth="1dp"
-                app:cornerRadius="24dp"
-                style="@style/Widget.Material3.Button.OutlinedButton"/>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnBook"
-                android:layout_width="wrap_content"
-                android:layout_height="48dp"
-                android:text="Book Now"
-                android:backgroundTint="@color/primary"
-                android:textColor="@color/background"
-                app:cornerRadius="24dp"
-                android:paddingStart="24dp"
-                android:paddingEnd="24dp"
-                style="@style/Widget.Material3.Button"/>
+                android:textSize="22sp"
+                android:fontFamily="sans-serif-black"
+                android:layout_marginTop="2dp"/>
 
         </LinearLayout>
 
-    </com.google.android.material.card.MaterialCardView>
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnChatOwner"
+            android:layout_width="wrap_content"
+            android:layout_height="54dp"
+            android:text="Chat"
+            android:textColor="@color/primary"
+            android:backgroundTint="@android:color/transparent"
+            android:layout_marginEnd="8dp"
+            app:strokeColor="@color/primary"
+            app:strokeWidth="1dp"
+            app:cornerRadius="27dp"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            style="@style/Widget.Material3.Button.OutlinedButton"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnBook"
+            android:layout_width="wrap_content"
+            android:layout_height="54dp"
+            android:text="Book Now"
+            android:backgroundTint="@color/primary"
+            android:textColor="@color/background"
+            app:cornerRadius="27dp"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:textStyle="bold"
+            style="@style/Widget.Material3.Button"/>
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
