@@ -162,7 +162,7 @@ public class activity_homepage extends AppCompatActivity {
             return true;
         }
         if (id == R.id.nav_live) {
-            startActivity(new Intent(this, activity_profile.class));
+            startActivity(new Intent(this, activity_product_reels.class));
             return true;
         }
         if (id == R.id.nav_chat) {

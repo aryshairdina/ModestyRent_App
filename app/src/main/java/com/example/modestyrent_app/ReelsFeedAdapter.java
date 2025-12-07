@@ -1,0 +1,111 @@
+package com.example.modestyrent_app;
+
+import android.content.Intent;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.viewpager2.widget.ViewPager2;
+
+import java.util.List;
+
+public class ReelsFeedAdapter extends RecyclerView.Adapter<ReelsFeedAdapter.ReelsViewHolder> {
+
+    private final activity_product_reels context;
+    private final List<ReelItem> reelsList;
+
+    public ReelsFeedAdapter(activity_product_reels context, List<ReelItem> reelsList) {
+        this.context = context;
+        this.reelsList = reelsList;
+    }
+
+    @NonNull
+    @Override
+    public ReelsViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(context).inflate(R.layout.video_feed_item, parent, false);
+        return new ReelsViewHolder(view);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull ReelsViewHolder holder, int position) {
+        ReelItem item = reelsList.get(position);
+
+        // Bind text data
+        holder.titleText.setText(item.title != null ? item.title : "Untitled");
+        holder.priceText.setText(item.rentalPrice != null ? item.rentalPrice : "RENT NOW");
+        holder.descriptionText.setText(item.description != null ? item.description : "");
+
+        // --- Setup Horizontal Media Carousel (ViewPager2) ---
+        ReelsMediaAdapter mediaAdapter = new ReelsMediaAdapter(context, item.mediaUrls);
+        holder.mediaViewPager.setAdapter(mediaAdapter);
+
+        // --- Interaction Listeners ---
+
+        // 1. Owner profile button → activity_owner_profile
+        holder.profileButton.setOnClickListener(v -> {
+            if (item.ownerId == null || item.ownerId.isEmpty()) {
+                Toast.makeText(context, "Owner info not available", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            Intent intent = new Intent(context, activity_owner_profile.class);
+            intent.putExtra("ownerId", item.ownerId); // 👈 key usually used in your app
+            context.startActivity(intent);
+        });
+
+        // 2. Price button → activity_product_details
+        holder.priceText.setOnClickListener(v -> {
+            if (item.productId == null || item.productId.isEmpty()) {
+                Toast.makeText(context, "Product ID not available", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            Intent intent = new Intent(context, activity_product_details.class);
+            intent.putExtra("productId", item.productId); // 👈 key used elsewhere in your app
+            context.startActivity(intent);
+        });
+
+        // 3. Like button (placeholder)
+        holder.likeButton.setOnClickListener(v ->
+                Toast.makeText(context, "Liked " + (item.title != null ? item.title : "item"), Toast.LENGTH_SHORT).show()
+        );
+
+        // 4. Comment button (placeholder)
+        holder.commentButton.setOnClickListener(v ->
+                Toast.makeText(context, "Opening comments for " + (item.title != null ? item.title : "item"), Toast.LENGTH_SHORT).show()
+        );
+    }
+
+    @Override
+    public int getItemCount() {
+        return reelsList != null ? reelsList.size() : 0;
+    }
+
+    // --- ViewHolder Class ---
+    public static class ReelsViewHolder extends RecyclerView.ViewHolder {
+        // Horizontal Carousel
+        ViewPager2 mediaViewPager;
+
+        // Text/Control Views
+        TextView titleText;
+        TextView priceText;
+        TextView descriptionText;
+        View profileButton;
+        View likeButton;
+        View commentButton;
+
+        public ReelsViewHolder(@NonNull View itemView) {
+            super(itemView);
+
+            mediaViewPager = itemView.findViewById(R.id.media_viewpager);
+            titleText = itemView.findViewById(R.id.text_video_title);
+            priceText = itemView.findViewById(R.id.text_price);
+            descriptionText = itemView.findViewById(R.id.text_video_description);
+            profileButton = itemView.findViewById(R.id.btn_owner_profile);
+            likeButton = itemView.findViewById(R.id.btn_like);
+            commentButton = itemView.findViewById(R.id.btn_comment);
+        }
+    }
+}
