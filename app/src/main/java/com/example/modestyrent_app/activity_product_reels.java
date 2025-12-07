@@ -6,11 +6,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.PagerSnapHelper;
 import androidx.recyclerview.widget.RecyclerView;
 
-import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.View;
-import android.widget.ImageView;
 import android.widget.Toast;
 
 import com.google.firebase.auth.FirebaseAuth;
@@ -62,7 +59,6 @@ public class activity_product_reels extends AppCompatActivity {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 List<ReelItem> reelsList = new ArrayList<>();
-                boolean hasOwnedProduct = false;
 
                 for (DataSnapshot productSnapshot : snapshot.getChildren()) {
                     Product product = productSnapshot.getValue(Product.class);
@@ -73,20 +69,22 @@ public class activity_product_reels extends AppCompatActivity {
                         product.setId(productSnapshot.getKey());
                     }
 
+                    // ✅ SKIP products that belong to the current owner/borrower
+                    String ownerId = product.getUserId();
+                    if (currentUserId != null && ownerId != null
+                            && currentUserId.equals(ownerId)) {
+                        // Don't show own product in reels feed
+                        continue;
+                    }
+
                     // Only show available products with media
-                    if (!"available".equalsIgnoreCase(
-                            product.getStatus() != null ? product.getStatus().trim() : "")
-                    ) {
+                    String status = product.getStatus() != null ? product.getStatus().trim() : "";
+                    if (!"available".equalsIgnoreCase(status)) {
                         continue;
                     }
 
                     if (product.getImageUrls() == null || product.getImageUrls().isEmpty()) {
                         continue;
-                    }
-
-                    // Check if current user owns at least one product (to show + button)
-                    if (currentUserId != null && currentUserId.equals(product.getUserId())) {
-                        hasOwnedProduct = true;
                     }
 
                     double price = product.getPrice();
@@ -104,9 +102,9 @@ public class activity_product_reels extends AppCompatActivity {
                     ));
                 }
 
-                ReelsFeedAdapter reelsFeedAdapter = new ReelsFeedAdapter(activity_product_reels.this, reelsList);
+                ReelsFeedAdapter reelsFeedAdapter =
+                        new ReelsFeedAdapter(activity_product_reels.this, reelsList);
                 recyclerView.setAdapter(reelsFeedAdapter);
-
             }
 
             @Override
