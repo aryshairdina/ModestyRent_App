@@ -60,6 +60,9 @@ public class activity_product_details extends AppCompatActivity {
     private TextView tvNoReviews;
     private LinearLayout reviewsContainer;
 
+    // ⭐ Media adapter (supports images + videos)
+    private ProductMediaAdapter mediaAdapter;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -272,13 +275,16 @@ public class activity_product_details extends AppCompatActivity {
     }
 
     private void setupImageSlider() {
-        ImageAdapter adapter = new ImageAdapter(this, imageUrls);
-        viewPagerImages.setAdapter(adapter);
+        // Use ProductMediaAdapter that supports images + videos
+        mediaAdapter = new ProductMediaAdapter(this, imageUrls);
+        viewPagerImages.setAdapter(mediaAdapter);
 
+        // Setup dots indicator
         tabLayoutIndicator.removeAllTabs();
         for (int i = 0; i < imageUrls.size(); i++) {
             tabLayoutIndicator.addTab(tabLayoutIndicator.newTab());
         }
+
         viewPagerImages.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override
             public void onPageSelected(int position) {
@@ -286,16 +292,29 @@ public class activity_product_details extends AppCompatActivity {
                 if (position < tabLayoutIndicator.getTabCount()) {
                     tabLayoutIndicator.selectTab(tabLayoutIndicator.getTabAt(position));
                 }
+                if (mediaAdapter != null) {
+                    mediaAdapter.handlePageSelected(position); // autoplay video if this page is video
+                }
             }
         });
 
         tabLayoutIndicator.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override public void onTabSelected(TabLayout.Tab tab) {
-                viewPagerImages.setCurrentItem(tab.getPosition(), true);
+                int pos = tab.getPosition();
+                viewPagerImages.setCurrentItem(pos, true);
+                if (mediaAdapter != null) {
+                    mediaAdapter.handlePageSelected(pos);
+                }
             }
             @Override public void onTabUnselected(TabLayout.Tab tab) {}
             @Override public void onTabReselected(TabLayout.Tab tab) {}
         });
+
+        // Start at first page, trigger playback if video
+        if (!imageUrls.isEmpty() && mediaAdapter != null) {
+            viewPagerImages.setCurrentItem(0, false);
+            mediaAdapter.handlePageSelected(0);
+        }
     }
 
     private void openChatWithOwner() {
@@ -469,5 +488,21 @@ public class activity_product_details extends AppCompatActivity {
         if (timestamp == null) return "";
         SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault());
         return sdf.format(new java.util.Date(timestamp));
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (mediaAdapter != null) {
+            mediaAdapter.pauseAllPlayers();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (mediaAdapter != null) {
+            mediaAdapter.releaseAllPlayers();
+        }
     }
 }

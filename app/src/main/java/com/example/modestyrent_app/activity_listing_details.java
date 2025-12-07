@@ -1,23 +1,27 @@
+// activity_listing_details.java (revised)
 package com.example.modestyrent_app;
 
 import android.app.Activity;
+import android.content.ClipData;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
-import android.widget.ImageView;
 import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ImageView;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.viewpager2.widget.ViewPager2;
 
-import com.bumptech.glide.Glide;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.textfield.TextInputEditText;
@@ -35,21 +39,25 @@ import com.google.firebase.storage.UploadTask;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
-/**
- * activity_listing_details.java
- * - Loads a product by productId (intent extra "productId")
- * - Populates form fields
- * - Allows changing image & updating product data in Firebase Realtime Database
- * - Uploads images to storage path: products/{ownerUserId}/{productId}.jpg
- */
 public class activity_listing_details extends AppCompatActivity {
 
-    private static final int REQ_PICK_IMAGE = 1001;
+    private static final int MAX_MEDIA = 4; // ⬅️ Max media for edit page
 
-    private ImageView ld_backIcon, ld_imgProduct;
-    private Button ld_btnPickImage, ld_btnUpdate;
+    // Top bar
+    private ImageView ld_backIcon;
+
+    // Media slider (same style as add product)
+    private ViewPager2 ld_mediaViewPager;
+    private MediaPagerAdapter mediaPagerAdapter;
+    private TextView ld_tvMediaCount;
+    private Button ld_btnPickImage;
+
+    // Form fields
+    private Button ld_btnUpdate;
     private TextInputEditText ld_etName, ld_etSize, ld_etPrice, ld_etDescription;
     private ChipGroup ld_chipGroupStatus, ld_chipGroupCategory, ld_chipGroupColor;
     private Chip ld_chipAvailable, ld_chipReserved, ld_chipUnavailable;
@@ -57,14 +65,21 @@ public class activity_listing_details extends AppCompatActivity {
     private Chip ld_chipColorWhite, ld_chipColorBlack, ld_chipColorNavy, ld_chipColorPink;
     private ProgressBar ld_progress;
 
+    // Firebase
     private FirebaseAuth auth;
     private DatabaseReference productsRef;
     private StorageReference storageRootRef;
 
     private String productId;
-    private Uri selectedImageUri = null;
-    private String currentImageUrl = null;
     private String ownerUserId = null;
+
+    // Media lists
+    private final ArrayList<Uri> selectedMediaUris = new ArrayList<>();      // For preview in ViewPager (remote + local)
+    private final ArrayList<Uri> newLocalMediaUris = new ArrayList<>();      // Only *new* local URIs
+    private final ArrayList<String> existingImageUrls = new ArrayList<>();   // URLs originally in DB
+
+    // Media picker launcher
+    private ActivityResultLauncher<Intent> pickMediaLauncher;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,12 +91,14 @@ public class activity_listing_details extends AppCompatActivity {
         productsRef = FirebaseDatabase.getInstance().getReference("products");
         storageRootRef = FirebaseStorage.getInstance().getReference();
 
-        // bind views
+        // Bind views
         ld_backIcon = findViewById(R.id.ld_backIcon);
-        ld_imgProduct = findViewById(R.id.ld_imgProduct);
-        ld_btnPickImage = findViewById(R.id.ld_btnPickImage);
-        ld_btnUpdate = findViewById(R.id.ld_btnUpdate);
 
+        ld_mediaViewPager = findViewById(R.id.ld_mediaViewPager);
+        ld_tvMediaCount = findViewById(R.id.ld_tvMediaCount);
+        ld_btnPickImage = findViewById(R.id.ld_btnPickImage);
+
+        ld_btnUpdate = findViewById(R.id.ld_btnUpdate);
         ld_etName = findViewById(R.id.ld_etName);
         ld_etSize = findViewById(R.id.ld_etSize);
         ld_etPrice = findViewById(R.id.ld_etPrice);
@@ -106,13 +123,10 @@ public class activity_listing_details extends AppCompatActivity {
 
         ld_progress = findViewById(R.id.ld_progress);
 
-        // disable image button until product loads (prevent upload before ownerUserId known)
-        ld_btnPickImage.setEnabled(false);
-
-        // Back pressed
+        // Back
         ld_backIcon.setOnClickListener(v -> finish());
 
-        // get productId
+        // Product ID from intent
         productId = getIntent().getStringExtra("productId");
         if (TextUtils.isEmpty(productId)) {
             Toast.makeText(this, "No product selected.", Toast.LENGTH_SHORT).show();
@@ -120,15 +134,111 @@ public class activity_listing_details extends AppCompatActivity {
             return;
         }
 
-        // pick image
-        ld_btnPickImage.setOnClickListener(v -> openImagePicker());
+        // Setup media slider
+        mediaPagerAdapter = new MediaPagerAdapter(this, selectedMediaUris);
+        ld_mediaViewPager.setAdapter(mediaPagerAdapter);
+        ld_mediaViewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageSelected(int position) {
+                super.onPageSelected(position);
+                updateMediaCountText();
+            }
+        });
+        updateMediaCountText();
 
-        // update
+        // Media picker launcher
+        pickMediaLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                        handlePickedMedia(result.getData());
+                    }
+                }
+        );
+
+        // Disable until product owner is verified
+        ld_btnPickImage.setEnabled(false);
+
+        ld_btnPickImage.setOnClickListener(v -> openMediaPicker());
         ld_btnUpdate.setOnClickListener(v -> attemptUpdate());
 
-        // load product
+        // Load product data
         loadProductAndPopulate();
     }
+
+    // --- Media helpers ---
+
+    private void updateMediaCountText() {
+        int count = selectedMediaUris.size();
+        if (count > 0) {
+            ld_tvMediaCount.setVisibility(View.VISIBLE);
+            ld_btnPickImage.setText("Change Photos/Video");
+            int current = ld_mediaViewPager.getCurrentItem() + 1;
+            ld_tvMediaCount.setText(String.format(Locale.getDefault(), "%d / %d", current, count));
+        } else {
+            ld_tvMediaCount.setVisibility(View.GONE);
+            ld_btnPickImage.setText("Add Photos/Video");
+        }
+    }
+
+    private void openMediaPicker() {
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.setType("*/*");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/*", "video/*"});
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        pickMediaLauncher.launch(Intent.createChooser(intent, "Select Photos or Video (Max " + MAX_MEDIA + ")"));
+    }
+
+    /**
+     * New selection REPLACES old media.
+     */
+    private void handlePickedMedia(Intent data) {
+        // Clear previous selection and new-media tracking
+        selectedMediaUris.clear();
+        newLocalMediaUris.clear();
+
+        ClipData clip = data.getClipData();
+        int added = 0;
+
+        if (clip != null) {
+            int count = Math.min(clip.getItemCount(), MAX_MEDIA);
+            for (int i = 0; i < count; i++) {
+                ClipData.Item item = clip.getItemAt(i);
+                if (item == null) continue;
+                Uri uri = item.getUri();
+                if (uri == null) continue;
+
+                selectedMediaUris.add(uri);
+                newLocalMediaUris.add(uri);
+                added++;
+            }
+        } else {
+            Uri uri = data.getData();
+            if (uri != null) {
+                selectedMediaUris.add(uri);
+                newLocalMediaUris.add(uri);
+                added++;
+            }
+        }
+
+        mediaPagerAdapter.updateMedia(selectedMediaUris);
+        if (!selectedMediaUris.isEmpty()) {
+            ld_mediaViewPager.setCurrentItem(0, false);
+        }
+        updateMediaCountText();
+
+        if (added == 0) {
+            Toast.makeText(this, "No media selected", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(
+                    this,
+                    "Replaced with " + added + " new media item(s) (max " + MAX_MEDIA + ")",
+                    Toast.LENGTH_SHORT
+            ).show();
+        }
+    }
+
+    // --- Loading product ---
 
     private void setLoading(boolean loading) {
         ld_progress.setVisibility(loading ? View.VISIBLE : View.GONE);
@@ -136,29 +246,8 @@ public class activity_listing_details extends AppCompatActivity {
         ld_btnPickImage.setEnabled(!loading && ownerUserId != null);
     }
 
-    private void openImagePicker() {
-        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.setType("image/*");
-        startActivityForResult(Intent.createChooser(intent, "Select Product Image"), REQ_PICK_IMAGE);
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == REQ_PICK_IMAGE && resultCode == Activity.RESULT_OK && data != null) {
-            Uri uri = data.getData();
-            if (uri != null) {
-                selectedImageUri = uri;
-                // preview
-                Glide.with(this).load(selectedImageUri).into(ld_imgProduct);
-            }
-        }
-    }
-
     private void loadProductAndPopulate() {
         setLoading(true);
-        // Single read
         productsRef.child(productId).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
@@ -171,7 +260,7 @@ public class activity_listing_details extends AppCompatActivity {
 
                 ownerUserId = snapshot.child("userId").getValue(String.class);
 
-                // check signed-in user
+                // Auth check
                 FirebaseUser current = auth.getCurrentUser();
                 if (current == null) {
                     Toast.makeText(activity_listing_details.this, "Please login first.", Toast.LENGTH_SHORT).show();
@@ -185,10 +274,10 @@ public class activity_listing_details extends AppCompatActivity {
                     return;
                 }
 
-                // enable image pick now that ownerUserId is known
+                // enable media picking now that ownerUserId is known
                 ld_btnPickImage.setEnabled(true);
 
-                // populate fields
+                // Basic fields
                 String name = snapshot.child("name").getValue(String.class);
                 String size = snapshot.child("size").getValue(String.class);
                 String description = snapshot.child("description").getValue(String.class);
@@ -204,35 +293,12 @@ public class activity_listing_details extends AppCompatActivity {
                 String status = snapshot.child("status").getValue(String.class);
                 String category = snapshot.child("category").getValue(String.class);
 
-                // load imageUrls (use first if exists)
-                currentImageUrl = null;
-                if (snapshot.child("imageUrls").exists()) {
-                    for (DataSnapshot imgNode : snapshot.child("imageUrls").getChildren()) {
-                        String url = imgNode.getValue(String.class);
-                        if (!TextUtils.isEmpty(url)) {
-                            currentImageUrl = url;
-                            break;
-                        }
-                    }
-                } else if (snapshot.child("imageUrl").exists()) {
-                    currentImageUrl = snapshot.child("imageUrl").getValue(String.class);
-                }
-
-                if (!TextUtils.isEmpty(currentImageUrl)) {
-                    Glide.with(activity_listing_details.this)
-                            .load(currentImageUrl)
-                            .placeholder(R.drawable.sample_product)
-                            .into(ld_imgProduct);
-                } else {
-                    ld_imgProduct.setImageResource(R.drawable.sample_product);
-                }
-
                 if (name != null) ld_etName.setText(name);
                 if (size != null) ld_etSize.setText(size);
                 if (description != null) ld_etDescription.setText(description);
                 if (price != null) ld_etPrice.setText(String.valueOf(price));
 
-                // status
+                // Status
                 if (status != null) {
                     switch (status.toLowerCase().trim()) {
                         case "available":
@@ -249,7 +315,7 @@ public class activity_listing_details extends AppCompatActivity {
                     }
                 }
 
-                // category
+                // Category
                 if (category != null) {
                     String cat = category.toLowerCase().trim();
                     if (cat.contains("kurung")) ld_chipGroupCategory.check(ld_chipCategoryKurung.getId());
@@ -258,14 +324,13 @@ public class activity_listing_details extends AppCompatActivity {
                     else ld_chipGroupCategory.clearCheck();
                 }
 
-                // colors: many possible shapes; try list then string
-                if (snapshot.child("colors").exists()) {
-                    // clear all
-                    ld_chipColorWhite.setChecked(false);
-                    ld_chipColorBlack.setChecked(false);
-                    ld_chipColorNavy.setChecked(false);
-                    ld_chipColorPink.setChecked(false);
+                // Colors
+                ld_chipColorWhite.setChecked(false);
+                ld_chipColorBlack.setChecked(false);
+                ld_chipColorNavy.setChecked(false);
+                ld_chipColorPink.setChecked(false);
 
+                if (snapshot.child("colors").exists()) {
                     for (DataSnapshot c : snapshot.child("colors").getChildren()) {
                         String color = c.getValue(String.class);
                         if (color == null) continue;
@@ -275,11 +340,34 @@ public class activity_listing_details extends AppCompatActivity {
                         else if (lower.contains("navy")) ld_chipColorNavy.setChecked(true);
                         else if (lower.contains("pink")) ld_chipColorPink.setChecked(true);
                     }
-                } else if (snapshot.child("color").exists()) {
-                    String colorsStr = snapshot.child("color").getValue(String.class);
-                    applyColorStringToChips(colorsStr);
-                } else if (snapshot.child("colorCSV").exists()) {
-                    applyColorStringToChips(snapshot.child("colorCSV").getValue(String.class));
+                }
+
+                // Existing media URLs
+                existingImageUrls.clear();
+                selectedMediaUris.clear();
+                newLocalMediaUris.clear();
+
+                if (snapshot.child("imageUrls").exists()) {
+                    for (DataSnapshot imgNode : snapshot.child("imageUrls").getChildren()) {
+                        String url = imgNode.getValue(String.class);
+                        if (!TextUtils.isEmpty(url)) {
+                            existingImageUrls.add(url);
+                            selectedMediaUris.add(Uri.parse(url)); // Glide can load from this
+                        }
+                    }
+                } else if (snapshot.child("imageUrl").exists()) {
+                    String singleUrl = snapshot.child("imageUrl").getValue(String.class);
+                    if (!TextUtils.isEmpty(singleUrl)) {
+                        existingImageUrls.add(singleUrl);
+                        selectedMediaUris.add(Uri.parse(singleUrl));
+                    }
+                }
+
+                mediaPagerAdapter.updateMedia(selectedMediaUris);
+                updateMediaCountText();
+
+                if (selectedMediaUris.isEmpty()) {
+                    Toast.makeText(activity_listing_details.this, "No media. You can add photos/videos.", Toast.LENGTH_SHORT).show();
                 }
             }
 
@@ -292,17 +380,9 @@ public class activity_listing_details extends AppCompatActivity {
         });
     }
 
-    private void applyColorStringToChips(String colorsStr) {
-        if (colorsStr == null) return;
-        String lower = colorsStr.toLowerCase();
-        if (lower.contains("white")) ld_chipColorWhite.setChecked(true);
-        if (lower.contains("black")) ld_chipColorBlack.setChecked(true);
-        if (lower.contains("navy")) ld_chipColorNavy.setChecked(true);
-        if (lower.contains("pink")) ld_chipColorPink.setChecked(true);
-    }
+    // --- Update product ---
 
     private void attemptUpdate() {
-        // check auth & ownership again
         FirebaseUser current = auth.getCurrentUser();
         if (current == null) {
             Toast.makeText(this, "Please sign in first.", Toast.LENGTH_SHORT).show();
@@ -373,52 +453,8 @@ public class activity_listing_details extends AppCompatActivity {
 
         setLoading(true);
 
-        // If user selected new image — upload it under: products/{ownerUserId}/{productId}.jpg
-        if (selectedImageUri != null) {
-            if (ownerUserId == null) {
-                setLoading(false);
-                Toast.makeText(this, "Owner UID not determined. Try again.", Toast.LENGTH_LONG).show();
-                return;
-            }
-
-            StorageReference imgRef = storageRootRef.child("products")
-                    .child(ownerUserId)
-                    .child(productId + ".jpg");
-
-            imgRef.putFile(selectedImageUri)
-                    .addOnSuccessListener(taskSnapshot -> imgRef.getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
-                        @Override
-                        public void onSuccess(Uri uri) {
-                            String downloadUrl = uri.toString();
-                            List<String> imageUrls = new ArrayList<>();
-                            imageUrls.add(downloadUrl);
-                            updates.put("imageUrls", imageUrls);
-
-                            // update database
-                            productsRef.child(productId).updateChildren(updates)
-                                    .addOnCompleteListener(task -> {
-                                        setLoading(false);
-                                        if (task.isSuccessful()) {
-                                            Toast.makeText(activity_listing_details.this, "Product updated successfully.", Toast.LENGTH_SHORT).show();
-                                            finish();
-                                        } else {
-                                            Toast.makeText(activity_listing_details.this, "Failed to update product: " + task.getException(), Toast.LENGTH_LONG).show();
-                                        }
-                                    });
-                        }
-                    }).addOnFailureListener(e -> {
-                        setLoading(false);
-                        Toast.makeText(activity_listing_details.this, "Failed to get image URL: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    }))
-                    .addOnFailureListener(new OnFailureListener() {
-                        @Override
-                        public void onFailure(@NonNull Exception e) {
-                            setLoading(false);
-                            Toast.makeText(activity_listing_details.this, "Image upload failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                        }
-                    });
-        } else {
-            // no image change, update DB directly
+        // If no new media picked -> keep existing imageUrls in DB
+        if (newLocalMediaUris.isEmpty()) {
             productsRef.child(productId).updateChildren(updates).addOnCompleteListener(task -> {
                 setLoading(false);
                 if (task.isSuccessful()) {
@@ -428,6 +464,70 @@ public class activity_listing_details extends AppCompatActivity {
                     Toast.makeText(activity_listing_details.this, "Failed to update product: " + task.getException(), Toast.LENGTH_LONG).show();
                 }
             });
+        } else {
+            uploadNewMediaThenUpdate(updates);
         }
+    }
+
+    private void uploadNewMediaThenUpdate(Map<String, Object> updates) {
+        if (ownerUserId == null) {
+            setLoading(false);
+            Toast.makeText(this, "Owner UID not determined. Try again.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        StorageReference rootRef = storageRootRef.child("products").child(ownerUserId);
+        List<Task<Uri>> urlTasks = new ArrayList<>();
+
+        for (Uri uri : newLocalMediaUris) {
+            String filename = productId + "_" + UUID.randomUUID().toString();
+            String extension = ".dat";
+
+            String mimeType = getContentResolver().getType(uri);
+            if (mimeType != null) {
+                if (mimeType.contains("image")) extension = ".jpg";
+                else if (mimeType.contains("video")) extension = ".mp4";
+            }
+
+            StorageReference fileRef = rootRef.child(filename + extension);
+            UploadTask uploadTask = fileRef.putFile(uri);
+
+            Task<Uri> urlTask = uploadTask.continueWithTask(task -> {
+                if (!task.isSuccessful()) {
+                    throw task.getException() != null ? task.getException() : new Exception("Upload failed");
+                }
+                return fileRef.getDownloadUrl();
+            });
+
+            urlTasks.add(urlTask);
+        }
+
+        Tasks.whenAllSuccess(urlTasks)
+                .addOnSuccessListener(objects -> {
+                    // ✅ Replace old URLs with only the new uploads
+                    List<String> finalUrls = new ArrayList<>();
+                    for (Object obj : objects) {
+                        if (obj instanceof Uri) {
+                            finalUrls.add(((Uri) obj).toString());
+                        }
+                    }
+
+                    updates.put("imageUrls", finalUrls);
+
+                    productsRef.child(productId).updateChildren(updates)
+                            .addOnCompleteListener(task -> {
+                                setLoading(false);
+                                if (task.isSuccessful()) {
+                                    Toast.makeText(activity_listing_details.this, "Product updated successfully.", Toast.LENGTH_SHORT).show();
+                                    finish();
+                                } else {
+                                    Toast.makeText(activity_listing_details.this, "Failed to update product: " + task.getException(), Toast.LENGTH_LONG).show();
+                                }
+                            });
+                })
+                .addOnFailureListener(e -> {
+                    setLoading(false);
+                    Toast.makeText(activity_listing_details.this, "Media upload failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
     }
 }

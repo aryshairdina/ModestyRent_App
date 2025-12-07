@@ -43,36 +43,49 @@ public class ReelsFeedAdapter extends RecyclerView.Adapter<ReelsFeedAdapter.Reel
         ReelsMediaAdapter mediaAdapter = new ReelsMediaAdapter(context, item.mediaUrls);
         holder.mediaViewPager.setAdapter(mediaAdapter);
 
+        holder.mediaViewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageSelected(int pos) {
+                super.onPageSelected(pos);
+                mediaAdapter.handlePageSelected(pos);
+            }
+        });
+
+        holder.mediaViewPager.setCurrentItem(0, false);
+        mediaAdapter.handlePageSelected(0);
+
         // --- Interaction Listeners ---
 
-        // 1. Owner profile button → activity_owner_profile
+        // Owner profile button
         holder.profileButton.setOnClickListener(v -> {
+            ReelsMediaAdapter.pauseAllPlayers(); // stop all videos
             if (item.ownerId == null || item.ownerId.isEmpty()) {
                 Toast.makeText(context, "Owner info not available", Toast.LENGTH_SHORT).show();
                 return;
             }
             Intent intent = new Intent(context, activity_owner_profile.class);
-            intent.putExtra("ownerId", item.ownerId); // 👈 key usually used in your app
+            intent.putExtra("ownerId", item.ownerId);
             context.startActivity(intent);
         });
 
-        // 2. Price button → activity_product_details
+        // Price button (RENT NOW)
         holder.priceText.setOnClickListener(v -> {
+            ReelsMediaAdapter.pauseAllPlayers(); // stop all videos
             if (item.productId == null || item.productId.isEmpty()) {
                 Toast.makeText(context, "Product ID not available", Toast.LENGTH_SHORT).show();
                 return;
             }
             Intent intent = new Intent(context, activity_product_details.class);
-            intent.putExtra("productId", item.productId); // 👈 key used elsewhere in your app
+            intent.putExtra("productId", item.productId);
             context.startActivity(intent);
         });
 
-        // 3. Like button (placeholder)
+        // Like button (placeholder)
         holder.likeButton.setOnClickListener(v ->
                 Toast.makeText(context, "Liked " + (item.title != null ? item.title : "item"), Toast.LENGTH_SHORT).show()
         );
 
-        // 4. Comment button (placeholder)
+        // Comment button (placeholder)
         holder.commentButton.setOnClickListener(v ->
                 Toast.makeText(context, "Opening comments for " + (item.title != null ? item.title : "item"), Toast.LENGTH_SHORT).show()
         );
@@ -85,10 +98,7 @@ public class ReelsFeedAdapter extends RecyclerView.Adapter<ReelsFeedAdapter.Reel
 
     // --- ViewHolder Class ---
     public static class ReelsViewHolder extends RecyclerView.ViewHolder {
-        // Horizontal Carousel
         ViewPager2 mediaViewPager;
-
-        // Text/Control Views
         TextView titleText;
         TextView priceText;
         TextView descriptionText;
@@ -98,7 +108,6 @@ public class ReelsFeedAdapter extends RecyclerView.Adapter<ReelsFeedAdapter.Reel
 
         public ReelsViewHolder(@NonNull View itemView) {
             super(itemView);
-
             mediaViewPager = itemView.findViewById(R.id.media_viewpager);
             titleText = itemView.findViewById(R.id.text_video_title);
             priceText = itemView.findViewById(R.id.text_price);

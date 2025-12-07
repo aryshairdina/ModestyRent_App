@@ -1,7 +1,7 @@
 package com.example.modestyrent_app;
 
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.PagerSnapHelper;
 import androidx.recyclerview.widget.RecyclerView;
@@ -30,6 +30,10 @@ public class activity_product_reels extends AppCompatActivity {
     private DatabaseReference productsRef;
     private String currentUserId;
 
+    private ReelsFeedAdapter reelsFeedAdapter;
+    private LinearLayoutManager layoutManager;
+    private PagerSnapHelper snapHelper;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -44,13 +48,55 @@ public class activity_product_reels extends AppCompatActivity {
         recyclerView = findViewById(R.id.recycler_video_feed);
 
         // 3. Setup RecyclerView (vertical reels + snapping)
-        recyclerView.setLayoutManager(
-                new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
-        );
-        new PagerSnapHelper().attachToRecyclerView(recyclerView);
+        layoutManager = new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false);
+        recyclerView.setLayoutManager(layoutManager);
+
+        snapHelper = new PagerSnapHelper();
+        snapHelper.attachToRecyclerView(recyclerView);
+
+        // When vertical scroll stops, decide which reel is "active"
+        recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(@NonNull RecyclerView rv, int newState) {
+                super.onScrollStateChanged(rv, newState);
+
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                    // Scroll has stopped -> find snapped reel
+                    if (snapHelper != null && layoutManager != null) {
+                        android.view.View snappedView = snapHelper.findSnapView(layoutManager);
+                        if (snappedView != null && reelsFeedAdapter != null) {
+                            int pos = layoutManager.getPosition(snappedView);
+                            if (pos != RecyclerView.NO_POSITION) {
+                                handleReelSelected(pos);
+                            }
+                        }
+                    }
+                }
+            }
+        });
 
         // 4. Fetch Data
         fetchProductReels();
+    }
+
+    // Called when a reel becomes centered after vertical scroll
+    private void handleReelSelected(int position) {
+        // Pause ALL videos first
+        ReelsMediaAdapter.pauseAllPlayers();
+
+        // Find the ViewHolder for this reel
+        RecyclerView.ViewHolder vh = recyclerView.findViewHolderForAdapterPosition(position);
+        if (vh instanceof ReelsFeedAdapter.ReelsViewHolder) {
+            ReelsFeedAdapter.ReelsViewHolder rVH = (ReelsFeedAdapter.ReelsViewHolder) vh;
+
+            // Get its horizontal ViewPager2 and adapter
+            androidx.viewpager2.widget.ViewPager2 vp = rVH.mediaViewPager;
+            if (vp != null && vp.getAdapter() instanceof ReelsMediaAdapter) {
+                ReelsMediaAdapter mediaAdapter = (ReelsMediaAdapter) vp.getAdapter();
+                int currentPage = vp.getCurrentItem();
+                mediaAdapter.handlePageSelected(currentPage); // will play only that page's video
+            }
+        }
     }
 
     // --- Data Fetching and Adapter Setup ---
@@ -69,11 +115,10 @@ public class activity_product_reels extends AppCompatActivity {
                         product.setId(productSnapshot.getKey());
                     }
 
-                    // ✅ SKIP products that belong to the current owner/borrower
+                    // ✅ SKIP products that belong to the current owner
                     String ownerId = product.getUserId();
                     if (currentUserId != null && ownerId != null
                             && currentUserId.equals(ownerId)) {
-                        // Don't show own product in reels feed
                         continue;
                     }
 
@@ -102,9 +147,13 @@ public class activity_product_reels extends AppCompatActivity {
                     ));
                 }
 
-                ReelsFeedAdapter reelsFeedAdapter =
-                        new ReelsFeedAdapter(activity_product_reels.this, reelsList);
+                reelsFeedAdapter = new ReelsFeedAdapter(activity_product_reels.this, reelsList);
                 recyclerView.setAdapter(reelsFeedAdapter);
+
+                // After first load, mark first reel as selected so its video plays
+                if (!reelsList.isEmpty()) {
+                    recyclerView.post(() -> handleReelSelected(0));
+                }
             }
 
             @Override
@@ -113,5 +162,17 @@ public class activity_product_reels extends AppCompatActivity {
                 Toast.makeText(activity_product_reels.this, "Failed to load reels.", Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        ReelsMediaAdapter.pauseAllPlayers(); // stop sound when leaving screen
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        ReelsMediaAdapter.pauseAllPlayers(); // extra safety
     }
 }

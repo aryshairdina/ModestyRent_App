@@ -21,48 +21,23 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-// Adapter for the horizontal scrolling media (images/videos) within a single Reel item.
-public class ReelsMediaAdapter extends RecyclerView.Adapter<ReelsMediaAdapter.MediaViewHolder> {
+public class ProductMediaAdapter extends RecyclerView.Adapter<ProductMediaAdapter.MediaViewHolder> {
 
-    private static final String TAG = "ReelsMediaAdapter";
+    private static final String TAG = "ProductMediaAdapter";
 
     private final Context context;
-    private final List<String> mediaUrls;      // already ordered: videos first, then images
+    private final List<String> mediaUrls;   // images + videos
     private final Map<Integer, ExoPlayer> playerMap = new HashMap<>();
 
-    // Global players list so we can pause everything
-    private static final List<ExoPlayer> globalPlayers = new ArrayList<>();
-
-    public ReelsMediaAdapter(Context context, List<String> mediaUrls) {
+    public ProductMediaAdapter(Context context, List<String> mediaUrls) {
         this.context = context;
-        this.mediaUrls = orderMediaUrls(mediaUrls != null ? mediaUrls : new ArrayList<>());
-    }
-
-    // Put videos first, then images
-    private List<String> orderMediaUrls(List<String> original) {
-        List<String> videos = new ArrayList<>();
-        List<String> images = new ArrayList<>();
-
-        for (String url : original) {
-            if (isVideoUrl(url)) {
-                videos.add(url);
-            } else {
-                images.add(url);
-            }
-        }
-
-        List<String> ordered = new ArrayList<>();
-        ordered.addAll(videos);
-        ordered.addAll(images);
-
-        Log.d(TAG, "orderMediaUrls -> videos: " + videos.size() + ", images: " + images.size());
-        return ordered;
+        this.mediaUrls = mediaUrls != null ? mediaUrls : new ArrayList<>();
     }
 
     @NonNull
     @Override
     public MediaViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(context).inflate(R.layout.media_page_item, parent, false);
+        View view = LayoutInflater.from(context).inflate(R.layout.item_image_slider, parent, false);
         return new MediaViewHolder(view);
     }
 
@@ -70,12 +45,11 @@ public class ReelsMediaAdapter extends RecyclerView.Adapter<ReelsMediaAdapter.Me
     public void onBindViewHolder(@NonNull MediaViewHolder holder, int position) {
         String url = mediaUrls.get(position);
 
-        // Clean up any old player attached to this holder
+        // Clean up any old player on this view
         ExoPlayer existingPlayer = (ExoPlayer) holder.videoPlayerView.getPlayer();
         if (existingPlayer != null) {
             existingPlayer.setPlayWhenReady(false);
             existingPlayer.release();
-            globalPlayers.remove(existingPlayer);
             removePlayerFromMap(existingPlayer);
             holder.videoPlayerView.setPlayer(null);
         }
@@ -91,13 +65,12 @@ public class ReelsMediaAdapter extends RecyclerView.Adapter<ReelsMediaAdapter.Me
 
             MediaItem mediaItem = MediaItem.fromUri(url);
             player.setMediaItem(mediaItem);
-            player.setRepeatMode(Player.REPEAT_MODE_ONE);   // loop
-            player.setVolume(1f);                            // sound ON; use 0f if you want mute by default
+            player.setRepeatMode(Player.REPEAT_MODE_ONE); // loop
+            player.setVolume(1f);                         // sound ON (set 0f if you want mute)
             player.prepare();
-            player.setPlayWhenReady(true);                   // autoplay
+            player.setPlayWhenReady(false);               // will be started by handlePageSelected
 
             playerMap.put(position, player);
-            globalPlayers.add(player);
 
         } else {
             Log.d(TAG, "Binding IMAGE at position " + position + " url=" + url);
@@ -107,9 +80,8 @@ public class ReelsMediaAdapter extends RecyclerView.Adapter<ReelsMediaAdapter.Me
 
             Glide.with(context)
                     .load(url)
-                    .placeholder(android.R.drawable.stat_sys_download)
-                    .error(android.R.drawable.ic_menu_close_clear_cancel)
                     .centerCrop()
+                    .placeholder(R.drawable.ic_person)
                     .into(holder.imageView);
         }
     }
@@ -121,7 +93,6 @@ public class ReelsMediaAdapter extends RecyclerView.Adapter<ReelsMediaAdapter.Me
         if (player != null) {
             player.setPlayWhenReady(false);
             player.release();
-            globalPlayers.remove(player);
             removePlayerFromMap(player);
             holder.videoPlayerView.setPlayer(null);
         }
@@ -146,14 +117,12 @@ public class ReelsMediaAdapter extends RecyclerView.Adapter<ReelsMediaAdapter.Me
     }
 
     /**
-     * Called when user swipes inside horizontal ViewPager2.
-     * Only selected page's video (if any) should play; others pause.
+     * Page in ViewPager2 selected: only that page's video should play.
      */
     public void handlePageSelected(int selectedPosition) {
         for (Map.Entry<Integer, ExoPlayer> entry : playerMap.entrySet()) {
             int pos = entry.getKey();
             ExoPlayer player = entry.getValue();
-
             if (pos == selectedPosition) {
                 player.setPlayWhenReady(true);
                 player.setVolume(1f);
@@ -164,45 +133,43 @@ public class ReelsMediaAdapter extends RecyclerView.Adapter<ReelsMediaAdapter.Me
         }
     }
 
-    /**
-     * Pause ALL videos globally.
-     */
-    public static void pauseAllPlayers() {
-        for (ExoPlayer player : globalPlayers) {
+    public void pauseAllPlayers() {
+        for (ExoPlayer player : playerMap.values()) {
             player.setPlayWhenReady(false);
             player.setVolume(0f);
         }
     }
 
-    // Check if URL is a video (Firebase URLs have ?alt=media...)
+    public void releaseAllPlayers() {
+        for (ExoPlayer player : playerMap.values()) {
+            player.setPlayWhenReady(false);
+            player.release();
+        }
+        playerMap.clear();
+    }
+
     private boolean isVideoUrl(String url) {
         if (url == null) return false;
-
         String clean = url;
         int qIndex = url.indexOf("?");
         if (qIndex >= 0) {
             clean = url.substring(0, qIndex);
         }
-
         clean = clean.toLowerCase();
-
-        boolean isVideo = clean.endsWith(".mp4")
+        return clean.endsWith(".mp4")
                 || clean.endsWith(".mkv")
                 || clean.endsWith(".webm")
                 || clean.endsWith(".3gp");
-
-        Log.d(TAG, "isVideoUrl? " + url + " -> " + isVideo);
-        return isVideo;
     }
 
-    // --- ViewHolder Class ---
+    // --- ViewHolder ---
     public static class MediaViewHolder extends RecyclerView.ViewHolder {
         ImageView imageView;
         PlayerView videoPlayerView;
 
         public MediaViewHolder(@NonNull View itemView) {
             super(itemView);
-            imageView = itemView.findViewById(R.id.image_media);
+            imageView = itemView.findViewById(R.id.ivSlider);
             videoPlayerView = itemView.findViewById(R.id.video_player_view);
         }
     }
