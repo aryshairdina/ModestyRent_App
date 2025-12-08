@@ -17,6 +17,12 @@
         android:theme="@style/Theme.ModestyRentApp"
         tools:targetApi="31">
         <activity
+            android:name=".activity_product_reels_onboarding"
+            android:exported="false" />
+        <activity
+            android:name=".activity_product_details_onboarding"
+            android:exported="false" />
+        <activity
             android:name=".activity_product_reels"
             android:exported="false" />
         <activity

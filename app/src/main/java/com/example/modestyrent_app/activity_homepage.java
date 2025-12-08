@@ -2,6 +2,7 @@ package com.example.modestyrent_app;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -20,6 +21,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -76,6 +78,9 @@ public class activity_homepage extends AppCompatActivity {
     // Store color per productId (from database "color" field)
     private final Map<String, String> productColorMap = new HashMap<>();
 
+    // Top chips group
+    private ChipGroup topCategoryGroup;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -131,6 +136,9 @@ public class activity_homepage extends AppCompatActivity {
 
         setupProductGrid();
         setupSearchAndFilters();
+
+        // --- NEW: wire top category chips to filters ---
+        setupCategoryChips();
     }
 
     @Override
@@ -190,6 +198,91 @@ public class activity_homepage extends AppCompatActivity {
             btnFilter.setOnClickListener(v -> openFilterDialog());
         }
     }
+
+    /**
+     * Hook top category chips (the ChipGroup in activity_homepage.xml) so when user taps a chip
+     * the selectedCategory value updates and filtering is immediately applied.
+     */
+    private void setupCategoryChips() {
+        topCategoryGroup = findViewById(R.id.categoryGroup);
+        if (topCategoryGroup == null) {
+            Log.w(TAG, "Top category ChipGroup (categoryGroup) not found in layout.");
+            return;
+        }
+
+        // Determine initial selectedCategory from the checked chip (if any)
+        int checkedId = topCategoryGroup.getCheckedChipId();
+        if (checkedId != View.NO_ID) {
+            View v = topCategoryGroup.findViewById(checkedId);
+            if (v instanceof Chip) {
+                selectedCategory = ((Chip) v).getText().toString();
+            } else {
+                selectedCategory = "All";
+            }
+        } else {
+            selectedCategory = "All";
+        }
+
+        // Ensure initial visual state (color the chips correctly at startup)
+        updateTopChipsVisual(checkedId);
+
+        // Single listener that updates visuals and triggers filtering
+        topCategoryGroup.setOnCheckedChangeListener((group, checkedChipId) -> {
+            // Update visual state for each chip
+            updateTopChipsVisual(checkedChipId);
+
+            // Update selectedCategory and apply filters
+            selectedCategory = getSelectedChipText(group, "All");
+            applySearchAndFilters();
+        });
+    }
+
+    /**
+     * Update chip background/text/stroke colors for top Category chips.
+     * selectedChipId may be View.NO_ID (none selected) — in that case we mark "All" checked if present.
+     */
+    private void updateTopChipsVisual(int selectedChipId) {
+        if (topCategoryGroup == null) return;
+
+        // If nothing selected, try to select "All" chip by text as fallback
+        if (selectedChipId == View.NO_ID) {
+            for (int i = 0; i < topCategoryGroup.getChildCount(); i++) {
+                View child = topCategoryGroup.getChildAt(i);
+                if (child instanceof Chip) {
+                    Chip chip = (Chip) child;
+                    if ("All".equalsIgnoreCase(chip.getText().toString())) {
+                        chip.setChecked(true); // this will trigger listener if already set, but safe at startup
+                        selectedChipId = chip.getId();
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Colors
+        int colorPrimary = ContextCompat.getColor(this, R.color.primary);
+        int colorSecondary = ContextCompat.getColor(this, R.color.secondary);
+        ColorStateList textChecked = ContextCompat.getColorStateList(this, R.color.background); // text on primary
+        ColorStateList textUnchecked = ContextCompat.getColorStateList(this, R.color.neutral);   // text on secondary
+        int strokeChecked = ContextCompat.getColor(this, R.color.primary);
+        int strokeUnchecked = ContextCompat.getColor(this, R.color.textcolor);
+
+        // Apply colors to each chip
+        for (int i = 0; i < topCategoryGroup.getChildCount(); i++) {
+            View child = topCategoryGroup.getChildAt(i);
+            if (child instanceof Chip) {
+                Chip chip = (Chip) child;
+                boolean isChecked = (chip.getId() == selectedChipId) || chip.isChecked();
+                // background
+                chip.setChipBackgroundColor(ColorStateList.valueOf(isChecked ? colorPrimary : colorSecondary));
+                // text color (use ColorStateList for API compatibility)
+                chip.setTextColor(isChecked ? textChecked : textUnchecked);
+                // stroke
+                chip.setChipStrokeColor(ColorStateList.valueOf(isChecked ? strokeChecked : strokeUnchecked));
+            }
+        }
+    }
+
 
     private void openFilterDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -314,11 +407,42 @@ public class activity_homepage extends AppCompatActivity {
                 filterMaxPrice = maxAll;
             }
 
+            // If top chips exist, keep them in sync: check matching chip on top (optional)
+            syncTopCategorySelectionWithDialog(selectedCategory);
+
             applySearchAndFilters();
             dialog.dismiss();
         });
 
         dialog.show();
+    }
+
+    /**
+     * Optional helper: when user applies a category via the dialog, keep top chips in sync.
+     */
+    private void syncTopCategorySelectionWithDialog(String categoryText) {
+        if (topCategoryGroup == null || categoryText == null) return;
+        for (int i = 0; i < topCategoryGroup.getChildCount(); i++) {
+            View child = topCategoryGroup.getChildAt(i);
+            if (child instanceof Chip) {
+                Chip chip = (Chip) child;
+                if (categoryText.equalsIgnoreCase(chip.getText().toString())) {
+                    chip.setChecked(true);
+                    return;
+                }
+            }
+        }
+        // fallback if not found: check "All" chip if exists
+        for (int i = 0; i < topCategoryGroup.getChildCount(); i++) {
+            View child = topCategoryGroup.getChildAt(i);
+            if (child instanceof Chip) {
+                Chip chip = (Chip) child;
+                if ("All".equalsIgnoreCase(chip.getText().toString())) {
+                    chip.setChecked(true);
+                    return;
+                }
+            }
+        }
     }
 
     private void restoreChipSelectionByText(ChipGroup group, String text) {

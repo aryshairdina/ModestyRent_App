@@ -137,11 +137,11 @@
                     android:layout_height="wrap_content"
                     android:checked="true"
                     android:text="All"
-                    app:chipBackgroundColor="@color/primary"
                     android:textColor="@color/background"
+                    app:checkedIconVisible="false"
+                    app:chipBackgroundColor="@color/primary"
                     app:chipCornerRadius="20dp"
                     app:chipMinHeight="40dp"
-                    app:checkedIconVisible="false"
                     app:chipStrokeColor="@color/primary"
                     app:chipStrokeWidth="1dp"
                     app:rippleColor="@color/background" />
@@ -150,12 +150,12 @@
                     style="@style/Widget.Material3.Chip.Suggestion"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Baju Kurung"
-                    app:chipBackgroundColor="@color/secondary"
+                    android:text="Kurung"
                     android:textColor="@color/neutral"
+                    app:checkedIconVisible="false"
+                    app:chipBackgroundColor="@color/secondary"
                     app:chipCornerRadius="20dp"
                     app:chipMinHeight="40dp"
-                    app:checkedIconVisible="false"
                     app:chipStrokeColor="@color/textcolor"
                     app:chipStrokeWidth="0dp"
                     app:rippleColor="@color/primary" />
@@ -165,11 +165,11 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Jubah"
-                    app:chipBackgroundColor="@color/secondary"
                     android:textColor="@color/neutral"
+                    app:checkedIconVisible="false"
+                    app:chipBackgroundColor="@color/secondary"
                     app:chipCornerRadius="20dp"
                     app:chipMinHeight="40dp"
-                    app:checkedIconVisible="false"
                     app:chipStrokeColor="@color/textcolor"
                     app:chipStrokeWidth="0dp"
                     app:rippleColor="@color/primary" />
@@ -178,12 +178,12 @@
                     style="@style/Widget.Material3.Chip.Suggestion"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Dress"
-                    app:chipBackgroundColor="@color/secondary"
+                    android:text="Kebaya"
                     android:textColor="@color/neutral"
+                    app:checkedIconVisible="false"
+                    app:chipBackgroundColor="@color/secondary"
                     app:chipCornerRadius="20dp"
                     app:chipMinHeight="40dp"
-                    app:checkedIconVisible="false"
                     app:chipStrokeColor="@color/textcolor"
                     app:chipStrokeWidth="0dp"
                     app:rippleColor="@color/primary" />
@@ -193,11 +193,25 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Shawl"
-                    app:chipBackgroundColor="@color/secondary"
                     android:textColor="@color/neutral"
+                    app:checkedIconVisible="false"
+                    app:chipBackgroundColor="@color/secondary"
                     app:chipCornerRadius="20dp"
                     app:chipMinHeight="40dp"
+                    app:chipStrokeColor="@color/textcolor"
+                    app:chipStrokeWidth="0dp"
+                    app:rippleColor="@color/primary" />
+
+                <com.google.android.material.chip.Chip
+                    style="@style/Widget.Material3.Chip.Suggestion"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Other"
+                    android:textColor="@color/neutral"
                     app:checkedIconVisible="false"
+                    app:chipBackgroundColor="@color/secondary"
+                    app:chipCornerRadius="20dp"
+                    app:chipMinHeight="40dp"
                     app:chipStrokeColor="@color/textcolor"
                     app:chipStrokeWidth="0dp"
                     app:rippleColor="@color/primary" />
@@ -224,16 +238,6 @@
             android:textColor="@color/neutral"
             android:textSize="20sp"
             android:fontFamily="sans-serif-medium"/>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="View All"
-            android:textColor="@color/primary"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:clickable="true"
-            android:focusable="true"/>
 
     </LinearLayout>
 

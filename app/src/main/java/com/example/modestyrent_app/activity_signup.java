@@ -35,14 +35,12 @@ public class activity_signup extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_signup);
 
-        // Views
         fullNameEditText = findViewById(R.id.fullNameEditText);
         emailEditText = findViewById(R.id.emailEditText);
         passwordEditText = findViewById(R.id.passwordEditText);
         confirmPasswordEditText = findViewById(R.id.confirmPasswordEditText);
         signUpButton = findViewById(R.id.signUpButton);
 
-        // Firebase
         mAuth = FirebaseAuth.getInstance();
         usersRef = FirebaseDatabase.getInstance().getReference("users");
 
@@ -52,7 +50,6 @@ public class activity_signup extends AppCompatActivity {
 
         signUpButton.setOnClickListener(v -> attemptSignup());
 
-        // Optional: login redirect
         View loginRedirect = findViewById(R.id.loginRedirectText);
         if (loginRedirect != null) {
             loginRedirect.setOnClickListener(v -> {
@@ -68,22 +65,33 @@ public class activity_signup extends AppCompatActivity {
         String password = passwordEditText.getText() != null ? passwordEditText.getText().toString() : "";
         String confirm = confirmPasswordEditText.getText() != null ? confirmPasswordEditText.getText().toString() : "";
 
-        // Validation
+        // Full name validation
         if (TextUtils.isEmpty(fullName)) {
             fullNameEditText.setError("Enter full name");
             fullNameEditText.requestFocus();
             return;
         }
+
+        // Email validation - Gmail only
         if (TextUtils.isEmpty(email) || !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
             emailEditText.setError("Enter a valid email");
             emailEditText.requestFocus();
             return;
         }
+
+        if (!email.endsWith("@gmail.com")) {
+            emailEditText.setError("Only Gmail accounts are allowed");
+            emailEditText.requestFocus();
+            return;
+        }
+
+        // Password validation
         if (TextUtils.isEmpty(password) || password.length() < 6) {
             passwordEditText.setError("Password must be at least 6 characters");
             passwordEditText.requestFocus();
             return;
         }
+
         if (!password.equals(confirm)) {
             confirmPasswordEditText.setError("Passwords do not match");
             confirmPasswordEditText.requestFocus();
@@ -92,10 +100,11 @@ public class activity_signup extends AppCompatActivity {
 
         progressDialog.show();
 
-        // Create user in Firebase Authentication
+        // Create Firebase Authentication user
         mAuth.createUserWithEmailAndPassword(email, password)
                 .addOnCompleteListener(this, createTask -> {
                     if (createTask.isSuccessful()) {
+
                         FirebaseUser firebaseUser = mAuth.getCurrentUser();
                         if (firebaseUser == null) {
                             progressDialog.dismiss();
@@ -106,64 +115,43 @@ public class activity_signup extends AppCompatActivity {
                         String uid = firebaseUser.getUid();
                         user userObj = new user(uid, fullName, email);
 
-                        // Save user profile to Realtime Database
+                        // Save to Realtime Database
                         usersRef.child(uid).setValue(userObj)
                                 .addOnCompleteListener(dbTask -> {
                                     progressDialog.dismiss();
-                                    if (dbTask.isSuccessful()) {
-                                        // Optionally send email verification
-                                        sendEmailVerification(firebaseUser);
 
-                                        Toast.makeText(activity_signup.this, "Account created.", Toast.LENGTH_LONG).show();
-                                        // Redirect to sign-in or home as desired
+                                    if (dbTask.isSuccessful()) {
+                                        Toast.makeText(activity_signup.this, "Account created successfully.", Toast.LENGTH_LONG).show();
+
+                                        // Redirect to Sign In
                                         Intent i = new Intent(activity_signup.this, activity_signin.class);
                                         i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
                                         startActivity(i);
                                         finish();
+
                                     } else {
-                                        // DB write failed -> delete auth user to avoid orphaned account
                                         Exception dbEx = dbTask.getException();
-                                        Log.e(TAG, "Failed to save user in Realtime DB", dbEx);
-                                        // delete auth user
-                                        firebaseUser.delete().addOnCompleteListener(deleteTask -> {
-                                            if (deleteTask.isSuccessful()) {
-                                                Log.d(TAG, "Auth user deleted after DB write failure");
-                                            } else {
-                                                Log.w(TAG, "Failed to delete auth user after DB write failure", deleteTask.getException());
-                                            }
-                                        });
+                                        Log.e(TAG, "Database error", dbEx);
+
+                                        firebaseUser.delete(); // remove orphan auth
 
                                         String msg = dbEx != null ? dbEx.getMessage() : "Failed to save profile";
-                                        Toast.makeText(activity_signup.this, "Failed to save profile: " + msg, Toast.LENGTH_LONG).show();
+                                        Toast.makeText(activity_signup.this, msg, Toast.LENGTH_LONG).show();
                                     }
                                 });
+
                     } else {
                         progressDialog.dismiss();
                         Exception ex = createTask.getException();
-                        Log.e(TAG, "createUserWithEmailAndPassword failed", ex);
+                        Log.e(TAG, "Firebase createUser failed", ex);
 
-                        // Friendly error messages for common cases
                         if (ex instanceof FirebaseAuthUserCollisionException) {
-                            // Email already in use
-                            Toast.makeText(activity_signup.this, "This email is already registered. Try signing in or use password reset.", Toast.LENGTH_LONG).show();
+                            Toast.makeText(activity_signup.this, "This email is already registered.", Toast.LENGTH_LONG).show();
                         } else if (ex != null) {
-                            Toast.makeText(activity_signup.this, "Registration failed: " + ex.getMessage(), Toast.LENGTH_LONG).show();
+                            Toast.makeText(activity_signup.this, ex.getMessage(), Toast.LENGTH_LONG).show();
                         } else {
-                            Toast.makeText(activity_signup.this, "Registration failed (unknown error)", Toast.LENGTH_LONG).show();
+                            Toast.makeText(activity_signup.this, "Registration failed", Toast.LENGTH_LONG).show();
                         }
-                    }
-                });
-    }
-
-    private void sendEmailVerification(FirebaseUser user) {
-        if (user == null) return;
-
-        user.sendEmailVerification()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        Log.d(TAG, "Verification email sent to " + user.getEmail());
-                    } else {
-                        Log.w(TAG, "Failed to send verification email", task.getException());
                     }
                 });
     }
