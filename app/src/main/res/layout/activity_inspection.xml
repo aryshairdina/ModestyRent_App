@@ -62,74 +62,169 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Due Date Status Indicator -->
+            <!-- Due Date Status Indicator - IMPROVED LAYOUT -->
             <androidx.cardview.widget.CardView
                 android:id="@+id/cvDueDateIndicator"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="4dp"
-                android:layout_marginBottom="16dp"
-                android:padding="16dp">
+                android:layout_marginBottom="16dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
+                    <!-- Top Row: Status and Icon -->
                     <LinearLayout
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="8dp">
 
                         <TextView
                             android:id="@+id/tvDueDateStatus"
-                            android:layout_width="wrap_content"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
+                            android:layout_weight="1"
                             android:text="CHECKING..."
                             android:textColor="@android:color/white"
-                            android:textSize="16sp"
-                            android:textStyle="bold"
-                            android:layout_marginBottom="4dp" />
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
 
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:src="@drawable/ic_calendar"
+                            app:tint="@android:color/white" />
+
+                    </LinearLayout>
+
+                    <!-- Bottom Row: Label and Value -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:id="@+id/tvDueDateLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Due Date:"
+                            android:textColor="@android:color/white"
+                            android:textSize="14sp"
+                            android:layout_marginEnd="8dp" />
+
+                        <TextView
+                            android:id="@+id/tvDueDateValue"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="--"
+                            android:textColor="@android:color/white"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </androidx.cardview.widget.CardView>
+
+            <!-- Late Penalty Section (Hidden by default) - MOVED HERE for better flow -->
+            <LinearLayout
+                android:id="@+id/llLatePenaltySection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:layout_marginBottom="16dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="4dp"
+                    app:cardBackgroundColor="@color/background"
+                    app:strokeColor="#F44336"
+                    app:strokeWidth="2dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <!-- Title Row -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:orientation="horizontal">
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginBottom="8dp">
 
-                            <TextView
-                                android:id="@+id/tvDueDateLabel"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Due Date:"
-                                android:textColor="@android:color/white"
-                                android:textSize="14sp"
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:src="@drawable/ic_warning"
+                                app:tint="#F44336"
                                 android:layout_marginEnd="8dp" />
 
                             <TextView
-                                android:id="@+id/tvDueDateValue"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Late Return Penalty"
+                                android:textColor="#F44336"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+
+                        </LinearLayout>
+
+                        <!-- Description -->
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="RM 5.00 per day penalty applied for late return"
+                            android:textColor="@color/textcolor"
+                            android:textSize="14sp"
+                            android:layout_marginBottom="12dp" />
+
+                        <!-- Penalty Amount -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Total Late Penalty"
+                                android:textColor="@color/textcolor"
+                                android:textSize="14sp" />
+
+                            <TextView
+                                android:id="@+id/tvLatePenaltyAmount"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="--"
-                                android:textColor="@android:color/white"
-                                android:textSize="14sp"
+                                android:text="RM 0.00"
+                                android:textColor="#F44336"
+                                android:textSize="18sp"
                                 android:textStyle="bold" />
 
                         </LinearLayout>
 
                     </LinearLayout>
 
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/ic_calendar"
-                        app:tint="@android:color/white" />
+                </com.google.android.material.card.MaterialCardView>
 
-                </LinearLayout>
-
-            </androidx.cardview.widget.CardView>
+            </LinearLayout>
 
             <!-- Booking Information Card -->
             <com.google.android.material.card.MaterialCardView
@@ -155,11 +250,12 @@
                         android:textStyle="bold"
                         android:layout_marginBottom="12dp" />
 
+                    <!-- Product -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:layout_marginBottom="8dp">
+                        android:layout_marginBottom="12dp">
 
                         <TextView
                             android:layout_width="0dp"
@@ -176,15 +272,18 @@
                             android:text="—"
                             android:textColor="@color/neutral"
                             android:textSize="14sp"
-                            android:textStyle="bold" />
+                            android:textStyle="bold"
+                            android:maxLines="2"
+                            android:ellipsize="end" />
 
                     </LinearLayout>
 
+                    <!-- Borrower -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:layout_marginBottom="8dp">
+                        android:layout_marginBottom="12dp">
 
                         <TextView
                             android:layout_width="0dp"
@@ -205,11 +304,12 @@
 
                     </LinearLayout>
 
+                    <!-- Rental Period -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:layout_marginBottom="8dp">
+                        android:layout_marginBottom="12dp">
 
                         <TextView
                             android:layout_width="0dp"
@@ -230,6 +330,7 @@
 
                     </LinearLayout>
 
+                    <!-- Return Method -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -394,12 +495,14 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="16dp"
-                        app:boxCornerRadiusBottomEnd="12dp"
-                        app:boxCornerRadiusBottomStart="12dp"
-                        app:boxCornerRadiusTopEnd="12dp"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                         app:boxCornerRadiusTopStart="12dp"
+                        app:boxCornerRadiusTopEnd="12dp"
+                        app:boxCornerRadiusBottomStart="12dp"
+                        app:boxCornerRadiusBottomEnd="12dp"
                         app:boxBackgroundColor="@color/background"
-                        app:boxStrokeColor="@color/primary">
+                        app:boxStrokeColor="@color/primary"
+                        app:hintTextColor="@color/textcolor">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etDamageNotes"
@@ -458,80 +561,6 @@
 
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Late Penalty Section (Hidden by default) -->
-            <LinearLayout
-                android:id="@+id/llLatePenaltySection"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone"
-                android:layout_marginBottom="16dp">
-
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:cardCornerRadius="16dp"
-                    app:cardElevation="4dp"
-                    app:cardBackgroundColor="@color/background"
-                    app:strokeColor="#F44336"
-                    app:strokeWidth="2dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="20dp">
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Late Return Penalty"
-                            android:textColor="#F44336"
-                            android:textSize="16sp"
-                            android:textStyle="bold"
-                            android:layout_marginBottom="12dp"
-                            android:drawablePadding="8dp"
-                            android:drawableStart="@drawable/ic_warning" />
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="RM 5.00 per day penalty applied for late return"
-                            android:textColor="@color/textcolor"
-                            android:textSize="14sp"
-                            android:layout_marginBottom="12dp" />
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical">
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="Total Late Penalty"
-                                android:textColor="@color/textcolor"
-                                android:textSize="14sp" />
-
-                            <TextView
-                                android:id="@+id/tvLatePenaltyAmount"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="RM 0.00"
-                                android:textColor="#F44336"
-                                android:textSize="16sp"
-                                android:textStyle="bold" />
-
-                        </LinearLayout>
-
-                    </LinearLayout>
-
-                </com.google.android.material.card.MaterialCardView>
-
-            </LinearLayout>
-
             <!-- Deposit Adjustment Card -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
@@ -556,6 +585,7 @@
                         android:textStyle="bold"
                         android:layout_marginBottom="16dp" />
 
+                    <!-- Original Deposit -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -597,13 +627,13 @@
                             android:textSize="14sp" />
 
                         <TextView
+                            android:id="@+id/tvRepairCostDeduction"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="RM 0.00"
                             android:textColor="@color/primary"
                             android:textSize="14sp"
-                            android:textStyle="bold"
-                            android:id="@+id/tvRepairCostDeduction" />
+                            android:textStyle="bold" />
 
                     </LinearLayout>
 
@@ -641,6 +671,7 @@
                         android:background="@color/secondary"
                         android:layout_marginBottom="12dp" />
 
+                    <!-- Total Deductions -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -668,10 +699,11 @@
 
                     <View
                         android:layout_width="match_parent"
-                        android:layout_height="1dp"
+                        android:layout_height="2dp"
                         android:background="@color/primary"
                         android:layout_marginBottom="12dp" />
 
+                    <!-- Refund Amount -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"

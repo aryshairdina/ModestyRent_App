@@ -187,8 +187,6 @@ public class activity_dummy_payment extends AppCompatActivity {
                         productsRef.child(productId).child("status").setValue("Unavailable");
                     }
 
-                    Toast.makeText(this, "Payment successful", Toast.LENGTH_SHORT).show();
-
                     // Go to booking confirmation page
                     Intent intent = new Intent(activity_dummy_payment.this, activity_booking.class);
                     intent.putExtra("bookingId", bookingId);

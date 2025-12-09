@@ -3,6 +3,7 @@ package com.example.modestyrent_app;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.*;
 import androidx.annotation.NonNull;
@@ -33,8 +34,9 @@ public class activity_inspection extends AppCompatActivity {
 
     // New UI Components for late return indicator
     private CardView cvDueDateIndicator;
-    private TextView tvDueDateStatus, tvDueDateLabel, tvDueDateValue, tvLatePenaltyAmount;
-    private LinearLayout llLatePenaltySection;
+    private TextView tvDueDateStatus, tvDueDateLabel, tvDueDateValue, tvLatePenaltyAmount, tvRepairCostDeduction, tvLatePenaltyDeduction;
+
+    private LinearLayout llLatePenaltySection, llLatePenaltyDeduction;
 
     // Database References
     private DatabaseReference bookingsRef, usersRef, productsRef;
@@ -108,6 +110,11 @@ public class activity_inspection extends AppCompatActivity {
         tvDueDateValue = findViewById(R.id.tvDueDateValue);
         tvLatePenaltyAmount = findViewById(R.id.tvLatePenaltyAmount);
         llLatePenaltySection = findViewById(R.id.llLatePenaltySection);
+
+        // Add these lines after initializing other views
+        tvRepairCostDeduction = findViewById(R.id.tvRepairCostDeduction);
+        tvLatePenaltyDeduction = findViewById(R.id.tvLatePenaltyDeduction);
+        llLatePenaltyDeduction = findViewById(R.id.llLatePenaltyDeduction);
 
         backButton.setOnClickListener(v -> finish());
     }
@@ -219,31 +226,70 @@ public class activity_inspection extends AppCompatActivity {
         Long endDate = getLongValue(bookingSnapshot, "endDate");
 
         if (endDate != null) {
-            Calendar endDateCal = Calendar.getInstance();
-            endDateCal.setTimeInMillis(endDate);
-            endDateCal.set(Calendar.HOUR_OF_DAY, 23);
-            endDateCal.set(Calendar.MINUTE, 59);
-            endDateCal.set(Calendar.SECOND, 59);
+            // Create calendar instances
+            Calendar dueDateCal = Calendar.getInstance();
+            dueDateCal.setTimeInMillis(endDate);
+
+            // Set due date to END of the due day (23:59:59)
+            dueDateCal.set(Calendar.HOUR_OF_DAY, 23);
+            dueDateCal.set(Calendar.MINUTE, 59);
+            dueDateCal.set(Calendar.SECOND, 59);
+            dueDateCal.set(Calendar.MILLISECOND, 999);
 
             Calendar now = Calendar.getInstance();
 
-            // Calculate days late
-            long diff = now.getTimeInMillis() - endDateCal.getTimeInMillis();
-            daysLate = diff / (1000 * 60 * 60 * 24);
+            // DEBUG: Log the dates for troubleshooting
+            SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy HH:mm:ss", Locale.getDefault());
+            Log.d("LateCheck", "Due Date: " + sdf.format(dueDateCal.getTime()));
+            Log.d("LateCheck", "Current Date: " + sdf.format(now.getTime()));
+            Log.d("LateCheck", "Due Date in ms: " + dueDateCal.getTimeInMillis());
+            Log.d("LateCheck", "Current Date in ms: " + now.getTimeInMillis());
 
-            if (daysLate > 0) {
-                // Late return
-                isLateReturn = true;
-                latePenaltyAmount = Math.min(daysLate * PENALTY_PER_DAY, PENALTY_CAP);
+            // Check if current time is AFTER the due date (including time of day)
+            if (now.getTimeInMillis() > dueDateCal.getTimeInMillis()) {
+                // Calculate days late
+                // We calculate based on calendar days, not 24-hour periods
+                Calendar dueDateOnly = Calendar.getInstance();
+                dueDateOnly.setTimeInMillis(endDate);
+                dueDateOnly.set(Calendar.HOUR_OF_DAY, 0);
+                dueDateOnly.set(Calendar.MINUTE, 0);
+                dueDateOnly.set(Calendar.SECOND, 0);
+                dueDateOnly.set(Calendar.MILLISECOND, 0);
 
-                // Update UI for late return (RED indicator)
-                updateDueDateIndicator(false, daysLate, endDate);
+                Calendar nowOnly = Calendar.getInstance();
+                nowOnly.set(Calendar.HOUR_OF_DAY, 0);
+                nowOnly.set(Calendar.MINUTE, 0);
+                nowOnly.set(Calendar.SECOND, 0);
+                nowOnly.set(Calendar.MILLISECOND, 0);
 
-                // Show late penalty section
-                llLatePenaltySection.setVisibility(View.VISIBLE);
-                tvLatePenaltyAmount.setText(String.format("RM %.2f", latePenaltyAmount));
+                long diffInMillis = nowOnly.getTimeInMillis() - dueDateOnly.getTimeInMillis();
+                daysLate = diffInMillis / (1000 * 60 * 60 * 24);
 
-                Toast.makeText(this, "Late return detected: " + daysLate + " day(s) late", Toast.LENGTH_LONG).show();
+                Log.d("LateCheck", "Days Late: " + daysLate);
+
+                if (daysLate > 0) {
+                    // Late return
+                    isLateReturn = true;
+                    latePenaltyAmount = Math.min(daysLate * PENALTY_PER_DAY, PENALTY_CAP);
+
+                    // Update UI for late return (RED indicator)
+                    updateDueDateIndicator(false, daysLate, endDate);
+
+                    // Show late penalty section
+                    llLatePenaltySection.setVisibility(View.VISIBLE);
+                    tvLatePenaltyAmount.setText(String.format("RM %.2f", latePenaltyAmount));
+
+                    String message = "Late return detected: " + daysLate + " day(s) late\n";
+                    message += "Due: " + formatDate(endDate) + "\n";
+                    message += "Returned: " + formatDate(now.getTimeInMillis());
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                } else {
+                    // This should not happen, but just in case
+                    isLateReturn = false;
+                    latePenaltyAmount = 0.0;
+                    updateDueDateIndicator(true, 0, endDate);
+                    llLatePenaltySection.setVisibility(View.GONE);
+                }
             } else {
                 // On time or early return (GREEN indicator)
                 isLateReturn = false;
@@ -251,6 +297,7 @@ public class activity_inspection extends AppCompatActivity {
 
                 updateDueDateIndicator(true, 0, endDate);
                 llLatePenaltySection.setVisibility(View.GONE);
+                Log.d("LateCheck", "Return is ON TIME");
             }
 
             // Initial calculation
@@ -299,8 +346,19 @@ public class activity_inspection extends AppCompatActivity {
         // Get current repair cost from slider
         repairCostAmount = (double) sliderRepairCost.getValue();
 
+        // Update repair cost deduction display
+        tvRepairCostDeduction.setText(String.format("RM %.2f", repairCostAmount));
+
         // Calculate total deductions (repair cost + late penalty)
         double totalDeductions = repairCostAmount + latePenaltyAmount;
+
+        // Update late penalty UI if applicable
+        if (isLateReturn && latePenaltyAmount > 0) {
+            llLatePenaltyDeduction.setVisibility(View.VISIBLE);
+            tvLatePenaltyDeduction.setText(String.format("RM %.2f", latePenaltyAmount));
+        } else {
+            llLatePenaltyDeduction.setVisibility(View.GONE);
+        }
 
         // Calculate refund amount
         double refundAmount = Math.max(0, originalDepositAmount - totalDeductions);
@@ -361,7 +419,11 @@ public class activity_inspection extends AppCompatActivity {
 
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(this, "Rental completed successfully", Toast.LENGTH_SHORT).show();
+                    String message = "Rental completed successfully";
+                    if (isLateReturn) {
+                        message += "\nLate penalty applied: RM " + String.format("%.2f", latePenaltyAmount);
+                    }
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show();
 
                     Intent intent = new Intent(this, activity_rentals_details_owner.class);
                     intent.putExtra("bookingId", bookingId);
@@ -435,7 +497,7 @@ public class activity_inspection extends AppCompatActivity {
 
     private String formatDate(Long timestamp) {
         if (timestamp == null) return "N/A";
-        SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault());
-        return sdf.format(new java.util.Date(timestamp));
+        SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy", Locale.getDefault());
+        return sdf.format(new Date(timestamp));
     }
 }
