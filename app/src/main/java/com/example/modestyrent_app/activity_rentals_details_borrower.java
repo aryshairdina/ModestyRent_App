@@ -924,7 +924,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
 
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(this, "Item marked as picked up", Toast.LENGTH_SHORT).show();
                     loadBookingDetails();
                 })
                 .addOnFailureListener(e -> {
@@ -940,7 +939,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
 
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(this, "Item marked as received", Toast.LENGTH_SHORT).show();
                     loadBookingDetails();
                 })
                 .addOnFailureListener(e -> {

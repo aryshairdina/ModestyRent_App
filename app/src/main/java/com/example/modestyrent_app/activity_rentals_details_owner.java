@@ -2,6 +2,7 @@ package com.example.modestyrent_app;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ImageView;
@@ -258,6 +259,18 @@ public class activity_rentals_details_owner extends AppCompatActivity {
         String status = getStringValue(bookingSnapshot, "status");
         String deliveryStatus = getStringValue(bookingSnapshot, "deliveryStatus");
 
+        // Debug logging
+        Log.d("StatusDebug", "status: " + status + ", deliveryStatus: " + deliveryStatus + ", deliveryOption: " + deliveryOption);
+
+        // Log all timestamps for debugging
+        Long completionTime = getLongValue(bookingSnapshot, "completionTime");
+        Long inspectionTime = getLongValue(bookingSnapshot, "inspectionTime");
+        Long returnTime = getLongValue(bookingSnapshot, "returnTime");
+
+        Log.d("StatusDebug", "completionTime: " + completionTime);
+        Log.d("StatusDebug", "inspectionTime: " + inspectionTime);
+        Log.d("StatusDebug", "returnTime: " + returnTime);
+
         if ("Delivery".equals(deliveryOption)) {
             String[] statusFlow = {"Confirmed", "Preparing Delivery", "Out for Delivery", "On Rent", "Return", "Inspection", "Completed"};
             String[] statusDescriptions = {
@@ -270,19 +283,22 @@ public class activity_rentals_details_owner extends AppCompatActivity {
                     "Rental completed successfully"
             };
             String[] statusIcons = {"ic_check", "ic_preparing", "ic_delivery", "ic_onrent", "ic_return", "ic_inspection", "ic_completed"};
-            String[] statusDates = {
-                    formatDateTime(paymentDate != null ? paymentDate : bookingDate),
-                    formatDateTime(getLongValue(bookingSnapshot, "preparationTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "deliveryLeaveTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "deliveryTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "returnTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "inspectionTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "completionTime"))
+
+            // Get all timestamps
+            Long[] statusTimestamps = {
+                    paymentDate != null ? paymentDate : bookingDate,
+                    getLongValue(bookingSnapshot, "preparationTime"),
+                    getLongValue(bookingSnapshot, "deliveryLeaveTime"),
+                    getLongValue(bookingSnapshot, "deliveryTime"),
+                    returnTime,
+                    inspectionTime,
+                    completionTime
             };
 
             for (int i = 0; i < statusFlow.length; i++) {
                 String currentStatus = statusFlow[i];
-                View statusItem = createStatusItem(currentStatus, statusDescriptions[i], statusIcons[i], statusDates[i],
+                String dateText = getDateTextForStatus(statusTimestamps[i], statusFlow[i], status, deliveryStatus);
+                View statusItem = createStatusItem(currentStatus, statusDescriptions[i], statusIcons[i], dateText,
                         status, deliveryStatus, i == statusFlow.length - 1);
                 statusTimeline.addView(statusItem);
             }
@@ -298,23 +314,60 @@ public class activity_rentals_details_owner extends AppCompatActivity {
                     "Rental completed successfully"
             };
             String[] statusIcons = {"ic_check", "ic_preparing", "ic_ready_pickup", "ic_onrent", "ic_return", "ic_inspection", "ic_completed"};
-            String[] statusDates = {
-                    formatDateTime(paymentDate != null ? paymentDate : bookingDate),
-                    formatDateTime(getLongValue(bookingSnapshot, "preparationTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "readyForPickupTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "pickupTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "returnTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "inspectionTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "completionTime"))
+
+            // Get all timestamps
+            Long[] statusTimestamps = {
+                    paymentDate != null ? paymentDate : bookingDate,
+                    getLongValue(bookingSnapshot, "preparationTime"),
+                    getLongValue(bookingSnapshot, "readyForPickupTime"),
+                    getLongValue(bookingSnapshot, "pickupTime"),
+                    returnTime,
+                    inspectionTime,
+                    completionTime
             };
 
             for (int i = 0; i < statusFlow.length; i++) {
                 String currentStatus = statusFlow[i];
-                View statusItem = createStatusItem(currentStatus, statusDescriptions[i], statusIcons[i], statusDates[i],
+                String dateText = getDateTextForStatus(statusTimestamps[i], statusFlow[i], status, deliveryStatus);
+                View statusItem = createStatusItem(currentStatus, statusDescriptions[i], statusIcons[i], dateText,
                         status, deliveryStatus, i == statusFlow.length - 1);
                 statusTimeline.addView(statusItem);
             }
         }
+    }
+
+    // NEW METHOD: Determine what date text to show for each status
+    private String getDateTextForStatus(Long timestamp, String timelineStatus, String currentStatus, String deliveryStatus) {
+        if (timestamp == null || timestamp == 0) {
+            // Check if this status should be completed based on current booking status
+            boolean isCompleted = isStatusCompletedSimple(timelineStatus, currentStatus, deliveryStatus);
+            if (isCompleted) {
+                // If it should be completed but has no timestamp, show current time
+                return formatDateTime(System.currentTimeMillis());
+            } else {
+                return "Pending";
+            }
+        } else {
+            return formatDateTime(timestamp);
+        }
+    }
+
+    // Simplified version to check if a timeline status should be completed
+    private boolean isStatusCompletedSimple(String timelineStatus, String currentStatus, String deliveryStatus) {
+        if (currentStatus == null) return false;
+
+        String currentStatusLower = currentStatus.toLowerCase();
+        String deliveryStatusLower = deliveryStatus != null ? deliveryStatus.toLowerCase() : "";
+
+        // Basic logic: if current status is completed, all previous statuses should be completed
+        if (currentStatusLower.contains("complete") ||
+                currentStatusLower.contains("finished") ||
+                currentStatusLower.contains("done")) {
+            return true;
+        }
+
+        // Add more specific logic if needed
+        return false;
     }
 
     private View createStatusItem(String statusText, String description, String iconName, String date,
@@ -336,7 +389,9 @@ public class activity_rentals_details_owner extends AppCompatActivity {
 
         statusTextView.setText(statusText);
         statusDescriptionView.setText(description);
-        statusDateView.setText(date != null ? date : "Pending");
+
+        // Always set the date text - it should be determined by getDateTextForStatus
+        statusDateView.setText(date);
 
         if (isLast) {
             connectorLine.setVisibility(View.GONE);
@@ -344,6 +399,11 @@ public class activity_rentals_details_owner extends AppCompatActivity {
 
         boolean isCompleted = isStatusCompleted(statusText, currentStatus, deliveryStatus);
         boolean isCurrent = isCurrentStatus(statusText, currentStatus, deliveryStatus);
+
+        Log.d("StatusDebug", "Creating item: " + statusText +
+                ", date: " + date +
+                ", isCompleted: " + isCompleted +
+                ", isCurrent: " + isCurrent);
 
         if (isCompleted) {
             statusIndicator.setBackgroundResource(R.drawable.circle_completed);
@@ -363,42 +423,60 @@ public class activity_rentals_details_owner extends AppCompatActivity {
             statusTextView.setTextColor(getColor(R.color.textcolor));
             statusDescriptionView.setTextColor(getColor(R.color.textcolor));
             statusDateView.setTextColor(getColor(R.color.textcolor));
-            statusDateView.setText("Pending");
         }
 
         return statusItem;
     }
 
     private boolean isStatusCompleted(String timelineStatus, String currentStatus, String deliveryStatus) {
+        if (currentStatus == null) return false;
+
+        String currentStatusLower = currentStatus.toLowerCase();
+        String deliveryStatusLower = deliveryStatus != null ? deliveryStatus.toLowerCase() : "";
+
         if ("Delivery".equals(deliveryOption)) {
             switch (timelineStatus) {
                 case "Confirmed":
                     return true;
                 case "Preparing Delivery":
-                    return "PreparingDelivery".equals(currentStatus) ||
-                            "OutForDelivery".equals(deliveryStatus) ||
-                            "OnRent".equals(currentStatus) ||
-                            "ReturnRequested".equals(currentStatus) ||
-                            "AwaitingInspection".equals(currentStatus) ||
-                            "Completed".equals(currentStatus);
+                    return "preparingdelivery".equals(currentStatusLower) ||
+                            "outfordelivery".equals(deliveryStatusLower) ||
+                            "onrent".equals(currentStatusLower) ||
+                            "returnrequested".equals(currentStatusLower) ||
+                            "awaitinginspection".equals(currentStatusLower) ||
+                            currentStatusLower.contains("complete") ||
+                            currentStatusLower.contains("finished") ||
+                            currentStatusLower.contains("done");
                 case "Out for Delivery":
-                    return "OutForDelivery".equals(deliveryStatus) ||
-                            "OnRent".equals(currentStatus) ||
-                            "ReturnRequested".equals(currentStatus) ||
-                            "AwaitingInspection".equals(currentStatus) ||
-                            "Completed".equals(currentStatus);
+                    return "outfordelivery".equals(deliveryStatusLower) ||
+                            "onrent".equals(currentStatusLower) ||
+                            "returnrequested".equals(currentStatusLower) ||
+                            "awaitinginspection".equals(currentStatusLower) ||
+                            currentStatusLower.contains("complete") ||
+                            currentStatusLower.contains("finished") ||
+                            currentStatusLower.contains("done");
                 case "On Rent":
-                    return "OnRent".equals(currentStatus) ||
-                            "ReturnRequested".equals(currentStatus) ||
-                            "AwaitingInspection".equals(currentStatus) ||
-                            "Completed".equals(currentStatus);
+                    return "onrent".equals(currentStatusLower) ||
+                            "returnrequested".equals(currentStatusLower) ||
+                            "awaitinginspection".equals(currentStatusLower) ||
+                            currentStatusLower.contains("complete") ||
+                            currentStatusLower.contains("finished") ||
+                            currentStatusLower.contains("done");
                 case "Return":
-                    return "AwaitingInspection".equals(currentStatus) ||
-                            "Completed".equals(currentStatus);
+                    return "returnrequested".equals(currentStatusLower) ||
+                            "awaitinginspection".equals(currentStatusLower) ||
+                            currentStatusLower.contains("complete") ||
+                            currentStatusLower.contains("finished") ||
+                            currentStatusLower.contains("done");
                 case "Inspection":
-                    return "Completed".equals(currentStatus);
+                    return "awaitinginspection".equals(currentStatusLower) ||
+                            currentStatusLower.contains("complete") ||
+                            currentStatusLower.contains("finished") ||
+                            currentStatusLower.contains("done");
                 case "Completed":
-                    return "Completed".equals(currentStatus);
+                    return currentStatusLower.contains("complete") ||
+                            currentStatusLower.contains("finished") ||
+                            currentStatusLower.contains("done");
                 default:
                     return false;
             }
@@ -407,30 +485,44 @@ public class activity_rentals_details_owner extends AppCompatActivity {
                 case "Confirmed":
                     return true;
                 case "Preparing Pickup":
-                    return "PreparingPickup".equals(currentStatus) ||
-                            "ReadyForPickup".equals(deliveryStatus) ||
-                            "OnRent".equals(currentStatus) ||
-                            "ReturnRequested".equals(currentStatus) ||
-                            "AwaitingInspection".equals(currentStatus) ||
-                            "Completed".equals(currentStatus);
+                    return "preparingpickup".equals(currentStatusLower) ||
+                            "readyforpickup".equals(deliveryStatusLower) ||
+                            "onrent".equals(currentStatusLower) ||
+                            "returnrequested".equals(currentStatusLower) ||
+                            "awaitinginspection".equals(currentStatusLower) ||
+                            currentStatusLower.contains("complete") ||
+                            currentStatusLower.contains("finished") ||
+                            currentStatusLower.contains("done");
                 case "Ready for Pickup":
-                    return "ReadyForPickup".equals(deliveryStatus) ||
-                            "OnRent".equals(currentStatus) ||
-                            "ReturnRequested".equals(currentStatus) ||
-                            "AwaitingInspection".equals(currentStatus) ||
-                            "Completed".equals(currentStatus);
+                    return "readyforpickup".equals(deliveryStatusLower) ||
+                            "onrent".equals(currentStatusLower) ||
+                            "returnrequested".equals(currentStatusLower) ||
+                            "awaitinginspection".equals(currentStatusLower) ||
+                            currentStatusLower.contains("complete") ||
+                            currentStatusLower.contains("finished") ||
+                            currentStatusLower.contains("done");
                 case "On Rent":
-                    return "OnRent".equals(currentStatus) ||
-                            "ReturnRequested".equals(currentStatus) ||
-                            "AwaitingInspection".equals(currentStatus) ||
-                            "Completed".equals(currentStatus);
+                    return "onrent".equals(currentStatusLower) ||
+                            "returnrequested".equals(currentStatusLower) ||
+                            "awaitinginspection".equals(currentStatusLower) ||
+                            currentStatusLower.contains("complete") ||
+                            currentStatusLower.contains("finished") ||
+                            currentStatusLower.contains("done");
                 case "Return":
-                    return "AwaitingInspection".equals(currentStatus) ||
-                            "Completed".equals(currentStatus);
+                    return "returnrequested".equals(currentStatusLower) ||
+                            "awaitinginspection".equals(currentStatusLower) ||
+                            currentStatusLower.contains("complete") ||
+                            currentStatusLower.contains("finished") ||
+                            currentStatusLower.contains("done");
                 case "Inspection":
-                    return "Completed".equals(currentStatus);
+                    return "awaitinginspection".equals(currentStatusLower) ||
+                            currentStatusLower.contains("complete") ||
+                            currentStatusLower.contains("finished") ||
+                            currentStatusLower.contains("done");
                 case "Completed":
-                    return "Completed".equals(currentStatus);
+                    return currentStatusLower.contains("complete") ||
+                            currentStatusLower.contains("finished") ||
+                            currentStatusLower.contains("done");
                 default:
                     return false;
             }
@@ -438,20 +530,31 @@ public class activity_rentals_details_owner extends AppCompatActivity {
     }
 
     private boolean isCurrentStatus(String timelineStatus, String currentStatus, String deliveryStatus) {
+        if (currentStatus == null) return false;
+
+        String currentStatusLower = currentStatus.toLowerCase();
+        String deliveryStatusLower = deliveryStatus != null ? deliveryStatus.toLowerCase() : "";
+
         if ("Delivery".equals(deliveryOption)) {
-            return (timelineStatus.equals("Preparing Delivery") && "PreparingDelivery".equals(currentStatus)) ||
-                    (timelineStatus.equals("Out for Delivery") && "OutForDelivery".equals(deliveryStatus)) ||
-                    (timelineStatus.equals("On Rent") && "OnRent".equals(currentStatus)) ||
-                    (timelineStatus.equals("Return") && "ReturnRequested".equals(currentStatus)) ||
-                    (timelineStatus.equals("Inspection") && "AwaitingInspection".equals(currentStatus)) ||
-                    (timelineStatus.equals("Completed") && "Completed".equals(currentStatus));
+            return (timelineStatus.equals("Preparing Delivery") && "preparingdelivery".equals(currentStatusLower)) ||
+                    (timelineStatus.equals("Out for Delivery") && "outfordelivery".equals(deliveryStatusLower)) ||
+                    (timelineStatus.equals("On Rent") && "onrent".equals(currentStatusLower)) ||
+                    (timelineStatus.equals("Return") && "returnrequested".equals(currentStatusLower)) ||
+                    (timelineStatus.equals("Inspection") && "awaitinginspection".equals(currentStatusLower)) ||
+                    (timelineStatus.equals("Completed") &&
+                            (currentStatusLower.contains("complete") ||
+                                    currentStatusLower.contains("finished") ||
+                                    currentStatusLower.contains("done")));
         } else {
-            return (timelineStatus.equals("Preparing Pickup") && "PreparingPickup".equals(currentStatus)) ||
-                    (timelineStatus.equals("Ready for Pickup") && "ReadyForPickup".equals(deliveryStatus)) ||
-                    (timelineStatus.equals("On Rent") && "OnRent".equals(currentStatus)) ||
-                    (timelineStatus.equals("Return") && "ReturnRequested".equals(currentStatus)) ||
-                    (timelineStatus.equals("Inspection") && "AwaitingInspection".equals(currentStatus)) ||
-                    (timelineStatus.equals("Completed") && "Completed".equals(currentStatus));
+            return (timelineStatus.equals("Preparing Pickup") && "preparingpickup".equals(currentStatusLower)) ||
+                    (timelineStatus.equals("Ready for Pickup") && "readyforpickup".equals(deliveryStatusLower)) ||
+                    (timelineStatus.equals("On Rent") && "onrent".equals(currentStatusLower)) ||
+                    (timelineStatus.equals("Return") && "returnrequested".equals(currentStatusLower)) ||
+                    (timelineStatus.equals("Inspection") && "awaitinginspection".equals(currentStatusLower)) ||
+                    (timelineStatus.equals("Completed") &&
+                            (currentStatusLower.contains("complete") ||
+                                    currentStatusLower.contains("finished") ||
+                                    currentStatusLower.contains("done")));
         }
     }
 
@@ -511,6 +614,11 @@ public class activity_rentals_details_owner extends AppCompatActivity {
         updates.put("depositReturned", true);
         updates.put("completionTime", System.currentTimeMillis());
 
+        // Also update deliveryStatus if needed
+        if ("Delivery".equals(deliveryOption)) {
+            updates.put("deliveryStatus", "CompletedDelivery");
+        }
+
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Rental completed successfully", Toast.LENGTH_SHORT).show();
@@ -569,81 +677,50 @@ public class activity_rentals_details_owner extends AppCompatActivity {
 
         if (status == null) return;
 
+        String statusLower = status.toLowerCase();
+        String deliveryStatusLower = deliveryStatus != null ? deliveryStatus.toLowerCase() : "";
+
         boolean hasAction = false;
 
         if ("Delivery".equals(deliveryOption)) {
-            switch (status) {
-                case "PreparingDelivery":
-                    if (!"OutForDelivery".equals(deliveryStatus)) {
-                        btnMarkOutForDelivery.setVisibility(View.VISIBLE);
-                        hasAction = true;
-                    }
-                    break;
-
-                case "OutForDelivery":
-                    break;
-
-                case "OnRent":
-                    break;
-
-                case "ReturnRequested":
-                    btnInspectReturn.setText("Mark as Received");
-                    btnInspectReturn.setVisibility(View.VISIBLE);
-                    btnInspectReturn.setOnClickListener(v -> markReturnAsReceived());
+            if (statusLower.contains("preparingdelivery")) {
+                if (!deliveryStatusLower.contains("outfordelivery")) {
+                    btnMarkOutForDelivery.setVisibility(View.VISIBLE);
                     hasAction = true;
-                    break;
-
-                case "AwaitingInspection":
-                    btnInspectReturn.setText("Inspect Return");
-                    btnInspectReturn.setVisibility(View.VISIBLE);
-                    btnInspectReturn.setOnClickListener(v -> inspectReturnedItem());
-                    hasAction = true;
-                    break;
-
-                case "Completed":
-                    checkAndShowRefundButton();
-                    hasAction = true;
-                    break;
-
-                case "Dispute":
-                    break;
+                }
+            } else if (statusLower.contains("returnrequested")) {
+                btnInspectReturn.setText("Mark as Received");
+                btnInspectReturn.setVisibility(View.VISIBLE);
+                btnInspectReturn.setOnClickListener(v -> markReturnAsReceived());
+                hasAction = true;
+            } else if (statusLower.contains("awaitinginspection")) {
+                btnInspectReturn.setText("Inspect Return");
+                btnInspectReturn.setVisibility(View.VISIBLE);
+                btnInspectReturn.setOnClickListener(v -> inspectReturnedItem());
+                hasAction = true;
+            } else if (statusLower.contains("complete") || statusLower.contains("finished") || statusLower.contains("done")) {
+                checkAndShowRefundButton();
+                hasAction = true;
             }
         } else {
-            switch (status) {
-                case "PreparingPickup":
-                    if (!"ReadyForPickup".equals(deliveryStatus)) {
-                        btnConfirmReadyPickup.setVisibility(View.VISIBLE);
-                        hasAction = true;
-                    }
-                    break;
-
-                case "ReadyForPickup":
-                    break;
-
-                case "OnRent":
-                    break;
-
-                case "ReturnRequested":
-                    btnInspectReturn.setText("Mark as Received");
-                    btnInspectReturn.setVisibility(View.VISIBLE);
-                    btnInspectReturn.setOnClickListener(v -> markReturnAsReceived());
+            if (statusLower.contains("preparingpickup")) {
+                if (!deliveryStatusLower.contains("readyforpickup")) {
+                    btnConfirmReadyPickup.setVisibility(View.VISIBLE);
                     hasAction = true;
-                    break;
-
-                case "AwaitingInspection":
-                    btnInspectReturn.setText("Inspect Return");
-                    btnInspectReturn.setVisibility(View.VISIBLE);
-                    btnInspectReturn.setOnClickListener(v -> inspectReturnedItem());
-                    hasAction = true;
-                    break;
-
-                case "Completed":
-                    checkAndShowRefundButton();
-                    hasAction = true;
-                    break;
-
-                case "Dispute":
-                    break;
+                }
+            } else if (statusLower.contains("returnrequested")) {
+                btnInspectReturn.setText("Mark as Received");
+                btnInspectReturn.setVisibility(View.VISIBLE);
+                btnInspectReturn.setOnClickListener(v -> markReturnAsReceived());
+                hasAction = true;
+            } else if (statusLower.contains("awaitinginspection")) {
+                btnInspectReturn.setText("Inspect Return");
+                btnInspectReturn.setVisibility(View.VISIBLE);
+                btnInspectReturn.setOnClickListener(v -> inspectReturnedItem());
+                hasAction = true;
+            } else if (statusLower.contains("complete") || statusLower.contains("finished") || statusLower.contains("done")) {
+                checkAndShowRefundButton();
+                hasAction = true;
             }
         }
 
@@ -684,6 +761,7 @@ public class activity_rentals_details_owner extends AppCompatActivity {
         if (child.exists()) {
             Object value = child.getValue();
             if (value instanceof Long) return (Long) value;
+            if (value instanceof Integer) return ((Integer) value).longValue();
             if (value instanceof String) {
                 try {
                     return Long.parseLong((String) value);
@@ -736,7 +814,7 @@ public class activity_rentals_details_owner extends AppCompatActivity {
     }
 
     private String formatDateTime(Long timestamp) {
-        if (timestamp == null) return null;
+        if (timestamp == null || timestamp == 0) return null;
         SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault());
         return sdf.format(new Date(timestamp));
     }
