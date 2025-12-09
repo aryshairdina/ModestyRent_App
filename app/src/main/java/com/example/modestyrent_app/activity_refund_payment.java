@@ -2,6 +2,7 @@ package com.example.modestyrent_app;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.*;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -18,7 +19,9 @@ public class activity_refund_payment extends AppCompatActivity {
 
     private String bookingId, productId, renterId;
     private String itemCondition, damageNotes;
-    private double repairCost, refundAmount;
+    private double repairCost, refundAmount, latePenalty;
+    private long daysLate;
+    private boolean isLateReturn;
 
     private ImageView backButton;
     private TextView tvRefundAmount, tvPaymentSummary, tvPaymentMethodLabel, tvBottomRefundAmount;
@@ -28,6 +31,8 @@ public class activity_refund_payment extends AppCompatActivity {
 
     private DatabaseReference bookingsRef;
     private FirebaseAuth mAuth;
+
+    private static final String TAG = "RefundPayment";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,6 +49,11 @@ public class activity_refund_payment extends AppCompatActivity {
         repairCost = intent.getDoubleExtra("repairCost", 0.0);
         refundAmount = intent.getDoubleExtra("refundAmount", 0.0);
 
+        // CRITICAL: Get late penalty data
+        latePenalty = intent.getDoubleExtra("latePenalty", 0.0);
+        daysLate = intent.getLongExtra("daysLate", 0);
+        isLateReturn = intent.getBooleanExtra("isLateReturn", false);
+
         if (bookingId == null) {
             Toast.makeText(this, "Booking ID not provided", Toast.LENGTH_SHORT).show();
             finish();
@@ -52,6 +62,15 @@ public class activity_refund_payment extends AppCompatActivity {
 
         mAuth = FirebaseAuth.getInstance();
         bookingsRef = FirebaseDatabase.getInstance().getReference("bookings");
+
+        // Debug logging
+        Log.d(TAG, "Refund Payment Activity Started:");
+        Log.d(TAG, "- Booking ID: " + bookingId);
+        Log.d(TAG, "- Refund Amount: RM " + refundAmount);
+        Log.d(TAG, "- Late Penalty: RM " + latePenalty);
+        Log.d(TAG, "- Days Late: " + daysLate);
+        Log.d(TAG, "- Is Late Return: " + isLateReturn);
+        Log.d(TAG, "- Repair Cost: RM " + repairCost);
 
         initializeViews();
         setupUI();
@@ -76,12 +95,29 @@ public class activity_refund_payment extends AppCompatActivity {
     private void setupUI() {
         tvRefundAmount.setText(String.format("RM %.2f", refundAmount));
         tvBottomRefundAmount.setText(String.format("RM %.2f", refundAmount));
-        tvPaymentSummary.setText(
-                String.format(
-                        "You will refund RM %.2f to the borrower.\nDamage/repair cost: RM %.2f",
-                        refundAmount, repairCost
-                )
-        );
+
+        // Update payment summary to include penalty information
+        String summaryText;
+        if (isLateReturn && latePenalty > 0) {
+            summaryText = String.format(
+                    "You will refund RM %.2f to the borrower.\n\nBreakdown:\n" +
+                            "- Damage/repair cost: RM %.2f\n" +
+                            "- Late return penalty (%d days): RM %.2f\n" +
+                            "- Total deductions: RM %.2f",
+                    refundAmount,
+                    repairCost,
+                    daysLate,
+                    latePenalty,
+                    (repairCost + latePenalty)
+            );
+        } else {
+            summaryText = String.format(
+                    "You will refund RM %.2f to the borrower.\n" +
+                            "Damage/repair cost: RM %.2f",
+                    refundAmount, repairCost
+            );
+        }
+        tvPaymentSummary.setText(summaryText);
     }
 
     private void setupListeners() {
@@ -118,6 +154,9 @@ public class activity_refund_payment extends AppCompatActivity {
     }
 
     private void processRefundPayment() {
+        // Calculate total deductions
+        double totalDeductions = repairCost + latePenalty;
+
         // Simulate successful refund payment
         Map<String, Object> updates = new HashMap<>();
         updates.put("status", "Completed");
@@ -125,13 +164,35 @@ public class activity_refund_payment extends AppCompatActivity {
         updates.put("itemCondition", itemCondition);
         updates.put("damageNotes", damageNotes);
         updates.put("repairCost", repairCost);
+
+        // CRITICAL: Save late penalty data to Firebase
+        updates.put("latePenalty", latePenalty);
+        updates.put("daysLate", daysLate);
+        updates.put("totalDeductions", totalDeductions);
+
         updates.put("refundAmount", refundAmount);
         updates.put("depositReturned", true);
         updates.put("depositReturnDate", System.currentTimeMillis());
 
+        // Debug logging
+        Log.d(TAG, "Saving to Firebase:");
+        Log.d(TAG, "- Status: Completed");
+        Log.d(TAG, "- latePenalty: RM " + latePenalty);
+        Log.d(TAG, "- daysLate: " + daysLate);
+        Log.d(TAG, "- totalDeductions: RM " + totalDeductions);
+        Log.d(TAG, "- refundAmount: RM " + refundAmount);
+        Log.d(TAG, "- isLateReturn: " + isLateReturn);
+
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(this, "Refund paid and rental completed", Toast.LENGTH_SHORT).show();
+                    String message = "Refund paid and rental completed";
+                    if (isLateReturn && latePenalty > 0) {
+                        message += "\nLate penalty of RM " + String.format("%.2f", latePenalty) +
+                                " applied for " + daysLate + " day(s) late";
+                    }
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+
+                    Log.d(TAG, "Firebase updated successfully with penalty data");
 
                     Intent intent = new Intent(this, activity_rentals_details_owner.class);
                     intent.putExtra("bookingId", bookingId);
@@ -143,6 +204,7 @@ public class activity_refund_payment extends AppCompatActivity {
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to process refund", Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Failed to update Firebase: " + e.getMessage());
                 });
     }
 

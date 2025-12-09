@@ -47,6 +47,157 @@
             </LinearLayout>
         </com.google.android.material.appbar.AppBarLayout>
 
+        <!-- Late Return Warning (Shown from OnRent until Completed) -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cvLateReturnWarning"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp"
+            android:background="@color/error_light"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <!-- Warning Header -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="8dp">
+
+                    <ImageView
+                        android:id="@+id/ivWarningIcon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_warning"
+                        app:tint="@color/error"
+                        android:layout_marginEnd="8dp" />
+
+                    <TextView
+                        android:id="@+id/tvLateWarningTitle"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="⚠️ LATE RETURN DETECTED"
+                        android:textColor="@color/error"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                </LinearLayout>
+
+                <!-- Warning Details -->
+                <LinearLayout
+                    android:id="@+id/llLatePenaltyInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/tvLateWarningDays"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Late by: 0 day(s)"
+                        android:textColor="@color/error"
+                        android:textSize="14sp"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:id="@+id/tvLateWarningPenalty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Current penalty: RM 0.00"
+                        android:textColor="@color/error"
+                        android:textSize="14sp"
+                        android:layout_marginBottom="8dp"
+                        android:textStyle="bold" />
+
+                    <!-- Dynamic Message based on status -->
+                    <TextView
+                        android:id="@+id/tvLateWarningMessage"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Return the item immediately to avoid additional charges!"
+                        android:textColor="@color/error_dark"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:padding="8dp"
+                        android:background="@color/error_light"
+                        android:drawablePadding="8dp"
+                        android:drawableStart="@drawable/ic_calendar"
+                        android:layout_marginBottom="8dp"
+                        android:visibility="gone" />
+
+                    <!-- For Completed rentals -->
+                    <TextView
+                        android:id="@+id/tvCompletedPenaltyMessage"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Refunded: RM 45.00 (90% of deposit)"
+                        android:textColor="@color/warning_dark"
+                        android:textSize="13sp"
+                        android:padding="8dp"
+                        android:background="@color/warning_light"
+                        android:layout_marginBottom="8dp"
+                        android:visibility="gone" />
+
+                    <!-- Penalty Information -->
+                    <LinearLayout
+                        android:id="@+id/llPenaltyPolicy"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:background="@color/error_very_light"
+                        android:padding="12dp"
+                        android:layout_marginBottom="8dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="⚠️ Late Return Policy"
+                            android:textColor="@color/error_dark"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:layout_marginBottom="4dp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="• RM 5.00 per day penalty"
+                            android:textColor="@color/error_dark"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="• Maximum penalty: RM 50.00"
+                            android:textColor="@color/error_dark"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="• Penalty deducted from deposit"
+                            android:textColor="@color/error_dark"
+                            android:textSize="12sp" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
         <!-- Main Content Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"

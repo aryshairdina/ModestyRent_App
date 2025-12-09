@@ -53,6 +53,7 @@ public class activity_inspection extends AppCompatActivity {
     // Constants
     private static final double PENALTY_PER_DAY = 5.0; // RM 5 per day
     private static final int PENALTY_CAP = 50; // Maximum penalty (optional)
+    private static final String TAG = "InspectionActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -240,10 +241,10 @@ public class activity_inspection extends AppCompatActivity {
 
             // DEBUG: Log the dates for troubleshooting
             SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy HH:mm:ss", Locale.getDefault());
-            Log.d("LateCheck", "Due Date: " + sdf.format(dueDateCal.getTime()));
-            Log.d("LateCheck", "Current Date: " + sdf.format(now.getTime()));
-            Log.d("LateCheck", "Due Date in ms: " + dueDateCal.getTimeInMillis());
-            Log.d("LateCheck", "Current Date in ms: " + now.getTimeInMillis());
+            Log.d(TAG, "Due Date: " + sdf.format(dueDateCal.getTime()));
+            Log.d(TAG, "Current Date: " + sdf.format(now.getTime()));
+            Log.d(TAG, "Due Date in ms: " + dueDateCal.getTimeInMillis());
+            Log.d(TAG, "Current Date in ms: " + now.getTimeInMillis());
 
             // Check if current time is AFTER the due date (including time of day)
             if (now.getTimeInMillis() > dueDateCal.getTimeInMillis()) {
@@ -265,7 +266,7 @@ public class activity_inspection extends AppCompatActivity {
                 long diffInMillis = nowOnly.getTimeInMillis() - dueDateOnly.getTimeInMillis();
                 daysLate = diffInMillis / (1000 * 60 * 60 * 24);
 
-                Log.d("LateCheck", "Days Late: " + daysLate);
+                Log.d(TAG, "Days Late: " + daysLate);
 
                 if (daysLate > 0) {
                     // Late return
@@ -283,12 +284,15 @@ public class activity_inspection extends AppCompatActivity {
                     message += "Due: " + formatDate(endDate) + "\n";
                     message += "Returned: " + formatDate(now.getTimeInMillis());
                     Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+
+                    Log.d(TAG, "LATE RETURN: " + daysLate + " days, Penalty: RM " + latePenaltyAmount);
                 } else {
                     // This should not happen, but just in case
                     isLateReturn = false;
                     latePenaltyAmount = 0.0;
                     updateDueDateIndicator(true, 0, endDate);
                     llLatePenaltySection.setVisibility(View.GONE);
+                    Log.d(TAG, "Not late (daysLate <= 0)");
                 }
             } else {
                 // On time or early return (GREEN indicator)
@@ -297,7 +301,7 @@ public class activity_inspection extends AppCompatActivity {
 
                 updateDueDateIndicator(true, 0, endDate);
                 llLatePenaltySection.setVisibility(View.GONE);
-                Log.d("LateCheck", "Return is ON TIME");
+                Log.d(TAG, "Return is ON TIME");
             }
 
             // Initial calculation
@@ -376,6 +380,11 @@ public class activity_inspection extends AppCompatActivity {
             needsRefundPayment = false;
             btnCompleteInspection.setText("Complete Rental");
         }
+
+        Log.d(TAG, "Refund calculated: RM " + refundAmount +
+                " (Deposit: " + originalDepositAmount +
+                ", Repair: " + repairCostAmount +
+                ", Penalty: " + latePenaltyAmount + ")");
     }
 
     private boolean validateItemCondition() {
@@ -410,20 +419,30 @@ public class activity_inspection extends AppCompatActivity {
         updates.put("itemCondition", itemCondition);
         updates.put("damageNotes", damageNotes);
         updates.put("repairCost", repairCostAmount);
+
+        // CRITICAL: Always save penalty data if it exists (even if 0)
         updates.put("latePenalty", latePenaltyAmount);
         updates.put("daysLate", daysLate);
+
         updates.put("totalDeductions", repairCostAmount + latePenaltyAmount);
         updates.put("refundAmount", refundAmount);
         updates.put("depositReturned", true);
         updates.put("depositReturnDate", System.currentTimeMillis());
 
+        Log.d(TAG, "Saving to Firebase:");
+        Log.d(TAG, "- latePenalty: " + latePenaltyAmount);
+        Log.d(TAG, "- daysLate: " + daysLate);
+        Log.d(TAG, "- isLateReturn: " + isLateReturn);
+        Log.d(TAG, "- refundAmount: " + refundAmount);
+
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     String message = "Rental completed successfully";
-                    if (isLateReturn) {
+                    if (isLateReturn && latePenaltyAmount > 0) {
                         message += "\nLate penalty applied: RM " + String.format("%.2f", latePenaltyAmount);
                     }
                     Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                    Log.d(TAG, "Firebase updated successfully");
 
                     Intent intent = new Intent(this, activity_rentals_details_owner.class);
                     intent.putExtra("bookingId", bookingId);
@@ -434,6 +453,7 @@ public class activity_inspection extends AppCompatActivity {
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to complete rental", Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Failed to update Firebase: " + e.getMessage());
                 });
     }
 
@@ -451,6 +471,12 @@ public class activity_inspection extends AppCompatActivity {
             refundAmount = Double.parseDouble(refundText);
         } catch (NumberFormatException ignored) {}
 
+        Log.d(TAG, "Opening refund payment page:");
+        Log.d(TAG, "- latePenalty: " + latePenaltyAmount);
+        Log.d(TAG, "- daysLate: " + daysLate);
+        Log.d(TAG, "- refundAmount: " + refundAmount);
+        Log.d(TAG, "- isLateReturn: " + isLateReturn);
+
         Intent intent = new Intent(this, activity_refund_payment.class);
         intent.putExtra("bookingId", bookingId);
         intent.putExtra("productId", productId);
@@ -460,6 +486,7 @@ public class activity_inspection extends AppCompatActivity {
         intent.putExtra("repairCost", repairCostAmount);
         intent.putExtra("latePenalty", latePenaltyAmount);
         intent.putExtra("daysLate", daysLate);
+        intent.putExtra("isLateReturn", isLateReturn); // Add this flag
         intent.putExtra("refundAmount", refundAmount);
         startActivity(intent);
     }

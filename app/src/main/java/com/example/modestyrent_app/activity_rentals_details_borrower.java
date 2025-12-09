@@ -3,6 +3,7 @@ package com.example.modestyrent_app;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ImageView;
@@ -12,6 +13,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.cardview.widget.CardView;
 
 import com.bumptech.glide.Glide;
 import com.google.android.material.button.MaterialButton;
@@ -24,6 +26,7 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
@@ -52,8 +55,21 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
     // ⭐ 5 review stars
     private ImageView reviewStar1, reviewStar2, reviewStar3, reviewStar4, reviewStar5;
 
+    // New: Late return warning
+    private CardView cvLateReturnWarning;
+    private TextView tvLateWarningTitle, tvLateWarningDays, tvLateWarningPenalty;
+    private LinearLayout llLatePenaltyInfo;
+    private ImageView ivWarningIcon;
+    private TextView tvLateWarningMessage, tvCompletedPenaltyMessage;
+    private LinearLayout llPenaltyPolicy;
+
     private DatabaseReference bookingsRef, productsRef, usersRef, reviewsRef;
     private FirebaseAuth mAuth;
+
+    // Constants for penalty calculation
+    private static final double PENALTY_PER_DAY = 5.0; // RM 5 per day
+    private static final int PENALTY_CAP = 50; // Maximum penalty
+    private static final String TAG = "LateReturnWarning";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -115,6 +131,17 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         reviewStar4 = findViewById(R.id.reviewStar4);
         reviewStar5 = findViewById(R.id.reviewStar5);
 
+        // New: Late return warning views
+        cvLateReturnWarning = findViewById(R.id.cvLateReturnWarning);
+        tvLateWarningTitle = findViewById(R.id.tvLateWarningTitle);
+        tvLateWarningDays = findViewById(R.id.tvLateWarningDays);
+        tvLateWarningPenalty = findViewById(R.id.tvLateWarningPenalty);
+        llLatePenaltyInfo = findViewById(R.id.llLatePenaltyInfo);
+        ivWarningIcon = findViewById(R.id.ivWarningIcon);
+        tvLateWarningMessage = findViewById(R.id.tvLateWarningMessage);
+        tvCompletedPenaltyMessage = findViewById(R.id.tvCompletedPenaltyMessage);
+        llPenaltyPolicy = findViewById(R.id.llPenaltyPolicy);
+
         backButton.setOnClickListener(v -> finish());
         setupButtonListeners();
     }
@@ -123,7 +150,7 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         bookingsRef = FirebaseDatabase.getInstance().getReference("bookings");
         productsRef = FirebaseDatabase.getInstance().getReference("products");
         usersRef = FirebaseDatabase.getInstance().getReference("users");
-        reviewsRef = FirebaseDatabase.getInstance().getReference("reviews"); // reviews/{bookingId}/{reviewId}
+        reviewsRef = FirebaseDatabase.getInstance().getReference("reviews");
     }
 
     private void setupButtonListeners() {
@@ -133,20 +160,26 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
     }
 
     private void loadBookingDetails() {
+        Log.d(TAG, "Loading booking details for: " + bookingId);
+
         bookingsRef.child(bookingId).addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (snapshot.exists()) {
                     try {
+                        Log.d(TAG, "Booking snapshot exists");
                         String productId = getStringValue(snapshot, "productId");
                         String ownerId = getStringValue(snapshot, "ownerId");
                         deliveryOption = getStringValue(snapshot, "deliveryOption");
 
                         updateBookingUI(snapshot);
                         loadDeliveryInformation(snapshot, ownerId);
+                        checkLateReturn(snapshot); // Check for late return
 
                     } catch (Exception e) {
+                        Log.e(TAG, "Error loading booking details", e);
                         Toast.makeText(activity_rentals_details_borrower.this, "Error loading booking details", Toast.LENGTH_SHORT).show();
+                        e.printStackTrace();
                     }
                 } else {
                     Toast.makeText(activity_rentals_details_borrower.this, "Booking not found", Toast.LENGTH_SHORT).show();
@@ -156,6 +189,7 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Failed to load booking: " + error.getMessage());
                 Toast.makeText(activity_rentals_details_borrower.this, "Failed to load booking", Toast.LENGTH_SHORT).show();
             }
         });
@@ -205,6 +239,304 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
                 reviewSummaryCard.setVisibility(View.GONE);
             }
         }
+    }
+
+    private void checkLateReturn(DataSnapshot bookingSnapshot) {
+        Log.d(TAG, "checkLateReturn() called");
+
+        String status = getStringValue(bookingSnapshot, "status");
+        Log.d(TAG, "Current status: " + status);
+
+        // Check if we should show warning for these statuses:
+        boolean shouldCheckLate = "OnRent".equals(status) ||
+                "ReturnRequested".equals(status) ||
+                "AwaitingInspection".equals(status) ||
+                "Completed".equals(status);
+
+        Log.d(TAG, "Should check late: " + shouldCheckLate);
+
+        if (shouldCheckLate) {
+            Log.d(TAG, "Status requires late check: " + status);
+
+            // For Completed status, check if there was a late penalty applied
+            if ("Completed".equals(status)) {
+                checkCompletedLatePenalty(bookingSnapshot);
+            } else {
+                // For other statuses, calculate based on current date
+                Long endDate = getLongValue(bookingSnapshot, "endDate");
+                if (endDate != null) {
+                    calculateAndShowLateWarning(endDate, status);
+                } else {
+                    Log.d(TAG, "End date is null, hiding warning");
+                    hideLateReturnWarning();
+                }
+            }
+        } else {
+            Log.d(TAG, "Status does not require late check: " + status);
+            hideLateReturnWarning();
+        }
+    }
+
+    private void calculateAndShowLateWarning(Long endDate, String status) {
+        Log.d(TAG, "calculateAndShowLateWarning() called for status: " + status);
+
+        // Debug: Show dates
+        SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy HH:mm:ss", Locale.getDefault());
+        Log.d(TAG, "End date from DB: " + sdf.format(new Date(endDate)));
+        Log.d(TAG, "Current date: " + sdf.format(new Date()));
+
+        // Create calendar for due date (end of rental day)
+        Calendar dueDateCal = Calendar.getInstance();
+        dueDateCal.setTimeInMillis(endDate);
+        dueDateCal.set(Calendar.HOUR_OF_DAY, 23);
+        dueDateCal.set(Calendar.MINUTE, 59);
+        dueDateCal.set(Calendar.SECOND, 59);
+        dueDateCal.set(Calendar.MILLISECOND, 999);
+
+        Calendar now = Calendar.getInstance();
+
+        Log.d(TAG, "Due date (end of day): " + sdf.format(dueDateCal.getTime()));
+        Log.d(TAG, "Now: " + sdf.format(now.getTime()));
+
+        // Check if current time is AFTER the due date
+        if (now.getTimeInMillis() > dueDateCal.getTimeInMillis()) {
+            Log.d(TAG, "Current time is AFTER due date - LATE!");
+
+            // Calculate days late based on calendar days
+            Calendar dueDateOnly = Calendar.getInstance();
+            dueDateOnly.setTimeInMillis(endDate);
+            dueDateOnly.set(Calendar.HOUR_OF_DAY, 0);
+            dueDateOnly.set(Calendar.MINUTE, 0);
+            dueDateOnly.set(Calendar.SECOND, 0);
+            dueDateOnly.set(Calendar.MILLISECOND, 0);
+
+            Calendar nowOnly = Calendar.getInstance();
+            nowOnly.set(Calendar.HOUR_OF_DAY, 0);
+            nowOnly.set(Calendar.MINUTE, 0);
+            nowOnly.set(Calendar.SECOND, 0);
+            nowOnly.set(Calendar.MILLISECOND, 0);
+
+            long diffInMillis = nowOnly.getTimeInMillis() - dueDateOnly.getTimeInMillis();
+            long daysLate = diffInMillis / (1000 * 60 * 60 * 24);
+
+            Log.d(TAG, "Days late calculated: " + daysLate);
+
+            if (daysLate > 0) {
+                double penaltyAmount = Math.min(daysLate * PENALTY_PER_DAY, PENALTY_CAP);
+
+                Log.d(TAG, "Showing warning: " + daysLate + " days late, penalty: RM " + penaltyAmount);
+
+                // Show warning with different message based on status
+                showLateReturnWarning(daysLate, penaltyAmount, status);
+
+                // Update button text to emphasize urgency if still OnRent
+                if ("OnRent".equals(status) && btnSecondaryAction != null && btnSecondaryAction.getVisibility() == View.VISIBLE) {
+                    btnSecondaryAction.setText("RETURN NOW - Avoid More Penalty");
+                    btnSecondaryAction.setBackgroundColor(getColor(R.color.error));
+                    btnSecondaryAction.setTextColor(Color.WHITE);
+                }
+            } else {
+                Log.d(TAG, "Days late is 0 or negative, hiding warning");
+                hideLateReturnWarning();
+            }
+        } else {
+            Log.d(TAG, "Current time is BEFORE due date - NOT LATE");
+            hideLateReturnWarning();
+        }
+    }
+
+    private void checkCompletedLatePenalty(DataSnapshot bookingSnapshot) {
+        Log.d(TAG, "checkCompletedLatePenalty() called");
+
+        // For completed rentals, check if late penalty was applied
+        Double latePenalty = getDoubleValue(bookingSnapshot, "latePenalty");
+        Long daysLate = getLongValue(bookingSnapshot, "daysLate");
+        Double refundAmount = getDoubleValue(bookingSnapshot, "refundAmount");
+        Double originalDeposit = getDoubleValue(bookingSnapshot, "depositAmount");
+
+        Log.d(TAG, "Completed rental check:");
+        Log.d(TAG, "- latePenalty: " + latePenalty);
+        Log.d(TAG, "- daysLate: " + daysLate);
+        Log.d(TAG, "- refundAmount: " + refundAmount);
+        Log.d(TAG, "- originalDeposit: " + originalDeposit);
+
+        // First check: Was a late penalty applied?
+        if (latePenalty != null && latePenalty > 0 && daysLate != null && daysLate > 0) {
+            Log.d(TAG, "Completed rental had late penalty: RM " + latePenalty + " for " + daysLate + " days");
+
+            // Show final penalty warning for completed rental
+            showCompletedLatePenaltyWarning(daysLate, latePenalty, refundAmount, originalDeposit);
+        }
+        // Second check: Was the rental completed WITHOUT penalty?
+        else if ("Completed".equals(getStringValue(bookingSnapshot, "status"))) {
+            Log.d(TAG, "Rental completed without late penalty");
+            hideLateReturnWarning();
+        }
+    }
+
+    private void showLateReturnWarning(long daysLate, double penaltyAmount, String status) {
+        Log.d(TAG, "showLateReturnWarning() called - days: " + daysLate + ", penalty: " + penaltyAmount + ", status: " + status);
+
+        if (cvLateReturnWarning == null) {
+            Log.e(TAG, "cvLateReturnWarning is null!");
+            return;
+        }
+
+        runOnUiThread(() -> {
+            cvLateReturnWarning.setVisibility(View.VISIBLE);
+            cvLateReturnWarning.setCardBackgroundColor(getColor(R.color.error_light));
+
+            if (llLatePenaltyInfo != null) {
+                llLatePenaltyInfo.setVisibility(View.VISIBLE);
+            }
+
+            // Set icon color
+            if (ivWarningIcon != null) {
+                ivWarningIcon.setColorFilter(getColor(R.color.error));
+            }
+
+            // Different title based on status
+            String title = "";
+            String message = "";
+            boolean showUrgentMessage = false;
+
+            if ("OnRent".equals(status)) {
+                title = "⚠️ LATE RETURN DETECTED";
+                message = "Return the item immediately to avoid additional charges!";
+                showUrgentMessage = true;
+            } else if ("ReturnRequested".equals(status) || "AwaitingInspection".equals(status)) {
+                title = "⚠️ LATE RETURN - UNDER REVIEW";
+                message = "Your return is being inspected. Penalty will be applied if confirmed late.";
+                showUrgentMessage = false;
+            }
+
+            if (tvLateWarningTitle != null) {
+                tvLateWarningTitle.setText(title);
+                tvLateWarningTitle.setTextColor(getColor(R.color.error));
+            }
+
+            if (tvLateWarningDays != null) {
+                tvLateWarningDays.setText("Late by: " + daysLate + " day(s)");
+                tvLateWarningDays.setTextColor(getColor(R.color.error));
+            }
+
+            if (tvLateWarningPenalty != null) {
+                String penaltyText;
+                if ("OnRent".equals(status)) {
+                    penaltyText = "Current penalty: RM " + String.format("%.2f", penaltyAmount);
+                } else {
+                    penaltyText = "Pending penalty: RM " + String.format("%.2f", penaltyAmount);
+                }
+                tvLateWarningPenalty.setText(penaltyText);
+                tvLateWarningPenalty.setTextColor(getColor(R.color.error));
+            }
+
+            // Show/hide messages
+            if (tvLateWarningMessage != null) {
+                tvLateWarningMessage.setText(message);
+                tvLateWarningMessage.setVisibility(showUrgentMessage ? View.VISIBLE : View.GONE);
+            }
+
+            if (tvCompletedPenaltyMessage != null) {
+                tvCompletedPenaltyMessage.setVisibility(View.GONE);
+            }
+
+            // Update policy card color
+            if (llPenaltyPolicy != null) {
+                llPenaltyPolicy.setBackgroundColor(getColor(R.color.error_very_light));
+            }
+
+            Log.d(TAG, "Late warning shown for " + status + ": " + daysLate + " days, RM " + penaltyAmount);
+        });
+    }
+
+    private void showCompletedLatePenaltyWarning(long daysLate, double penaltyAmount, Double refundAmount, Double originalDeposit) {
+        Log.d(TAG, "showCompletedLatePenaltyWarning() called - days: " + daysLate + ", penalty: " + penaltyAmount);
+
+        if (cvLateReturnWarning == null) {
+            Log.e(TAG, "cvLateReturnWarning is null!");
+            return;
+        }
+
+        runOnUiThread(() -> {
+            cvLateReturnWarning.setVisibility(View.VISIBLE);
+            cvLateReturnWarning.setCardBackgroundColor(getColor(R.color.warning_light));
+
+            if (llLatePenaltyInfo != null) {
+                llLatePenaltyInfo.setVisibility(View.VISIBLE);
+            }
+
+            // Set icon color to warning orange
+            if (ivWarningIcon != null) {
+                ivWarningIcon.setColorFilter(getColor(R.color.warning));
+            }
+
+            // Calculate refund percentage
+            String refundText = "";
+            if (refundAmount != null && originalDeposit != null && originalDeposit > 0) {
+                double refundPercentage = (refundAmount / originalDeposit) * 100;
+                refundText = String.format("Refunded: RM %.2f (%.0f%% of deposit)", refundAmount, refundPercentage);
+            } else if (refundAmount != null) {
+                refundText = String.format("Refunded: RM %.2f", refundAmount);
+            }
+
+            if (tvLateWarningTitle != null) {
+                tvLateWarningTitle.setText("⚠️ LATE RETURN PENALTY APPLIED");
+                tvLateWarningTitle.setTextColor(getColor(R.color.warning_dark));
+            }
+
+            if (tvLateWarningDays != null) {
+                tvLateWarningDays.setText("Late return: " + daysLate + " day(s)");
+                tvLateWarningDays.setTextColor(getColor(R.color.warning_dark));
+            }
+
+            if (tvLateWarningPenalty != null) {
+                tvLateWarningPenalty.setText("Penalty charged: RM " + String.format("%.2f", penaltyAmount));
+                tvLateWarningPenalty.setTextColor(getColor(R.color.warning_dark));
+            }
+
+            // Show/hide messages
+            if (tvLateWarningMessage != null) {
+                tvLateWarningMessage.setVisibility(View.GONE);
+            }
+
+            if (tvCompletedPenaltyMessage != null) {
+                tvCompletedPenaltyMessage.setText(refundText);
+                tvCompletedPenaltyMessage.setVisibility(View.VISIBLE);
+            }
+
+            // Update policy card color for completed
+            if (llPenaltyPolicy != null) {
+                llPenaltyPolicy.setBackgroundColor(getColor(R.color.warning_very_light));
+            }
+
+            Log.d(TAG, "Completed penalty warning shown: " + daysLate + " days, RM " + penaltyAmount + ", " + refundText);
+        });
+    }
+
+    private void hideLateReturnWarning() {
+        Log.d(TAG, "hideLateReturnWarning() called");
+
+        runOnUiThread(() -> {
+            if (cvLateReturnWarning != null) {
+                cvLateReturnWarning.setVisibility(View.GONE);
+                // Reset card color
+                cvLateReturnWarning.setCardBackgroundColor(getColor(R.color.error_light));
+            }
+
+            if (llLatePenaltyInfo != null) {
+                llLatePenaltyInfo.setVisibility(View.GONE);
+            }
+
+            // Reset button appearance if it was changed
+            if (btnSecondaryAction != null) {
+                btnSecondaryAction.setText("Start Return");
+                btnSecondaryAction.setBackgroundColor(getColor(R.color.background));
+                btnSecondaryAction.setTextColor(getColor(R.color.primary));
+            }
+
+            Log.d(TAG, "Late warning hidden");
+        });
     }
 
     private void loadDeliveryInformation(DataSnapshot bookingSnapshot, String ownerId) {
@@ -276,6 +608,31 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         String status = getStringValue(bookingSnapshot, "status");
         String deliveryStatus = getStringValue(bookingSnapshot, "deliveryStatus");
 
+        // Get ALL timestamp fields
+        Long preparationTime = getLongValue(bookingSnapshot, "preparationTime");
+        Long deliveryLeaveTime = getLongValue(bookingSnapshot, "deliveryLeaveTime");
+        Long deliveryTime = getLongValue(bookingSnapshot, "deliveryTime");
+        Long pickupTime = getLongValue(bookingSnapshot, "pickupTime");
+        Long readyForPickupTime = getLongValue(bookingSnapshot, "readyForPickupTime");
+        Long returnTime = getLongValue(bookingSnapshot, "returnTime");
+        Long inspectionTime = getLongValue(bookingSnapshot, "inspectionTime");
+        Long completionTime = getLongValue(bookingSnapshot, "completionTime");
+
+        // If completionTime doesn't exist but status is "Completed", use current time
+        if ("Completed".equals(status) && completionTime == null) {
+            completionTime = System.currentTimeMillis();
+        }
+
+        // If inspectionTime doesn't exist but status is "Completed", use completionTime
+        if ("Completed".equals(status) && inspectionTime == null && completionTime != null) {
+            inspectionTime = completionTime;
+        }
+
+        // If returnTime doesn't exist but status is "Completed" or "AwaitingInspection", use inspectionTime
+        if (("AwaitingInspection".equals(status) || "Completed".equals(status)) && returnTime == null && inspectionTime != null) {
+            returnTime = inspectionTime;
+        }
+
         if ("Delivery".equals(deliveryOption)) {
             String[] statusFlow = {"Confirmed", "Preparing Delivery", "Out for Delivery", "On Rent", "Return", "Inspection", "Completed"};
             String[] statusDescriptions = {
@@ -290,12 +647,12 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
             String[] statusIcons = {"ic_check", "ic_preparing", "ic_delivery", "ic_onrent", "ic_return", "ic_inspection", "ic_completed"};
             String[] statusDates = {
                     formatDateTime(paymentDate != null ? paymentDate : bookingDate),
-                    formatDateTime(getLongValue(bookingSnapshot, "preparationTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "deliveryLeaveTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "deliveryTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "returnTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "inspectionTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "completionTime"))
+                    formatDateTime(preparationTime),
+                    formatDateTime(deliveryLeaveTime),
+                    formatDateTime(deliveryTime),
+                    formatDateTime(returnTime),
+                    formatDateTime(inspectionTime),
+                    formatDateTime(completionTime)
             };
 
             for (int i = 0; i < statusFlow.length; i++) {
@@ -318,12 +675,12 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
             String[] statusIcons = {"ic_check", "ic_preparing", "ic_ready_pickup", "ic_onrent", "ic_return", "ic_inspection", "ic_completed"};
             String[] statusDates = {
                     formatDateTime(paymentDate != null ? paymentDate : bookingDate),
-                    formatDateTime(getLongValue(bookingSnapshot, "preparationTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "readyForPickupTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "pickupTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "returnTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "inspectionTime")),
-                    formatDateTime(getLongValue(bookingSnapshot, "completionTime"))
+                    formatDateTime(preparationTime),
+                    formatDateTime(readyForPickupTime),
+                    formatDateTime(pickupTime),
+                    formatDateTime(returnTime),
+                    formatDateTime(inspectionTime),
+                    formatDateTime(completionTime)
             };
 
             for (int i = 0; i < statusFlow.length; i++) {
@@ -354,7 +711,13 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
 
         statusTextView.setText(statusText);
         statusDescriptionView.setText(description);
-        statusDateView.setText(date != null ? date : "Pending");
+
+        // Handle date display - show "Pending" for null/empty dates
+        if (date == null || date.isEmpty() || "null".equals(date) || "N/A".equals(date)) {
+            statusDateView.setText("Pending");
+        } else {
+            statusDateView.setText(date);
+        }
 
         if (isLast) {
             connectorLine.setVisibility(View.GONE);
@@ -369,6 +732,12 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
             statusTextView.setTextColor(getColor(R.color.primary));
             statusDescriptionView.setTextColor(getColor(R.color.textcolor));
             statusDateView.setTextColor(getColor(R.color.textcolor));
+
+            // If date shows "Pending" but status is completed, show current date
+            if ("Pending".equals(statusDateView.getText().toString()) && "Completed".equals(currentStatus)) {
+                SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault());
+                statusDateView.setText(sdf.format(new Date()));
+            }
         } else if (isCurrent) {
             statusIndicator.setBackgroundResource(R.drawable.circle_current);
             statusIcon.setColorFilter(getColor(R.color.primary));
@@ -388,10 +757,15 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
     }
 
     private boolean isStatusCompleted(String timelineStatus, String currentStatus, String deliveryStatus) {
+        // If current status is "Completed", ALL timeline statuses should be completed
+        if ("Completed".equals(currentStatus)) {
+            return true; // All statuses are completed
+        }
+
         if ("Delivery".equals(deliveryOption)) {
             switch (timelineStatus) {
                 case "Confirmed":
-                    return true;
+                    return true; // Always completed once booking is confirmed
                 case "Preparing Delivery":
                     return "PreparingDelivery".equals(currentStatus) ||
                             "OutForDelivery".equals(deliveryStatus) ||
@@ -414,7 +788,7 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
                     return "AwaitingInspection".equals(currentStatus) ||
                             "Completed".equals(currentStatus);
                 case "Inspection":
-                    return "Completed".equals(currentStatus);
+                    return "Completed".equals(currentStatus); // Fixed: Only completed when status is "Completed"
                 case "Completed":
                     return "Completed".equals(currentStatus);
                 default:
@@ -423,7 +797,7 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         } else {
             switch (timelineStatus) {
                 case "Confirmed":
-                    return true;
+                    return true; // Always completed once booking is confirmed
                 case "Preparing Pickup":
                     return "PreparingPickup".equals(currentStatus) ||
                             "ReadyForPickup".equals(deliveryStatus) ||
@@ -446,7 +820,7 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
                     return "AwaitingInspection".equals(currentStatus) ||
                             "Completed".equals(currentStatus);
                 case "Inspection":
-                    return "Completed".equals(currentStatus);
+                    return "Completed".equals(currentStatus); // Fixed: Only completed when status is "Completed"
                 case "Completed":
                     return "Completed".equals(currentStatus);
                 default:
@@ -473,7 +847,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         }
     }
 
-    // Borrower actions (with hasReview)
     private void updateBorrowerActions(String status, String deliveryStatus, String deliveryOption, boolean hasReview) {
         btnPrimaryAction.setVisibility(View.GONE);
         btnSecondaryAction.setVisibility(View.GONE);
@@ -591,7 +964,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         startActivity(intent);
     }
 
-    // Load review summary from /reviews/{bookingId}/{reviewId}
     private void loadReviewSummary() {
         if (reviewsRef == null || bookingId == null || currentUserId == null) return;
 
@@ -665,7 +1037,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
                 });
     }
 
-    // ⭐ helper to color 5 stars based on rating
     private void updateReviewStars(int rating) {
         ImageView[] stars = new ImageView[]{reviewStar1, reviewStar2, reviewStar3, reviewStar4, reviewStar5};
 
@@ -683,7 +1054,7 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         }
     }
 
-    // Helpers
+    // Helper methods
     private String getStringValue(DataSnapshot snapshot, String key) {
         DataSnapshot child = snapshot.child(key);
         return child.exists() && child.getValue() != null ? child.getValue().toString() : null;
@@ -740,14 +1111,20 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
     }
 
     private String formatDate(Long timestamp) {
-        if (timestamp == null) return "N/A";
+        if (timestamp == null || timestamp == 0) return "N/A";
         SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy", Locale.getDefault());
         return sdf.format(new Date(timestamp));
     }
 
     private String formatDateTime(Long timestamp) {
-        if (timestamp == null) return null;
-        SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault());
-        return sdf.format(new Date(timestamp));
+        if (timestamp == null || timestamp == 0) {
+            return "Pending";
+        }
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault());
+            return sdf.format(new Date(timestamp));
+        } catch (Exception e) {
+            return "Pending";
+        }
     }
 }
