@@ -1,10 +1,13 @@
 package com.example.modestyrent_app;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.*;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.cardview.widget.CardView;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.slider.Slider;
@@ -18,6 +21,7 @@ public class activity_inspection extends AppCompatActivity {
 
     private String bookingId, productId, renterId;
 
+    // UI Components
     private ImageView backButton;
     private TextView tvProductName, tvBorrowerName, tvRentalPeriod, tvReturnMethod;
     private RadioGroup rgItemCondition;
@@ -27,12 +31,26 @@ public class activity_inspection extends AppCompatActivity {
     private TextView tvRepairCost, tvOriginalDeposit, tvDeductions, tvRefundAmount, tvFinalRefund;
     private MaterialButton btnCompleteInspection;
 
+    // New UI Components for late return indicator
+    private CardView cvDueDateIndicator;
+    private TextView tvDueDateStatus, tvDueDateLabel, tvDueDateValue, tvLatePenaltyAmount;
+    private LinearLayout llLatePenaltySection;
+
+    // Database References
     private DatabaseReference bookingsRef, usersRef, productsRef;
     private FirebaseAuth mAuth;
 
-    // New fields
-    private double originalDepositAmount = 50.0;   // default, will be overridden by DB
-    private boolean needsRefundPayment = false;    // true if refundAmount > 0
+    // Calculation fields
+    private double originalDepositAmount = 50.0;
+    private double latePenaltyAmount = 0.0;
+    private double repairCostAmount = 0.0;
+    private boolean needsRefundPayment = false;
+    private boolean isLateReturn = false;
+    private long daysLate = 0;
+
+    // Constants
+    private static final double PENALTY_PER_DAY = 5.0; // RM 5 per day
+    private static final int PENALTY_CAP = 50; // Maximum penalty (optional)
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,12 +84,14 @@ public class activity_inspection extends AppCompatActivity {
         tvRentalPeriod = findViewById(R.id.tvRentalPeriod);
         tvReturnMethod = findViewById(R.id.tvReturnMethod);
 
+        // Condition radio buttons
         rgItemCondition = findViewById(R.id.rgItemCondition);
         rbExcellent = findViewById(R.id.rbExcellent);
         rbGood = findViewById(R.id.rbGood);
         rbFair = findViewById(R.id.rbFair);
         rbPoor = findViewById(R.id.rbPoor);
 
+        // Damage and repair
         etDamageNotes = findViewById(R.id.etDamageNotes);
         sliderRepairCost = findViewById(R.id.sliderRepairCost);
         tvRepairCost = findViewById(R.id.tvRepairCost);
@@ -80,6 +100,14 @@ public class activity_inspection extends AppCompatActivity {
         tvRefundAmount = findViewById(R.id.tvRefundAmount);
         tvFinalRefund = findViewById(R.id.tvFinalRefund);
         btnCompleteInspection = findViewById(R.id.btnCompleteInspection);
+
+        // New views for late return indicator
+        cvDueDateIndicator = findViewById(R.id.cvDueDateIndicator);
+        tvDueDateStatus = findViewById(R.id.tvDueDateStatus);
+        tvDueDateLabel = findViewById(R.id.tvDueDateLabel);
+        tvDueDateValue = findViewById(R.id.tvDueDateValue);
+        tvLatePenaltyAmount = findViewById(R.id.tvLatePenaltyAmount);
+        llLatePenaltySection = findViewById(R.id.llLatePenaltySection);
 
         backButton.setOnClickListener(v -> finish());
     }
@@ -93,11 +121,12 @@ public class activity_inspection extends AppCompatActivity {
     private void setupListeners() {
         // Repair cost slider listener
         sliderRepairCost.addOnChangeListener((slider, value, fromUser) -> {
+            repairCostAmount = value;
             tvRepairCost.setText(String.format("RM %.2f", value));
             calculateRefundAmount();
         });
 
-        // Ensure ONLY ONE condition radio is selected at a time
+        // Condition radio buttons listener
         CompoundButton.OnCheckedChangeListener conditionListener = (buttonView, isChecked) -> {
             if (!isChecked) return;
 
@@ -114,11 +143,10 @@ public class activity_inspection extends AppCompatActivity {
         rbFair.setOnCheckedChangeListener(conditionListener);
         rbPoor.setOnCheckedChangeListener(conditionListener);
 
-        // Main action button
+        // Complete inspection button
         btnCompleteInspection.setOnClickListener(v -> {
             if (!validateItemCondition()) return;
 
-            // Decide: pay refund OR complete rental directly
             if (needsRefundPayment) {
                 openRefundPaymentPage();
             } else {
@@ -135,8 +163,10 @@ public class activity_inspection extends AppCompatActivity {
                     try {
                         updateBookingUI(snapshot);
                         loadBorrowerInfo();
+                        checkAndCalculateLatePenalty(snapshot);
                     } catch (Exception e) {
                         Toast.makeText(activity_inspection.this, "Error loading booking details", Toast.LENGTH_SHORT).show();
+                        e.printStackTrace();
                     }
                 } else {
                     Toast.makeText(activity_inspection.this, "Booking not found", Toast.LENGTH_SHORT).show();
@@ -183,9 +213,65 @@ public class activity_inspection extends AppCompatActivity {
             originalDepositAmount = 50.0;
             tvOriginalDeposit.setText("RM 50.00");
         }
+    }
 
-        // Initial calculation
-        calculateRefundAmount();
+    private void checkAndCalculateLatePenalty(DataSnapshot bookingSnapshot) {
+        Long endDate = getLongValue(bookingSnapshot, "endDate");
+
+        if (endDate != null) {
+            Calendar endDateCal = Calendar.getInstance();
+            endDateCal.setTimeInMillis(endDate);
+            endDateCal.set(Calendar.HOUR_OF_DAY, 23);
+            endDateCal.set(Calendar.MINUTE, 59);
+            endDateCal.set(Calendar.SECOND, 59);
+
+            Calendar now = Calendar.getInstance();
+
+            // Calculate days late
+            long diff = now.getTimeInMillis() - endDateCal.getTimeInMillis();
+            daysLate = diff / (1000 * 60 * 60 * 24);
+
+            if (daysLate > 0) {
+                // Late return
+                isLateReturn = true;
+                latePenaltyAmount = Math.min(daysLate * PENALTY_PER_DAY, PENALTY_CAP);
+
+                // Update UI for late return (RED indicator)
+                updateDueDateIndicator(false, daysLate, endDate);
+
+                // Show late penalty section
+                llLatePenaltySection.setVisibility(View.VISIBLE);
+                tvLatePenaltyAmount.setText(String.format("RM %.2f", latePenaltyAmount));
+
+                Toast.makeText(this, "Late return detected: " + daysLate + " day(s) late", Toast.LENGTH_LONG).show();
+            } else {
+                // On time or early return (GREEN indicator)
+                isLateReturn = false;
+                latePenaltyAmount = 0.0;
+
+                updateDueDateIndicator(true, 0, endDate);
+                llLatePenaltySection.setVisibility(View.GONE);
+            }
+
+            // Initial calculation
+            calculateRefundAmount();
+        }
+    }
+
+    private void updateDueDateIndicator(boolean isOnTime, long daysLate, Long dueDate) {
+        if (isOnTime) {
+            // Green indicator for on-time return
+            cvDueDateIndicator.setCardBackgroundColor(Color.parseColor("#4CAF50")); // Green
+            tvDueDateStatus.setText("On Time");
+            tvDueDateLabel.setText("Due Date:");
+            tvDueDateValue.setText(formatDate(dueDate));
+        } else {
+            // Red indicator for late return
+            cvDueDateIndicator.setCardBackgroundColor(Color.parseColor("#F44336")); // Red
+            tvDueDateStatus.setText("LATE RETURN");
+            tvDueDateLabel.setText("Late by:");
+            tvDueDateValue.setText(daysLate + " day(s)");
+        }
     }
 
     private void loadBorrowerInfo() {
@@ -210,17 +296,21 @@ public class activity_inspection extends AppCompatActivity {
     }
 
     private void calculateRefundAmount() {
-        // Only use repair cost as deduction
-        double repairCost = (double) sliderRepairCost.getValue();
+        // Get current repair cost from slider
+        repairCostAmount = (double) sliderRepairCost.getValue();
 
-        double totalDeductions = repairCost;
+        // Calculate total deductions (repair cost + late penalty)
+        double totalDeductions = repairCostAmount + latePenaltyAmount;
+
+        // Calculate refund amount
         double refundAmount = Math.max(0, originalDepositAmount - totalDeductions);
 
+        // Update UI
         tvDeductions.setText(String.format("RM %.2f", totalDeductions));
         tvRefundAmount.setText(String.format("RM %.2f", refundAmount));
         tvFinalRefund.setText(String.format("RM %.2f", refundAmount));
 
-        // Decide which action is needed
+        // Update button text based on refund amount
         if (refundAmount > 0) {
             needsRefundPayment = true;
             btnCompleteInspection.setText("Pay Refund");
@@ -254,16 +344,17 @@ public class activity_inspection extends AppCompatActivity {
     private void completeInspectionWithoutPayment() {
         String itemCondition = getSelectedCondition();
         String damageNotes = etDamageNotes.getText().toString().trim();
-        double repairCost = (double) sliderRepairCost.getValue();
-
-        double refundAmount = 0.0; // by definition in this case
+        double refundAmount = 0.0;
 
         Map<String, Object> updates = new HashMap<>();
         updates.put("status", "Completed");
         updates.put("inspectionTime", System.currentTimeMillis());
         updates.put("itemCondition", itemCondition);
         updates.put("damageNotes", damageNotes);
-        updates.put("repairCost", repairCost);
+        updates.put("repairCost", repairCostAmount);
+        updates.put("latePenalty", latePenaltyAmount);
+        updates.put("daysLate", daysLate);
+        updates.put("totalDeductions", repairCostAmount + latePenaltyAmount);
         updates.put("refundAmount", refundAmount);
         updates.put("depositReturned", true);
         updates.put("depositReturnDate", System.currentTimeMillis());
@@ -290,7 +381,6 @@ public class activity_inspection extends AppCompatActivity {
     private void openRefundPaymentPage() {
         String itemCondition = getSelectedCondition();
         String damageNotes = etDamageNotes.getText().toString().trim();
-        double repairCost = (double) sliderRepairCost.getValue();
 
         // Parse refund amount from UI
         String refundText = tvFinalRefund.getText().toString().replace("RM ", "").trim();
@@ -305,7 +395,9 @@ public class activity_inspection extends AppCompatActivity {
         intent.putExtra("renterId", renterId);
         intent.putExtra("itemCondition", itemCondition);
         intent.putExtra("damageNotes", damageNotes);
-        intent.putExtra("repairCost", repairCost);
+        intent.putExtra("repairCost", repairCostAmount);
+        intent.putExtra("latePenalty", latePenaltyAmount);
+        intent.putExtra("daysLate", daysLate);
         intent.putExtra("refundAmount", refundAmount);
         startActivity(intent);
     }

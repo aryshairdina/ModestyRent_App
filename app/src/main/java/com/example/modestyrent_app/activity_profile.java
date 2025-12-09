@@ -459,7 +459,7 @@ public class activity_profile extends AppCompatActivity {
         }
 
         if (id == R.id.nav_live) {
-            Toast.makeText(this, "Live feature coming soon", Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(activity_profile.this, activity_product_reels.class);
             return true;
         }
 

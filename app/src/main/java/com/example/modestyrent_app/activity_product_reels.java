@@ -6,10 +6,14 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.PagerSnapHelper;
 import androidx.recyclerview.widget.RecyclerView;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.Toast;
 
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -38,6 +42,7 @@ public class activity_product_reels extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_product_reels);
+        BottomNavigationView bottomNav = findViewById(R.id.bottomNavigation);
 
         // 1. Firebase Initialization
         mAuth = FirebaseAuth.getInstance();
@@ -77,6 +82,18 @@ public class activity_product_reels extends AppCompatActivity {
 
         // 4. Fetch Data
         fetchProductReels();
+
+        if (bottomNav == null) {
+            Toast.makeText(this, "BottomNavigationView not found (check layout id)", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        Menu menu = bottomNav.getMenu();
+        MenuItem homeItem = menu.findItem(R.id.nav_live);
+        if (homeItem != null) {
+            bottomNav.setSelectedItemId(R.id.nav_live);
+        }
+        bottomNav.setOnItemSelectedListener(this::handleNavItemSelected);
     }
 
     // Called when a reel becomes centered after vertical scroll
@@ -174,5 +191,30 @@ public class activity_product_reels extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         ReelsMediaAdapter.pauseAllPlayers(); // extra safety
+    }
+
+    private boolean handleNavItemSelected(@NonNull MenuItem item) {
+        int id = item.getItemId();
+
+        if (id == R.id.nav_home) {
+            startActivity(new Intent(this, activity_home.class));
+            return true;
+        }
+        if (id == R.id.nav_add_item) {
+            startActivity(new Intent(this, activity_add_product.class));
+            return true;
+        }
+        if (id == R.id.nav_profile) {
+            startActivity(new Intent(this, activity_profile.class));
+            return true;
+        }
+        if (id == R.id.nav_live) {
+            return true;
+        }
+        if (id == R.id.nav_chat) {
+            startActivity(new Intent(this, activity_chat_list.class));
+            return true;
+        }
+        return true;
     }
 }
