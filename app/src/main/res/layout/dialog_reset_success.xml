@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="32dp"
+    android:background="@color/background"
+    android:gravity="center">
+
+    <!-- Success Icon -->
+    <LinearLayout
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:background="@drawable/bg_circle_success"
+        android:gravity="center"
+        android:layout_marginBottom="24dp">
+
+        <ImageView
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_email_check"
+            app:tint="@color/background" />
+    </LinearLayout>
+
+    <!-- Success Title -->
+    <TextView
+        android:id="@+id/tvSuccessTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Check Your Email"
+        android:textColor="@color/neutral"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:fontFamily="sans-serif-medium"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Success Message -->
+    <TextView
+        android:id="@+id/tvSuccessMessage"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Password reset link has been sent to:"
+        android:textColor="@color/textcolor"
+        android:textSize="14sp"
+        android:layout_marginBottom="16dp"
+        android:gravity="center" />
+
+    <!-- Email Address Container -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@drawable/bg_email_container"
+        android:padding="16dp"
+        android:gravity="center"
+        android:layout_marginBottom="24dp">
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/ic_email"
+            app:tint="@color/primary"
+            android:layout_marginEnd="12dp" />
+
+        <TextView
+            android:id="@+id/tvEmailAddress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="user@example.com"
+            android:textColor="@color/neutral"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:fontFamily="monospace" />
+    </LinearLayout>
+
+    <!-- Instructions -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="✓ Follow the link in the email\n✓ Create a new password\n✓ Return to sign in"
+        android:textColor="@color/textcolor"
+        android:textSize="13sp"
+        android:lineSpacingExtra="4dp"
+        android:gravity="center"
+        android:layout_marginBottom="24dp" />
+
+    <!-- Spam Note -->
+    <TextView
+        android:id="@+id/tvSpamNote"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Didn't receive it? Check your spam folder"
+        android:textColor="@color/textcolor"
+        android:textSize="12sp"
+        android:textStyle="italic"
+        android:layout_marginBottom="32dp" />
+
+    <!-- Got It Button - CHANGED TO MaterialButton -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnGotIt"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:backgroundTint="@color/primary"
+        android:text="GOT IT, THANKS!"
+        android:textAllCaps="true"
+        android:textColor="@color/background"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        app:cornerRadius="26dp" />
+</LinearLayout>

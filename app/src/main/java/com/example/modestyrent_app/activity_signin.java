@@ -1,12 +1,13 @@
 package com.example.modestyrent_app;
 
 import android.app.ProgressDialog;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Patterns;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -16,7 +17,9 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
@@ -124,37 +127,116 @@ public class activity_signin extends AppCompatActivity {
     }
 
     private void showForgotPasswordDialog() {
-        final EditText input = new EditText(this);
-        input.setHint("Enter your email address");
-        input.setText(emailEditText.getText() != null ? emailEditText.getText().toString().trim() : "");
-        AlertDialog.Builder b = new AlertDialog.Builder(this)
-                .setTitle("Reset Password")
-                .setMessage("We'll send a password reset link to your email.")
-                .setView(input)
-                .setPositiveButton("Send", (dialog, which) -> {
-                    String mail = input.getText() != null ? input.getText().toString().trim() : "";
-                    if (TextUtils.isEmpty(mail) || !Patterns.EMAIL_ADDRESS.matcher(mail).matches()) {
-                        showErrorPanel("Enter a valid email address to reset password.");
-                        return;
-                    }
-                    sendPasswordResetEmail(mail);
-                })
-                .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
-        b.show();
+        // Inflate custom layout
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_forgot_password, null);
+
+        TextInputLayout emailInputLayout = dialogView.findViewById(R.id.emailInputLayout);
+        EditText etEmail = dialogView.findViewById(R.id.etEmail);
+        TextView tvError = dialogView.findViewById(R.id.tvError);
+        TextView tvDialogTitle = dialogView.findViewById(R.id.tvDialogTitle);
+        TextView tvDialogSubtitle = dialogView.findViewById(R.id.tvDialogSubtitle);
+
+        // Pre-fill with email from sign-in form if available
+        String currentEmail = emailEditText.getText() != null ? emailEditText.getText().toString().trim() : "";
+        if (!TextUtils.isEmpty(currentEmail)) {
+            etEmail.setText(currentEmail);
+        }
+
+        MaterialAlertDialogBuilder dialogBuilder = new MaterialAlertDialogBuilder(this, R.style.FashionDialogTheme)
+                .setView(dialogView)
+                .setCancelable(true);
+
+        AlertDialog dialog = dialogBuilder.create();
+
+        // Get buttons from custom layout
+        Button btnCancel = dialogView.findViewById(R.id.btnCancel);
+        Button btnSendLink = dialogView.findViewById(R.id.btnSendLink);
+
+        btnCancel.setOnClickListener(view -> dialog.dismiss());
+
+        btnSendLink.setOnClickListener(view -> {
+            String email = etEmail.getText().toString().trim();
+
+            if (TextUtils.isEmpty(email)) {
+                tvError.setText("Please enter your email address");
+                tvError.setVisibility(View.VISIBLE);
+                emailInputLayout.setError("Email is required");
+                return;
+            }
+
+            if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                tvError.setText("Please enter a valid email address");
+                tvError.setVisibility(View.VISIBLE);
+                emailInputLayout.setError("Invalid email format");
+                return;
+            }
+
+            // Clear errors
+            tvError.setVisibility(View.GONE);
+            emailInputLayout.setError(null);
+
+            // If validation passes, send reset email
+            sendPasswordResetEmail(email, dialog);
+        });
+
+        dialog.show();
     }
 
-    private void sendPasswordResetEmail(String email) {
-        progressDialog.show();
-        mAuth.sendPasswordResetEmail(email).addOnCompleteListener(task -> {
-            progressDialog.dismiss();
-            if (task.isSuccessful()) {
-                showErrorPanel("Password reset email sent. Check your inbox.");
-            } else {
-                String raw = task.getException() != null ? task.getException().getMessage() : null;
-                String friendly = raw != null ? raw : "Failed to send reset email. Try again later.";
-                showErrorPanel(friendly);
-            }
-        });
+    private void sendPasswordResetEmail(String email, AlertDialog dialog) {
+        ProgressDialog resetProgressDialog = new ProgressDialog(this);
+        resetProgressDialog.setMessage("Sending password reset link...");
+        resetProgressDialog.setCancelable(false);
+        resetProgressDialog.show();
+
+        mAuth.sendPasswordResetEmail(email)
+                .addOnCompleteListener(task -> {
+                    resetProgressDialog.dismiss();
+
+                    if (task.isSuccessful()) {
+                        dialog.dismiss();
+                        // Show success dialog
+                        showSuccessDialog(email);
+                    } else {
+                        // Handle errors
+                        String errorMessage = "Failed to send reset email";
+                        if (task.getException() != null) {
+                            String exceptionMessage = task.getException().getMessage();
+                            if (exceptionMessage.contains("user-not-found")) {
+                                errorMessage = "No account found with this email address";
+                            } else if (exceptionMessage.contains("invalid-email")) {
+                                errorMessage = "Invalid email address";
+                            } else if (exceptionMessage.contains("too-many-requests")) {
+                                errorMessage = "Too many attempts. Please try again later";
+                            } else if (exceptionMessage.contains("network")) {
+                                errorMessage = "Network error. Please check your connection";
+                            }
+                        }
+                        showErrorPanel(errorMessage);
+                    }
+                });
+    }
+
+    private void showSuccessDialog(String email) {
+        View successView = LayoutInflater.from(this).inflate(R.layout.dialog_reset_success, null);
+
+        TextView tvSuccessTitle = successView.findViewById(R.id.tvSuccessTitle);
+        TextView tvSuccessMessage = successView.findViewById(R.id.tvSuccessMessage);
+        TextView tvEmailAddress = successView.findViewById(R.id.tvEmailAddress);
+        TextView tvSpamNote = successView.findViewById(R.id.tvSpamNote);
+        Button btnGotIt = successView.findViewById(R.id.btnGotIt);
+
+        String formattedEmail = email.substring(0, Math.min(3, email.length())) + "***" +
+                email.substring(email.indexOf("@"));
+        tvEmailAddress.setText(email);
+
+        AlertDialog successDialog = new MaterialAlertDialogBuilder(this, R.style.FashionDialogTheme)
+                .setView(successView)
+                .setCancelable(false)
+                .create();
+
+        btnGotIt.setOnClickListener(view -> successDialog.dismiss());
+
+        successDialog.show();
     }
 
     private void showErrorPanel(String message) {
