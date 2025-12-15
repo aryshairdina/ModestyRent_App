@@ -1,4 +1,3 @@
-// activity_listing_details.java (revised)
 package com.example.modestyrent_app;
 
 import android.app.Activity;

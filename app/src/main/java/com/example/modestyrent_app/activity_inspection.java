@@ -17,6 +17,7 @@ import com.google.firebase.database.*;
 
 import java.text.SimpleDateFormat;
 import java.util.*;
+import com.example.modestyrent_app.NotificationHelper;
 
 public class activity_inspection extends AppCompatActivity {
 
@@ -416,6 +417,7 @@ public class activity_inspection extends AppCompatActivity {
         Map<String, Object> updates = new HashMap<>();
         updates.put("status", "Completed");
         updates.put("inspectionTime", System.currentTimeMillis());
+        updates.put("completionTime", System.currentTimeMillis()); // Add completion time
         updates.put("itemCondition", itemCondition);
         updates.put("damageNotes", damageNotes);
         updates.put("repairCost", repairCostAmount);
@@ -423,7 +425,6 @@ public class activity_inspection extends AppCompatActivity {
         // CRITICAL: Always save penalty data if it exists (even if 0)
         updates.put("latePenalty", latePenaltyAmount);
         updates.put("daysLate", daysLate);
-
         updates.put("totalDeductions", repairCostAmount + latePenaltyAmount);
         updates.put("refundAmount", refundAmount);
         updates.put("depositReturned", true);
@@ -437,6 +438,29 @@ public class activity_inspection extends AppCompatActivity {
 
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
+                    // 🔔 SEND RENTAL COMPLETION NOTIFICATION
+                    String completionMessage;
+                    if (isLateReturn && latePenaltyAmount > 0) {
+                        completionMessage = "Rental completed with late penalty: RM " +
+                                String.format("%.2f", latePenaltyAmount);
+                    } else {
+                        completionMessage = "Rental completed successfully!";
+                    }
+
+                    NotificationHelper.sendBookingNotification(
+                            bookingId,
+                            "Rental Completed",
+                            completionMessage,
+                            "rental_completed",
+                            renterId,
+                            mAuth.getCurrentUser().getUid()
+                    );
+
+                    // 🔔 SEND REVIEW REMINDER (after 1 day)
+                    new android.os.Handler().postDelayed(() -> {
+                        NotificationHelper.sendReviewReminder(bookingId, renterId);
+                    }, 24 * 60 * 60 * 1000); // 24 hours
+
                     String message = "Rental completed successfully";
                     if (isLateReturn && latePenaltyAmount > 0) {
                         message += "\nLate penalty applied: RM " + String.format("%.2f", latePenaltyAmount);

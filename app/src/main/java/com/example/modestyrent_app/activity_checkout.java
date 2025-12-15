@@ -15,6 +15,7 @@ import com.google.firebase.database.*;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 import java.util.Random;
+import com.example.modestyrent_app.NotificationHelper;
 
 public class activity_checkout extends AppCompatActivity {
 
@@ -42,6 +43,15 @@ public class activity_checkout extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_checkout);
 
+        // 🔒 AUTH GUARD (rule-related only)
+        FirebaseAuth auth = FirebaseAuth.getInstance();
+        if (auth.getCurrentUser() == null) {
+            Toast.makeText(this, "Please login to continue", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+        // 🔒 END auth guard
+
         initializeViews();
         getIntentData();
         initializeFirebase();
@@ -49,6 +59,7 @@ public class activity_checkout extends AppCompatActivity {
         setupClickListeners();
         updateUI();
     }
+
 
     private void initializeViews() {
         // TextViews
@@ -283,6 +294,9 @@ public class activity_checkout extends AppCompatActivity {
             startActivity(intent);
 
             // ⚠️ IMPORTANT: DO NOT WRITE TO bookingsRef HERE
+            // 🔔 Add these extras for notifications
+            intent.putExtra("renterId", currentUserId);
+            intent.putExtra("bookingNumber", generateBookingNumber());
             return;
         }
 
@@ -322,10 +336,31 @@ public class activity_checkout extends AppCompatActivity {
                 .addOnSuccessListener(aVoid -> {
                     updateProductStatusToUnavailable();
 
+                    // 🔔 SEND BOOKING CONFIRMATION NOTIFICATION
+                    NotificationHelper.sendBookingNotification(
+                            bookingId,
+                            "Booking Confirmed!",
+                            "Your booking #" + bookingNumber + " has been confirmed.",
+                            "booking_confirmed",
+                            currentUserId,  // Borrower
+                            ownerId         // Owner
+                    );
+
+                    // Also send payment status notification
+                    NotificationHelper.sendNotification(
+                            currentUserId,
+                            "Payment Pending",
+                            "Please pay via COD when you receive the item.",
+                            "payment_pending",
+                            bookingId
+                    );
+
                     Intent intent = new Intent(activity_checkout.this, activity_booking.class);
                     intent.putExtra("bookingId", bookingId);
                     startActivity(intent);
                     finish();
+
+
                 })
                 .addOnFailureListener(e ->
                         Toast.makeText(activity_checkout.this,

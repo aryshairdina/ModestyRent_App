@@ -3,6 +3,8 @@ package com.example.modestyrent_app;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -13,8 +15,10 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -34,8 +38,10 @@ import com.google.android.material.slider.RangeSlider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -72,6 +78,10 @@ public class activity_homepage extends AppCompatActivity {
     private float allProductsMinPrice = 0f;
     private float allProductsMaxPrice = 0f;
 
+    // NOTIFICATION - FIXED: Use RelativeLayout.LayoutParams instead of ConstraintLayout
+    private ImageView notificationIcon;
+    private TextView notificationBadge;
+
     private float filterMinPrice = 0f;
     private float filterMaxPrice = 0f;
 
@@ -91,11 +101,25 @@ public class activity_homepage extends AppCompatActivity {
         searchBar = findViewById(R.id.searchBar);
         btnFilter = findViewById(R.id.btnFilter);
 
+        // INITIALIZE NOTIFICATION VIEWS - FIXED
+        notificationIcon = findViewById(R.id.notificationIcon);
+        notificationBadge = findViewById(R.id.notificationBadge); // Make sure this ID exists in XML
+
+        if (notificationIcon != null) {
+            notificationIcon.setOnClickListener(v -> {
+                Intent intent = new Intent(this, activity_notifications.class);
+                startActivity(intent);
+            });
+        }
+
         mAuth = FirebaseAuth.getInstance();
         FirebaseUser currentUser = mAuth.getCurrentUser();
 
         if (currentUser != null) {
             welcomeText.setText("Welcome, " + currentUser.getEmail());
+
+            // SETUP NOTIFICATION BADGE
+            setupNotificationBadge(currentUser.getUid());
 
             String uid = currentUser.getUid();
             DatabaseReference userRef = FirebaseDatabase.getInstance()
@@ -150,6 +174,13 @@ public class activity_homepage extends AppCompatActivity {
             } else {
                 setupProductGrid();
             }
+
+            // REFRESH NOTIFICATION BADGE WHEN RETURNING TO HOMEPAGE
+            FirebaseUser currentUser = mAuth.getCurrentUser();
+            if (currentUser != null) {
+                setupNotificationBadge(currentUser.getUid());
+            }
+
         } catch (Exception e) {
             Log.w(TAG, "onResume refresh failed: " + e.getMessage(), e);
         }
@@ -631,7 +662,7 @@ public class activity_homepage extends AppCompatActivity {
                         }
 
                         if (finalCurrentUid != null && ownerId != null && finalCurrentUid.equals(ownerId)) {
-                            continue; // don’t show own products
+                            continue; // don't show own products
                         }
 
                         String status = p.getStatus();
@@ -728,6 +759,142 @@ public class activity_homepage extends AppCompatActivity {
         }).addOnFailureListener(e -> {
             Toast.makeText(this, "Error loading products: " + e.getMessage(), Toast.LENGTH_LONG).show();
         });
+    }
+
+    // ============== NOTIFICATION METHODS ==============
+
+    private void setupNotificationBadge(String userId) {
+        if (userId == null) return;
+
+        DatabaseReference notificationsRef = FirebaseDatabase.getInstance()
+                .getReference("notifications")
+                .child(userId);
+
+        notificationsRef.orderByChild("read").equalTo(false)
+                .addValueEventListener(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        long unreadCount = snapshot.getChildrenCount();
+                        updateNotificationBadge(unreadCount);
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {
+                        Log.e(TAG, "Failed to load notifications: " + error.getMessage());
+                    }
+                });
+    }
+
+    private void updateNotificationBadge(long unreadCount) {
+        runOnUiThread(() -> {
+            if (notificationBadge == null) {
+                // Try to find it in layout
+                notificationBadge = findViewById(R.id.notificationBadge);
+
+                // If still null, create it programmatically
+                if (notificationBadge == null && notificationIcon != null) {
+                    createNotificationBadgeProgrammatically();
+                }
+            }
+
+            if (notificationBadge != null) {
+                if (unreadCount > 0) {
+                    notificationBadge.setVisibility(View.VISIBLE);
+                    if (unreadCount > 99) {
+                        notificationBadge.setText("99+");
+                    } else {
+                        notificationBadge.setText(String.valueOf(unreadCount));
+                    }
+                } else {
+                    notificationBadge.setVisibility(View.GONE);
+                }
+            }
+
+            // Update icon color
+            if (notificationIcon != null) {
+                if (unreadCount > 0) {
+                    notificationIcon.setColorFilter(ContextCompat.getColor(this, R.color.notification_important));
+                    notificationIcon.setImageResource(R.drawable.ic_notifications); // Active icon
+                } else {
+                    notificationIcon.setColorFilter(ContextCompat.getColor(this, R.color.primary));
+                    notificationIcon.setImageResource(R.drawable.ic_notifications); // Normal icon
+                }
+            }
+        });
+    }
+
+    private void createNotificationBadgeProgrammatically() {
+        if (notificationIcon == null) return;
+
+        // Get parent layout
+        ViewGroup parent = (ViewGroup) notificationIcon.getParent();
+        if (parent == null) return;
+
+        // Create badge
+        notificationBadge = new TextView(this);
+        notificationBadge.setId(View.generateViewId());
+
+        // Create background drawable programmatically
+        GradientDrawable badgeBackground = new GradientDrawable();
+        badgeBackground.setShape(GradientDrawable.OVAL);
+        badgeBackground.setColor(ContextCompat.getColor(this, R.color.notification_important));
+        badgeBackground.setStroke(2, ContextCompat.getColor(this, R.color.background));
+
+        notificationBadge.setBackground(badgeBackground);
+        notificationBadge.setTextColor(Color.WHITE);
+        notificationBadge.setTextSize(10);
+        notificationBadge.setGravity(android.view.Gravity.CENTER);
+        notificationBadge.setPadding(4, 2, 4, 2);
+        notificationBadge.setMinWidth(20);
+        notificationBadge.setMinHeight(20);
+
+        // Position it on top-right of icon using RelativeLayout.LayoutParams
+        RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(
+                RelativeLayout.LayoutParams.WRAP_CONTENT,
+                RelativeLayout.LayoutParams.WRAP_CONTENT
+        );
+
+        // Check if parent is RelativeLayout
+        if (parent instanceof RelativeLayout) {
+            params.addRule(RelativeLayout.ALIGN_TOP, notificationIcon.getId());
+            params.addRule(RelativeLayout.ALIGN_RIGHT, notificationIcon.getId());
+            params.topMargin = -8; // Use topMargin instead of params.topMargin
+            params.rightMargin = -8; // Use rightMargin instead of params.endMargin
+
+            notificationBadge.setLayoutParams(params);
+            notificationBadge.setVisibility(View.GONE);
+
+            // Add to parent
+            parent.addView(notificationBadge);
+        } else {
+            // Fallback: Use simple positioning for other layouts
+            params = new RelativeLayout.LayoutParams(
+                    RelativeLayout.LayoutParams.WRAP_CONTENT,
+                    RelativeLayout.LayoutParams.WRAP_CONTENT
+            );
+            params.setMargins(-8, -8, 0, 0); // Top-left margin
+
+            ViewGroup.MarginLayoutParams marginParams = new ViewGroup.MarginLayoutParams(params);
+            marginParams.setMargins(-8, -8, 0, 0);
+            notificationBadge.setLayoutParams(marginParams);
+            notificationBadge.setVisibility(View.GONE);
+
+            // Wrap icon and badge in a FrameLayout
+            android.widget.FrameLayout container = new android.widget.FrameLayout(this);
+            FrameLayout.LayoutParams containerParams = new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT
+            );
+
+            // Replace icon with container
+            int index = parent.indexOfChild(notificationIcon);
+            parent.removeView(notificationIcon);
+
+            container.addView(notificationIcon);
+            container.addView(notificationBadge);
+
+            parent.addView(container, index, containerParams);
+        }
     }
 
     // ---------------- Adapter ----------------

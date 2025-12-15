@@ -13,6 +13,7 @@ import androidx.constraintlayout.widget.ConstraintLayout;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -50,12 +51,23 @@ public class activity_arrange_return extends AppCompatActivity {
         }
 
         mAuth = FirebaseAuth.getInstance();
-        currentUserId = mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : null;
+
+        // 🔒 AUTH GUARD (important for .write: auth != null)
+        FirebaseUser user = mAuth.getCurrentUser();
+        if (user == null) {
+            Toast.makeText(this, "Please sign in to continue", Toast.LENGTH_SHORT).show();
+            startActivity(new Intent(this, activity_signin.class));
+            finish();
+            return;
+        }
+        currentUserId = user.getUid();
+        // 🔒 END auth guard
 
         initializeViews();
         setupFirebase();
         loadBookingDetails();
     }
+
 
     private void initializeViews() {
         backButton = findViewById(R.id.backButton);

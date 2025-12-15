@@ -31,6 +31,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import com.example.modestyrent_app.NotificationHelper;
 
 public class activity_rentals_details_borrower extends AppCompatActivity {
 
@@ -94,6 +95,7 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         initializeViews();
         setupFirebase();
         loadBookingDetails();
+        sendReturnReminderNotification();
     }
 
     private void initializeViews() {
@@ -277,6 +279,8 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         }
     }
 
+
+
     private void calculateAndShowLateWarning(Long endDate, String status) {
         Log.d(TAG, "calculateAndShowLateWarning() called for status: " + status);
 
@@ -323,6 +327,23 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
 
             if (daysLate > 0) {
                 double penaltyAmount = Math.min(daysLate * PENALTY_PER_DAY, PENALTY_CAP);
+
+                // Send late notification
+                NotificationHelper.sendLateReturnNotification(
+                        bookingId,
+                        (int) daysLate,
+                        penaltyAmount,
+                        currentUserId
+                );
+
+                // Also notify owner
+                NotificationHelper.sendNotification(
+                        ownerId,
+                        "Late Return",
+                        "Borrower is " + daysLate + " days late returning the item.",
+                        "penalty_alert",
+                        bookingId
+                );
 
                 Log.d(TAG, "Showing warning: " + daysLate + " days late, penalty: RM " + penaltyAmount);
 
@@ -924,6 +945,16 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
 
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
+                    // Send notification using NotificationHelper
+                    NotificationHelper.sendBookingNotification(
+                            bookingId,
+                            "Item Picked Up",
+                            "You have picked up the rented item. Rental period has started.",
+                            "delivery_update",
+                            currentUserId,
+                            ownerId
+                    );
+
                     loadBookingDetails();
                 })
                 .addOnFailureListener(e -> {
@@ -939,6 +970,16 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
 
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
+                    // Send notification using NotificationHelper
+                    NotificationHelper.sendBookingNotification(
+                            bookingId,
+                            "Item Received",
+                            "You have received the rented item. Rental period has started.",
+                            "delivery_update",
+                            currentUserId,
+                            ownerId
+                    );
+
                     loadBookingDetails();
                 })
                 .addOnFailureListener(e -> {
@@ -947,11 +988,33 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
     }
 
     private void startReturnProcess() {
-        Intent intent = new Intent(this, activity_arrange_return.class);
-        intent.putExtra("bookingId", bookingId);
-        intent.putExtra("productId", productId);
-        intent.putExtra("ownerId", ownerId);
-        startActivity(intent);
+        // First update status to ReturnRequested
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("status", "ReturnRequested");
+        updates.put("returnTime", System.currentTimeMillis());
+
+        bookingsRef.child(bookingId).updateChildren(updates)
+                .addOnSuccessListener(aVoid -> {
+                    // Send notification
+                    NotificationHelper.sendBookingNotification(
+                            bookingId,
+                            "Return Requested",
+                            "You have requested to return the item. Please arrange return.",
+                            "return_update",
+                            currentUserId,
+                            ownerId
+                    );
+
+                    // Open return activity
+                    Intent intent = new Intent(this, activity_arrange_return.class);
+                    intent.putExtra("bookingId", bookingId);
+                    intent.putExtra("productId", productId);
+                    intent.putExtra("ownerId", ownerId);
+                    startActivity(intent);
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, "Failed to start return process", Toast.LENGTH_SHORT).show();
+                });
     }
 
     private void leaveReview() {
@@ -1125,4 +1188,38 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
             return "Pending";
         }
     }
+
+    private void sendReturnReminderNotification() {
+        bookingsRef.child(bookingId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                Long endDate = getLongValue(snapshot, "endDate");
+                String status = getStringValue(snapshot, "status");
+
+                if (endDate != null && "OnRent".equals(status)) {
+                    long now = System.currentTimeMillis();
+                    long timeUntilDue = endDate - now;
+                    long daysUntilDue = timeUntilDue / (1000 * 60 * 60 * 24);
+
+                    if (daysUntilDue <= 2 && daysUntilDue >= 0) {
+                        NotificationHelper.sendNotification(
+                                currentUserId,
+                                "Return Reminder",
+                                "Your rental period ends in " + daysUntilDue + " day(s). Please prepare to return the item.",
+                                "return_reminder",
+                                bookingId
+                        );
+                    }
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Failed to check return date");
+            }
+        });
+    }
+
+
+
 }

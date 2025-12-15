@@ -22,5 +22,13 @@
     <color name="warning_dark">#F57C00</color>
     <color name="warning_light">#FFE0B2</color>
     <color name="warning_very_light">#FFF3E0</color>
+
+    <!-- Notification specific colors -->
+    <color name="notification_new">#FFF2F0</color>  <!-- Light Red Background for New -->
+    <color name="notification_read">#F9F9F9</color> <!-- Light Gray Background for Read -->
+    <color name="notification_important">#B42E23</color> <!-- Important notification dot -->
+    <color name="notification_sale">#FF6B6B</color> <!-- Sale/Offer notification -->
+    <color name="notification_success">#27AE60</color> <!-- Success/Confirmed -->
+    <color name="notification_warning">#F39C12</color> <!-- Warning/Reminder -->
 </resources>
 

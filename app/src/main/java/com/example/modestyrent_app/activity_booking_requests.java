@@ -48,12 +48,23 @@ public class activity_booking_requests extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_booking_requests);
 
+        // 🔒 AUTH GUARD (required for .write: auth != null)
+        mAuth = FirebaseAuth.getInstance();
+        if (mAuth.getCurrentUser() == null) {
+            Toast.makeText(this, "Please sign in to continue", Toast.LENGTH_SHORT).show();
+            startActivity(new Intent(this, activity_signin.class));
+            finish();
+            return;
+        }
+        // 🔒 END auth guard
+
         initializeViews();
         setupFirebase();
         setupRecyclerView();
         setupListeners();
         loadProductsAndUsers();
     }
+
 
     private void initializeViews() {
         bookingsRecyclerView = findViewById(R.id.bookingsRecyclerView);

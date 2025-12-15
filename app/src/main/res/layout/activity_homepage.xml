@@ -32,13 +32,41 @@
             android:letterSpacing="0.15"
             android:fontFamily="sans-serif-black" />
 
-        <ImageView
-            android:id="@+id/notificationIcon"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:src="@drawable/ic_notifications"
-            app:tint="@color/neutral"
-            android:contentDescription="Notifications" />
+        <!-- Replace this section in your XML (around lines 25-45) -->
+        <RelativeLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+
+            <ImageView
+                android:id="@+id/notificationIcon"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:src="@drawable/ic_notifications"
+                app:tint="@color/primary"
+                android:contentDescription="Notifications" />
+
+            <TextView
+                android:id="@+id/notificationBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignTop="@id/notificationIcon"
+                android:layout_alignRight="@id/notificationIcon"
+                android:layout_marginTop="-8dp"
+                android:layout_marginRight="-8dp"
+                android:background="@drawable/badge_background"
+                android:textColor="@android:color/white"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:minWidth="10dp"
+                android:minHeight="10dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:visibility="gone"
+                android:text="0" />
+        </RelativeLayout>
     </LinearLayout>
 
     <TextView

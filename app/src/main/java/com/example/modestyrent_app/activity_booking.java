@@ -10,6 +10,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -36,6 +37,16 @@ public class activity_booking extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_booking);
 
+        // 🔒 AUTH GUARD (required for .write: auth != null)
+        FirebaseAuth auth = FirebaseAuth.getInstance();
+        if (auth.getCurrentUser() == null) {
+            Toast.makeText(this, "Please sign in to continue", Toast.LENGTH_SHORT).show();
+            startActivity(new Intent(this, activity_signin.class));
+            finish();
+            return;
+        }
+        // 🔒 END auth guard
+
         // Get bookingId from intent
         bookingId = getIntent().getStringExtra("bookingId");
         if (bookingId == null || bookingId.isEmpty()) {
@@ -48,6 +59,7 @@ public class activity_booking extends AppCompatActivity {
         setupClickListeners();
         loadBookingData();
     }
+
 
     private void initializeViews() {
         tvBookingNumber = findViewById(R.id.tvBookingNumber);

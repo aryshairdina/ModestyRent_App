@@ -43,12 +43,21 @@ public class activity_chat_list extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat_list);
 
+        // 🔒 AUTH GUARD (rule-related only)
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) {
+            finish();
+            return;
+        }
+        // 🔒 END auth guard
+
         initializeViews();
         initializeFirebase();
         setupRecyclerView();
         loadChatRooms();
         setupClickListeners();
     }
+
 
     @Override
     protected void onDestroy() {

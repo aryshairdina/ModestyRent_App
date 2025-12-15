@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -40,10 +41,11 @@ import java.util.UUID;
 public class activity_add_product extends AppCompatActivity {
 
     private Button btnSelectImage, btnSave;
+
+    private ImageView btnBack;
     private TextInputEditText etItemName, etPrice, spinnerSize, etDescription;
     private ChipGroup chipGroupStatus, chipGroupColor, chipGroupCategory;
 
-    // Media Slider components
     private ViewPager2 mediaViewPager;
     private MediaPagerAdapter mediaPagerAdapter;
     private TextView tvMediaCount;
@@ -58,7 +60,7 @@ public class activity_add_product extends AppCompatActivity {
 
     private ProgressDialog progressDialog;
 
-    private static final int MAX_MEDIA = 8; // Max images/videos
+    private static final int MAX_MEDIA = 8;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,6 +69,15 @@ public class activity_add_product extends AppCompatActivity {
 
         // Firebase Initialization
         mAuth = FirebaseAuth.getInstance();
+
+        // 🔹 AUTH SAFETY GUARD (only addition)
+        if (mAuth.getCurrentUser() == null) {
+            startActivity(new Intent(this, activity_signin.class));
+            finish();
+            return;
+        }
+        // 🔹 END auth guard
+
         storage = FirebaseStorage.getInstance();
         realtimeDb = FirebaseDatabase.getInstance().getReference();
 
@@ -77,12 +88,12 @@ public class activity_add_product extends AppCompatActivity {
         etPrice = findViewById(R.id.etPrice);
         spinnerSize = findViewById(R.id.spinnerSize);
         etDescription = findViewById(R.id.etDescription);
+        btnBack = findViewById(R.id.btnBack);
 
         chipGroupStatus = findViewById(R.id.chipGroupStatus);
         chipGroupColor = findViewById(R.id.chipGroupColor);
         chipGroupCategory = findViewById(R.id.chipGroupCategory);
 
-        // Media Slider setup
         mediaViewPager = findViewById(R.id.mediaViewPager);
         tvMediaCount = findViewById(R.id.tvMediaCount);
 
@@ -92,7 +103,6 @@ public class activity_add_product extends AppCompatActivity {
         mediaViewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override
             public void onPageSelected(int position) {
-                super.onPageSelected(position);
                 updateMediaCountText();
             }
         });
@@ -100,7 +110,6 @@ public class activity_add_product extends AppCompatActivity {
         progressDialog = new ProgressDialog(this);
         progressDialog.setCancelable(false);
 
-        // Setup Media Picker Launcher
         pickMediaLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -112,11 +121,16 @@ public class activity_add_product extends AppCompatActivity {
 
         btnSelectImage.setOnClickListener(v -> openMediaPicker());
         btnSave.setOnClickListener(v -> saveProduct());
+        btnBack.setOnClickListener(v -> {
+            onBackPressed(); // or finish();
+        });
 
         updateMediaCountText();
     }
 
-    private void updateMediaCountText() {
+
+
+private void updateMediaCountText() {
         int count = selectedMediaUris.size();
         if (count > 0) {
             tvMediaCount.setText(String.format("%d / %d", mediaViewPager.getCurrentItem() + 1, count));

@@ -2,6 +2,7 @@ package com.example.modestyrent_app;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -30,6 +31,7 @@ public class activity_dummy_payment extends AppCompatActivity {
     private double unitPrice, rentalAmount, depositAmount, totalAmount;
 
     private String currentUserId;
+    private String bookingNumber; // Add this field
 
     private DatabaseReference bookingsRef;
     private DatabaseReference productsRef;
@@ -39,12 +41,22 @@ public class activity_dummy_payment extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_dummy_payment);
 
+        // 🔒 AUTH GUARD (rule-related only)
+        FirebaseAuth auth = FirebaseAuth.getInstance();
+        if (auth.getCurrentUser() == null) {
+            Toast.makeText(this, "Please login to continue", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+        // 🔒 END auth guard
+
         getIntentData();
         initializeViews();
         initializeFirebase();
         updateUI();
         setupClickListeners();
     }
+
 
     private void getIntentData() {
         Intent intent = getIntent();
@@ -123,6 +135,9 @@ public class activity_dummy_payment extends AppCompatActivity {
         btnPayNow.setEnabled(false);
         btnPayNow.setText("Processing...");
 
+        // Generate booking number early
+        bookingNumber = generateBookingNumber();
+
         // Simple fake delay
         new android.os.Handler().postDelayed(() -> {
             if (bookingsRef == null) {
@@ -153,8 +168,6 @@ public class activity_dummy_payment extends AppCompatActivity {
             btnPayNow.setText("Pay Now");
             return;
         }
-
-        String bookingNumber = generateBookingNumber();
 
         Booking booking = new Booking();
         booking.setBookingId(bookingId);
@@ -187,6 +200,9 @@ public class activity_dummy_payment extends AppCompatActivity {
                         productsRef.child(productId).child("status").setValue("Unavailable");
                     }
 
+                    // 🔔 🔔 🔔 SEND BOOKING CONFIRMATION NOTIFICATIONS 🔔 🔔 🔔
+                    sendBookingNotifications(bookingId, bookingNumber);
+
                     // Go to booking confirmation page
                     Intent intent = new Intent(activity_dummy_payment.this, activity_booking.class);
                     intent.putExtra("bookingId", bookingId);
@@ -198,5 +214,49 @@ public class activity_dummy_payment extends AppCompatActivity {
                     btnPayNow.setEnabled(true);
                     btnPayNow.setText("Pay Now");
                 });
+    }
+
+    // 🔔 ADD THIS METHOD TO SEND NOTIFICATIONS
+    private void sendBookingNotifications(String bookingId, String bookingNumber) {
+        try {
+            // 1. Send notification to BORROWER (current user)
+            NotificationHelper.sendNotification(
+                    currentUserId,
+                    "Booking Confirmed!",
+                    "Your booking #" + bookingNumber + " has been confirmed. Payment received successfully.",
+                    "booking_confirmed",
+                    bookingId
+            );
+
+            Log.d("DummyPayment", "✅ Borrower notification sent to: " + currentUserId);
+
+            // 2. Send notification to OWNER
+            NotificationHelper.sendNotification(
+                    ownerId,
+                    "New Booking!",
+                    "You have a new booking #" + bookingNumber + " for " + productName +
+                            ". Please prepare the item for " + deliveryOption.toLowerCase() + ".",
+                    "new_booking",
+                    bookingId
+            );
+
+            Log.d("DummyPayment", "✅ Owner notification sent to: " + ownerId);
+
+            // 3. Send payment confirmation notification
+            NotificationHelper.sendNotification(
+                    currentUserId,
+                    "Payment Successful",
+                    "Payment of RM " + String.format(Locale.getDefault(), "%.2f", totalAmount) +
+                            " has been processed successfully.",
+                    "payment_success",
+                    bookingId
+            );
+
+            Log.d("DummyPayment", "✅ Payment confirmation sent");
+
+        } catch (Exception e) {
+            Log.e("DummyPayment", "❌ Failed to send notifications: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 }

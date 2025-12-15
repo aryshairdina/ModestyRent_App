@@ -20,13 +20,7 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 
-/**
- * Edit profile activity:
- * - Load fullname, email, phone, address from Realtime DB (/users/{uid})
- * - Show email as read-only (from FirebaseAuth + DB fallback)
- * - Allow adding phone & address if absent, and editing fullname/phone/address
- * - Save updates back to /users/{uid}
- */
+
 public class activity_edit_profile extends AppCompatActivity {
 
     private TextInputEditText etFullName, etEmail, etPhone, etAddress;
@@ -95,16 +89,6 @@ public class activity_edit_profile extends AppCompatActivity {
         });
     }
 
-    /**
-     * Read user data from /users/{uid} and populate the fields.
-     * Expected DB structure (example):
-     * users
-     *  └─ uid123
-     *      ├─ fullname: "Nur Arysha"
-     *      ├─ email: "nur.arysha@example.com"
-     *      ├─ phone: "0123456789"
-     *      └─ address: "..."
-     */
     private void loadUserProfileFromDb() {
         usersRef.get().addOnSuccessListener(new OnSuccessListener<DataSnapshot>() {
             @Override

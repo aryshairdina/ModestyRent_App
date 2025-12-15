@@ -197,7 +197,7 @@ public class activity_product_reels extends AppCompatActivity {
         int id = item.getItemId();
 
         if (id == R.id.nav_home) {
-            startActivity(new Intent(this, activity_home.class));
+            startActivity(new Intent(this, activity_homepage.class));
             return true;
         }
         if (id == R.id.nav_add_item) {

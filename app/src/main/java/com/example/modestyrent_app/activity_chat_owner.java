@@ -63,6 +63,14 @@ public class activity_chat_owner extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat_owner);
 
+        // 🔒 AUTH GUARD (rule-related only)
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) {
+            finish();
+            return;
+        }
+        // 🔒 END auth guard
+
         initializeViews();
         getIntentData();
         initializeFirebase();
@@ -72,6 +80,7 @@ public class activity_chat_owner extends AppCompatActivity {
         loadOwnerInfo();
         initializeChatRoom();
     }
+
 
     @Override
     protected void onDestroy() {
