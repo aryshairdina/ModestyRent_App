@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
@@ -8,8 +9,9 @@
     android:background="@color/background"
     tools:context=".activity_booking_requests">
 
-    <!-- App Bar -->
+    <!-- ================= APP BAR ================= -->
     <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/background"
@@ -34,7 +36,7 @@
                     android:layout_height="24dp"
                     android:src="@drawable/ic_arrow_back"
                     android:layout_marginEnd="16dp"
-                    android:backgroundTint="@color/neutral" />
+                    app:tint="@color/neutral" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -43,9 +45,7 @@
                     android:text="Booking Requests"
                     android:textColor="@color/neutral"
                     android:textSize="24sp"
-                    android:textStyle="bold"
-                    android:fontFamily="sans-serif-medium" />
-
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <!-- Search Bar -->
@@ -68,7 +68,7 @@
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:src="@drawable/ic_search"
-                        android:backgroundTint="@color/neutral"
+                        app:tint="@color/neutral"
                         android:layout_marginEnd="12dp" />
 
                     <EditText
@@ -76,14 +76,12 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:hint="Search by product, renter, or booking number..."
+                        android:hint="Search by product, renter, or booking number"
                         android:textColor="@color/neutral"
                         android:textColorHint="@color/neutral"
                         android:background="@null"
-                        android:inputType="text"
                         android:imeOptions="actionSearch"
                         android:singleLine="true" />
-
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -92,16 +90,18 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="12dp"
-                android:gravity="center_vertical">
+                android:layout_marginTop="12dp">
 
-                <!-- Status Filter -->
+                <!-- STATUS FILTER -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/statusFilterCard"
                     android:layout_width="0dp"
                     android:layout_height="48dp"
                     android:layout_weight="1"
                     android:layout_marginEnd="8dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
                     app:cardCornerRadius="12dp"
                     app:cardElevation="2dp"
                     app:cardBackgroundColor="@color/background">
@@ -111,9 +111,7 @@
                         android:layout_height="match_parent"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:paddingHorizontal="16dp"
-                        android:clickable="true"
-                        android:focusable="true">
+                        android:paddingHorizontal="16dp">
 
                         <TextView
                             android:id="@+id/statusFilterText"
@@ -122,24 +120,27 @@
                             android:layout_weight="1"
                             android:text="All Status"
                             android:textColor="@color/neutral"
-                            android:textSize="14sp" />
+                            android:clickable="false"
+                            android:focusable="false" />
 
                         <ImageView
                             android:layout_width="16dp"
                             android:layout_height="16dp"
                             android:src="@drawable/ic_arrow_drop_down"
-                            android:backgroundTint="@color/neutral" />
-
+                            app:tint="@color/neutral" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- Date Filter -->
+                <!-- DATE FILTER -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/dateFilterCard"
                     android:layout_width="0dp"
                     android:layout_height="48dp"
                     android:layout_weight="1"
                     android:layout_marginStart="8dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
                     app:cardCornerRadius="12dp"
                     app:cardElevation="2dp"
                     app:cardBackgroundColor="@color/background">
@@ -149,9 +150,7 @@
                         android:layout_height="match_parent"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:paddingHorizontal="16dp"
-                        android:clickable="true"
-                        android:focusable="true">
+                        android:paddingHorizontal="16dp">
 
                         <TextView
                             android:id="@+id/dateFilterText"
@@ -160,33 +159,32 @@
                             android:layout_weight="1"
                             android:text="All Dates"
                             android:textColor="@color/neutral"
-                            android:textSize="14sp" />
+                            android:clickable="false"
+                            android:focusable="false" />
 
                         <ImageView
                             android:layout_width="16dp"
                             android:layout_height="16dp"
                             android:src="@drawable/ic_arrow_drop_down"
-                            android:backgroundTint="@color/neutral" />
-
+                            app:tint="@color/neutral" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
             </LinearLayout>
-
         </LinearLayout>
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- Booking List -->
+    <!-- ================= BOOKING LIST ================= -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/bookingsRecyclerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginTop="220dp"
         android:padding="16dp"
         android:clipToPadding="false"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior"
         tools:listitem="@layout/item_booking_request" />
 
-    <!-- Empty State -->
+    <!-- ================= EMPTY STATE ================= -->
     <LinearLayout
         android:id="@+id/emptyState"
         android:layout_width="match_parent"
@@ -200,7 +198,7 @@
             android:layout_width="120dp"
             android:layout_height="120dp"
             android:src="@drawable/ic_shopping_bag"
-            android:backgroundTint="@color/secondary" />
+            app:tint="@color/secondary" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -215,14 +213,12 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:gravity="center"
             android:text="You don't have any booking requests yet"
             android:textColor="@color/textcolor"
             android:textSize="14sp" />
-
     </LinearLayout>
 
-    <!-- Loading Progress -->
+    <!-- ================= LOADING ================= -->
     <ProgressBar
         android:id="@+id/loadingProgress"
         android:layout_width="wrap_content"
