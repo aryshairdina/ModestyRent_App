@@ -64,7 +64,7 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Baju Kurung" />
+                android:text="Kurung" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipCategoryJubah"

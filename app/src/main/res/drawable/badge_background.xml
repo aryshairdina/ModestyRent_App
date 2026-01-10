@@ -4,10 +4,10 @@
     <!-- Outer glow/shadow -->
     <item>
         <shape android:shape="oval">
-            <solid android:color="#20FF0000" /> <!-- Light red shadow -->
+            <solid android:color="#20FF0000" />
             <size
-                android:width="24dp"
-                android:height="24dp" />
+                android:width="25dp"
+                android:height="25dp" />
         </shape>
     </item>
 
@@ -20,7 +20,7 @@
         <shape android:shape="oval">
             <solid android:color="@color/notification_important" />
             <stroke
-                android:width="1.5dp"
+                android:width="1dp"
                 android:color="@color/background" />
         </shape>
     </item>

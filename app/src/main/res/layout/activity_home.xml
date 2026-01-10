@@ -25,20 +25,13 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="MODESTYRENT"
-            android:textAlignment="viewStart"
+            android:gravity="center"
+            android:textAlignment="center"
             android:textColor="@color/primary"
             android:textStyle="bold"
             android:textSize="24sp"
             android:letterSpacing="0.15"
             android:fontFamily="sans-serif-black" />
-
-        <ImageView
-            android:id="@+id/notificationIcon"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:src="@drawable/ic_notifications"
-            app:tint="@color/neutral"
-            android:contentDescription="Notifications" />
     </LinearLayout>
 
 

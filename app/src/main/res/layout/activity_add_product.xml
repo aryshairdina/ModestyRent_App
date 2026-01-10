@@ -51,7 +51,8 @@
             android:layout_height="28dp"
             android:src="@drawable/ic_notifications"
             app:tint="@color/neutral"
-            android:contentDescription="Notifications" />
+            android:contentDescription="Notifications"
+            android:visibility="invisible"/>
     </LinearLayout>
 
 

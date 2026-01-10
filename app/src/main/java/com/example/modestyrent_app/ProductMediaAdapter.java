@@ -15,6 +15,8 @@ import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.ui.PlayerView;
+import android.app.Dialog;
+
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -80,9 +82,14 @@ public class ProductMediaAdapter extends RecyclerView.Adapter<ProductMediaAdapte
 
             Glide.with(context)
                     .load(url)
-                    .centerCrop()
+                    .fitCenter() // better preview before fullscreen
                     .placeholder(R.drawable.ic_person)
                     .into(holder.imageView);
+
+            // ⭐ FULLSCREEN IMAGE POPUP
+            holder.imageView.setOnClickListener(v -> {
+                showFullscreenImage(url);
+            });
         }
     }
 
@@ -131,6 +138,23 @@ public class ProductMediaAdapter extends RecyclerView.Adapter<ProductMediaAdapte
                 player.setVolume(0f);
             }
         }
+    }
+
+    private void showFullscreenImage(String imageUrl) {
+        Dialog dialog = new Dialog(context, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.setContentView(R.layout.dialog_fullscreen_image);
+
+        ImageView imageView = dialog.findViewById(R.id.photoView);
+        ImageView btnClose = dialog.findViewById(R.id.btnClose);
+
+        Glide.with(context)
+                .load(imageUrl)
+                .fitCenter()
+                .into(imageView);
+
+        btnClose.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
     }
 
     public void pauseAllPlayers() {

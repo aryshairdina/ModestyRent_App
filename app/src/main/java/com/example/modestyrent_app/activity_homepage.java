@@ -158,6 +158,7 @@ public class activity_homepage extends AppCompatActivity {
         }
         bottomNav.setOnItemSelectedListener(this::handleNavItemSelected);
 
+
         setupProductGrid();
         setupSearchAndFilters();
 
@@ -168,6 +169,12 @@ public class activity_homepage extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+
+        BottomNavigationView bottomNav = findViewById(R.id.bottomNavigation);
+        if (bottomNav != null) {
+            bottomNav.setSelectedItemId(R.id.nav_home);
+        }
+
         try {
             if (productsRef != null) {
                 loadProducts();
@@ -184,6 +191,7 @@ public class activity_homepage extends AppCompatActivity {
         } catch (Exception e) {
             Log.w(TAG, "onResume refresh failed: " + e.getMessage(), e);
         }
+
     }
 
     private boolean handleNavItemSelected(@NonNull MenuItem item) {
