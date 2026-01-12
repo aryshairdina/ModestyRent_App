@@ -1,56 +1,62 @@
 package com.example.modestyrent_app;
 
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.pdf.PdfDocument;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.FileProvider;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.database.*;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 import java.util.Random;
 
 public class activity_booking extends AppCompatActivity {
 
-    private TextView tvBookingNumber, tvProductName, tvRentalPeriod, tvDeliveryOption, tvPaymentMethod, tvTotalAmount, tvBookingStatus;
-    private MaterialButton btnViewBookings, btnBackToHome;
+    private TextView tvBookingNumber, tvProductName, tvRentalPeriod,
+            tvDeliveryOption, tvPaymentMethod, tvTotalAmount, tvBookingStatus;
+
+    private MaterialButton btnViewBookings, btnBackToHome, btnDownloadReceipt;
     private ImageView backIcon;
 
     private DatabaseReference bookingsRef;
     private String bookingId;
 
-    private final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd MMM yyyy", Locale.getDefault());
+    private final SimpleDateFormat DATE_FORMAT =
+            new SimpleDateFormat("dd MMM yyyy", Locale.getDefault());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_booking);
 
-        // 🔒 AUTH GUARD (required for .write: auth != null)
         FirebaseAuth auth = FirebaseAuth.getInstance();
         if (auth.getCurrentUser() == null) {
-            Toast.makeText(this, "Please sign in to continue", Toast.LENGTH_SHORT).show();
             startActivity(new Intent(this, activity_signin.class));
             finish();
             return;
         }
-        // 🔒 END auth guard
 
-        // Get bookingId from intent
         bookingId = getIntent().getStringExtra("bookingId");
-        if (bookingId == null || bookingId.isEmpty()) {
-            Toast.makeText(this, "Booking information not available", Toast.LENGTH_SHORT).show();
+        if (bookingId == null) {
+            Toast.makeText(this, "Booking not found", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
@@ -60,7 +66,6 @@ public class activity_booking extends AppCompatActivity {
         loadBookingData();
     }
 
-
     private void initializeViews() {
         tvBookingNumber = findViewById(R.id.tvBookingNumber);
         tvProductName = findViewById(R.id.tvProductName);
@@ -69,217 +74,205 @@ public class activity_booking extends AppCompatActivity {
         tvPaymentMethod = findViewById(R.id.tvPaymentMethod);
         tvTotalAmount = findViewById(R.id.tvTotalAmount);
         tvBookingStatus = findViewById(R.id.tvBookingStatus);
+
         btnViewBookings = findViewById(R.id.btnViewBookings);
         btnBackToHome = findViewById(R.id.btnBackToHome);
+        btnDownloadReceipt = findViewById(R.id.btnDownloadReceipt);
         backIcon = findViewById(R.id.backIcon);
     }
 
     private void setupClickListeners() {
-        if (backIcon != null) {
-            backIcon.setOnClickListener(v -> finish());
-        }
 
-        if (btnViewBookings != null) {
-            btnViewBookings.setOnClickListener(v -> {
-                // Navigate to My Bookings page
-                Intent intent = new Intent(activity_booking.this, activity_myrentals.class);
-                startActivity(intent);
-                finish();
-            });
-        }
+        if (backIcon != null) backIcon.setOnClickListener(v -> finish());
 
-        if (btnBackToHome != null) {
-            btnBackToHome.setOnClickListener(v -> {
-                // Navigate back to home page
-                Intent intent = new Intent(activity_booking.this, activity_homepage.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                startActivity(intent);
-                finish();
-            });
-        }
+        btnViewBookings.setOnClickListener(v -> {
+            startActivity(new Intent(this, activity_myrentals.class));
+            finish();
+        });
+
+        btnBackToHome.setOnClickListener(v -> {
+            Intent intent = new Intent(this, activity_homepage.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            startActivity(intent);
+            finish();
+        });
+
+        btnDownloadReceipt.setOnClickListener(v -> generatePdfReceipt());
     }
 
     private void loadBookingData() {
-        // Resolve bookings path
         DatabaseReference root = FirebaseDatabase.getInstance().getReference();
-        DatabaseReference candidate = root.child("ModestyRent - App").child("bookings");
+        bookingsRef = root.child("bookings");
 
-        candidate.get().addOnCompleteListener(task -> {
-            if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
-                bookingsRef = candidate;
-            } else {
-                bookingsRef = root.child("bookings");
-            }
-            fetchBookingDetails();
-        }).addOnFailureListener(e -> {
-            bookingsRef = root.child("bookings");
-            fetchBookingDetails();
-        });
-    }
+        bookingsRef.child(bookingId)
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
 
-    private void fetchBookingDetails() {
-        if (bookingsRef == null) return;
+                        if (!snapshot.exists()) {
+                            Toast.makeText(activity_booking.this,
+                                    "Booking not found", Toast.LENGTH_SHORT).show();
+                            finish();
+                            return;
+                        }
 
-        bookingsRef.child(bookingId).addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (snapshot.exists()) {
-                    // Get booking data
-                    String productName = snapshot.child("productName").getValue(String.class);
-                    String deliveryOption = snapshot.child("deliveryOption").getValue(String.class);
-                    String paymentMethod = snapshot.child("paymentMethod").getValue(String.class);
-                    String status = snapshot.child("status").getValue(String.class);
+                        String bookingNumber = snapshot.child("bookingNumber").getValue(String.class);
+                        if (bookingNumber == null) {
+                            bookingNumber = generateBookingNumber();
+                            saveBookingNumber(bookingNumber);
+                        }
 
-                    // Check if booking number exists
-                    String bookingNumber = snapshot.child("bookingNumber").getValue(String.class);
-                    if (bookingNumber == null || bookingNumber.isEmpty()) {
-                        bookingNumber = generateBookingNumber();
-                        saveBookingNumber(bookingNumber);
+                        tvBookingNumber.setText(bookingNumber);
+                        tvProductName.setText(snapshot.child("productName").getValue(String.class));
+                        tvDeliveryOption.setText(snapshot.child("deliveryOption").getValue(String.class));
+                        tvPaymentMethod.setText(snapshot.child("paymentMethod").getValue(String.class));
+
+                        Long start = snapshot.child("startDate").getValue(Long.class);
+                        Long end = snapshot.child("endDate").getValue(Long.class);
+                        if (start != null && end != null) {
+                            tvRentalPeriod.setText(
+                                    DATE_FORMAT.format(start) + " to " + DATE_FORMAT.format(end));
+                        }
+
+                        Double total = snapshot.child("totalAmount").getValue(Double.class);
+                        tvTotalAmount.setText(
+                                String.format(Locale.getDefault(),
+                                        "RM %.2f", total != null ? total : 0));
+
+                        tvBookingStatus.setText("Confirmed");
                     }
 
-                    Long startDate = snapshot.child("startDate").getValue(Long.class);
-                    Long endDate = snapshot.child("endDate").getValue(Long.class);
-                    Long rentalDays = snapshot.child("rentalDays").getValue(Long.class);
-
-                    Double totalAmount = snapshot.child("totalAmount").getValue(Double.class);
-                    Double rentalAmount = snapshot.child("rentalAmount").getValue(Double.class);
-                    Double depositAmount = snapshot.child("depositAmount").getValue(Double.class);
-
-                    // Update UI with booking data
-                    updateBookingUI(
-                            bookingNumber,
-                            productName,
-                            deliveryOption,
-                            paymentMethod,
-                            status,
-                            startDate,
-                            endDate,
-                            rentalDays,
-                            totalAmount,
-                            rentalAmount,
-                            depositAmount
-                    );
-                } else {
-                    Toast.makeText(activity_booking.this, "Booking details not found", Toast.LENGTH_SHORT).show();
-                    finish();
-                }
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Toast.makeText(activity_booking.this, "Failed to load booking details", Toast.LENGTH_SHORT).show();
-                finish();
-            }
-        });
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {
+                        Toast.makeText(activity_booking.this,
+                                "Failed to load booking", Toast.LENGTH_SHORT).show();
+                    }
+                });
     }
 
     private String generateBookingNumber() {
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyMMddHHmmss", Locale.getDefault());
-        String timestamp = dateFormat.format(System.currentTimeMillis());
-        Random random = new Random();
-        int randomDigits = random.nextInt(900) + 100;
-        return "MR" + timestamp + randomDigits;
+        String time = new SimpleDateFormat("yyMMddHHmmss", Locale.getDefault())
+                .format(System.currentTimeMillis());
+        return "MR" + time + new Random().nextInt(900);
     }
 
-    private void saveBookingNumber(String bookingNumber) {
-        if (bookingsRef != null && bookingId != null) {
-            bookingsRef.child(bookingId).child("bookingNumber").setValue(bookingNumber)
-                    .addOnCompleteListener(task -> {
-                        if (task.isSuccessful()) {
-                            System.out.println("Booking number saved: " + bookingNumber);
-                        }
-                    });
-        }
+    private void saveBookingNumber(String number) {
+        bookingsRef.child(bookingId).child("bookingNumber").setValue(number);
     }
 
-    private void updateBookingUI(String bookingNumber, String productName, String deliveryOption, String paymentMethod,
-                                 String status, Long startDate, Long endDate, Long rentalDays,
-                                 Double totalAmount, Double rentalAmount, Double depositAmount) {
+    // =========================
+    // PDF RECEIPT (PROFESSIONAL)
+    // =========================
 
-        // Set booking number
-        if (tvBookingNumber != null) {
-            tvBookingNumber.setText(bookingNumber != null ? bookingNumber : generateBookingNumber());
+    private void generatePdfReceipt() {
+
+        PdfDocument document = new PdfDocument();
+        Paint paint = new Paint();
+        Paint linePaint = new Paint();
+        linePaint.setStrokeWidth(2);
+
+        PdfDocument.Page page = document.startPage(
+                new PdfDocument.PageInfo.Builder(595, 842, 1).create());
+
+        Canvas canvas = page.getCanvas();
+
+        int x = 40;
+        int y = 50;
+
+        // LOGO
+        Bitmap logo = BitmapFactory.decodeResource(
+                getResources(), R.drawable.receipt_logo);
+        Bitmap scaledLogo = Bitmap.createScaledBitmap(logo, 80, 80, false);
+        canvas.drawBitmap(scaledLogo, x, y, paint);
+
+        // TITLE
+        paint.setFakeBoldText(true);
+        paint.setTextSize(20);
+        canvas.drawText("MODESTYRENT", x + 100, y + 30, paint);
+
+        paint.setTextSize(14);
+        paint.setFakeBoldText(false);
+        canvas.drawText("Booking Receipt", x + 100, y + 55, paint);
+
+        y += 100;
+        canvas.drawLine(x, y, 555, y, linePaint);
+        y += 30;
+
+        paint.setTextSize(12);
+
+        drawRow(canvas, paint, "Booking Number", tvBookingNumber.getText().toString(), y);
+        y += 25;
+        drawRow(canvas, paint, "Product", tvProductName.getText().toString(), y);
+        y += 25;
+        drawRow(canvas, paint, "Rental Period", tvRentalPeriod.getText().toString(), y);
+        y += 25;
+        drawRow(canvas, paint, "Delivery Option", tvDeliveryOption.getText().toString(), y);
+        y += 25;
+        drawRow(canvas, paint, "Payment Method", tvPaymentMethod.getText().toString(), y);
+
+        y += 30;
+        canvas.drawLine(x, y, 555, y, linePaint);
+        y += 30;
+
+        paint.setFakeBoldText(true);
+        paint.setTextSize(14);
+        drawRow(canvas, paint, "Total Paid", tvTotalAmount.getText().toString(), y);
+
+        y += 30;
+        paint.setFakeBoldText(false);
+        paint.setTextSize(12);
+        drawRow(canvas, paint, "Status", tvBookingStatus.getText().toString(), y);
+
+        // FOOTER
+        y = 760;
+        paint.setTextSize(10);
+        canvas.drawText("This is a system-generated receipt.", x, y, paint);
+        canvas.drawText("Thank you for using ModestyRent.", x, y + 15, paint);
+
+        document.finishPage(page);
+
+        try {
+            File file = new File(
+                    Environment.getExternalStoragePublicDirectory(
+                            Environment.DIRECTORY_DOWNLOADS),
+                    "ModestyRent_Receipt_" + tvBookingNumber.getText() + ".pdf");
+
+            document.writeTo(new FileOutputStream(file));
+            Toast.makeText(this,
+                    "Receipt saved to Downloads", Toast.LENGTH_LONG).show();
+            openPdf(file);
+
+        } catch (IOException e) {
+            Toast.makeText(this,
+                    "Failed to generate receipt", Toast.LENGTH_SHORT).show();
         }
 
-        // Set product name
-        if (tvProductName != null) {
-            tvProductName.setText(productName != null ? productName : "Unknown Product");
-        }
-
-        // Set rental period
-        String rentalPeriodText = "--";
-        if (startDate != null && endDate != null) {
-            String startStr = DATE_FORMAT.format(startDate);
-            String endStr = DATE_FORMAT.format(endDate);
-            rentalPeriodText = startStr + " to " + endStr;
-            if (rentalDays != null) {
-                rentalPeriodText += " (" + rentalDays + " days)";
-            }
-        }
-        if (tvRentalPeriod != null) {
-            tvRentalPeriod.setText(rentalPeriodText);
-        }
-
-        // Set delivery option
-        if (tvDeliveryOption != null) {
-            tvDeliveryOption.setText(deliveryOption != null ? deliveryOption : "--");
-        }
-
-        // Set payment method
-        if (tvPaymentMethod != null) {
-            tvPaymentMethod.setText(paymentMethod != null ? paymentMethod : "--");
-        }
-
-        // Set total amount
-        if (tvTotalAmount != null) {
-            if (totalAmount != null) {
-                tvTotalAmount.setText(String.format(Locale.getDefault(), "RM %.2f", totalAmount));
-            } else {
-                tvTotalAmount.setText("RM 0.00");
-            }
-        }
-
-        // Set status - update status to "pending" after payment
-        if (tvBookingStatus != null) {
-            String displayStatus = "Pending Delivery";
-            if (status != null && status.equals("pending_payment")) {
-                displayStatus = "Payment Completed";
-                // Update status in Firebase to "confirmed"
-                updateBookingStatus("Confirmed");
-            } else if (status != null) {
-                switch (status.toLowerCase()) {
-                    case "pending":
-                        displayStatus = "Pending Delivery";
-                        break;
-                    case "confirmed":
-                        displayStatus = "Confirmed";
-                        break;
-                    case "delivered":
-                        displayStatus = "Delivered";
-                        break;
-                    case "completed":
-                        displayStatus = "Completed";
-                        break;
-                    case "cancelled":
-                        displayStatus = "Cancelled";
-                        break;
-                    default:
-                        displayStatus = status;
-                        break;
-                }
-            }
-            tvBookingStatus.setText(displayStatus);
-        }
+        document.close();
     }
 
-    private void updateBookingStatus(String newStatus) {
-        if (bookingsRef != null && bookingId != null) {
-            bookingsRef.child(bookingId).child("status").setValue(newStatus)
-                    .addOnCompleteListener(task -> {
-                        if (task.isSuccessful()) {
-                            System.out.println("Booking status updated to: " + newStatus);
-                        }
-                    });
+    private void drawRow(Canvas canvas, Paint paint,
+                         String label, String value, int y) {
+        canvas.drawText(label, 40, y, paint);
+        canvas.drawText(value, 330, y, paint);
+    }
+
+    private void openPdf(File file) {
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NO_HISTORY |
+                Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            intent.setDataAndType(
+                    FileProvider.getUriForFile(
+                            this,
+                            "com.example.modestyrent_app.provider",
+                            file),
+                    "application/pdf");
+        } else {
+            intent.setDataAndType(
+                    android.net.Uri.fromFile(file),
+                    "application/pdf");
         }
+        startActivity(intent);
     }
 }

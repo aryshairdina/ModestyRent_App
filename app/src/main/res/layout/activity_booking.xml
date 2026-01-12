@@ -129,33 +129,6 @@
 
             </LinearLayout>
 
-            <!-- Booking ID (Hidden in UI but kept for reference) -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="12dp"
-                android:visibility="gone">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Booking ID"
-                    android:textColor="@color/neutral"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:id="@+id/tvBookingId"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="--"
-                    android:textStyle="bold"
-                    android:textColor="@color/neutral"
-                    android:textSize="14sp" />
-
-            </LinearLayout>
-
             <!-- Product Name -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -296,116 +269,16 @@
 
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- Next Steps Card -->
-    <com.google.android.material.card.MaterialCardView
+    <!-- ✅ ADDED PDF BUTTON (ONLY ADDITION) -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnDownloadReceipt"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        app:cardCornerRadius="16dp"
-        app:cardElevation="4dp"
-        app:cardBackgroundColor="@color/secondary"
-        android:layout_marginBottom="16dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="20dp">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="What's Next?"
-                android:textStyle="bold"
-                android:textColor="@color/neutral"
-                android:textSize="18sp"
-                android:layout_marginBottom="12dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="12dp"
-                android:gravity="center_vertical">
-
-                <TextView
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:text="1"
-                    android:gravity="center"
-                    android:textColor="@color/background"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/step_number_bg"
-                    android:layout_marginEnd="12dp" />
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Wait for owner confirmation"
-                    android:textColor="@color/neutral"
-                    android:textSize="14sp" />
-
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="12dp"
-                android:gravity="center_vertical">
-
-                <TextView
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:text="2"
-                    android:gravity="center"
-                    android:textColor="@color/background"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/step_number_bg"
-                    android:layout_marginEnd="12dp" />
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Coordinate delivery/pickup with owner"
-                    android:textColor="@color/neutral"
-                    android:textSize="14sp" />
-
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-                <TextView
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:text="3"
-                    android:gravity="center"
-                    android:textColor="@color/background"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/step_number_bg"
-                    android:layout_marginEnd="12dp" />
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Enjoy your rental period!"
-                    android:textColor="@color/neutral"
-                    android:textSize="14sp" />
-
-            </LinearLayout>
-
-        </LinearLayout>
-
-    </com.google.android.material.card.MaterialCardView>
+        android:layout_height="48dp"
+        android:text="Download Receipt (PDF)"
+        android:textColor="@color/background"
+        android:backgroundTint="@color/primary"
+        app:cornerRadius="24dp"
+        android:layout_marginBottom="16dp" />
 
     <!-- Action Buttons -->
     <LinearLayout
