@@ -150,7 +150,7 @@
                 android:text="XL" />
         </com.google.android.material.chip.ChipGroup>
 
-        <!-- COLOR -->
+        <!-- COLOR (GROUP-BASED) -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -177,27 +177,56 @@
                 android:checked="true" />
 
             <com.google.android.material.chip.Chip
-                android:id="@+id/chipColorNeutral"
+                android:id="@+id/chipColorWhite"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Neutral" />
+                android:text="White" />
 
             <com.google.android.material.chip.Chip
-                android:id="@+id/chipColorPastel"
+                android:id="@+id/chipColorBlack"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Pastel" />
+                android:text="Black" />
 
             <com.google.android.material.chip.Chip
-                android:id="@+id/chipColorDark"
+                android:id="@+id/chipColorPink"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Dark" />
+                android:text="Pink" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipColorBlue"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Blue" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipColorGreen"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Green" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipColorBrown"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Brown" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipColorRed"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Red" />
 
         </com.google.android.material.chip.ChipGroup>
+
 
         <!-- PRICE RANGE -->
         <TextView

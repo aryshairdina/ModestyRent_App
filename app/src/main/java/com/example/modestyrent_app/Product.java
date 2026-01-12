@@ -16,6 +16,9 @@ public class Product {
     private long createdAt;
     private long updated_at;
 
+    // ADD THIS FIELD FOR COLOR FILTERING
+    private String color;
+
     // No-arg constructor required for Firebase mapping
     public Product() {}
 
@@ -33,6 +36,17 @@ public class Product {
     public long getCreatedAt() { return createdAt; }
     public long getUpdated_at() { return updated_at; }
 
+    // ADD THIS GETTER
+    public String getColor() {
+        if (color != null && !color.trim().isEmpty()) {
+            return color;
+        }
+        if (colors != null && !colors.isEmpty()) {
+            return colors.get(0);
+        }
+        return "";
+    }
+
     // Setters (required)
     public void setId(String id) { this.id = id; }
     public void setName(String name) { this.name = name; }
@@ -46,4 +60,7 @@ public class Product {
     public void setImageUrls(ArrayList<String> imageUrls) { this.imageUrls = imageUrls; }
     public void setCreatedAt(long createdAt) { this.createdAt = createdAt; }
     public void setUpdated_at(long updated_at) { this.updated_at = updated_at; }
+
+    // ADD THIS SETTER
+    public void setColor(String color) { this.color = color; }
 }

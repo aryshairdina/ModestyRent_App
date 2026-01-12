@@ -18,12 +18,12 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.viewpager2.widget.ViewPager2;
 
-import com.google.android.gms.tasks.Continuation;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DatabaseReference;
@@ -41,10 +41,14 @@ import java.util.UUID;
 public class activity_add_product extends AppCompatActivity {
 
     private Button btnSelectImage, btnSave;
-
     private ImageView btnBack;
+
     private TextInputEditText etItemName, etPrice, spinnerSize, etDescription;
+    private TextInputEditText etCustomColor;
+    private TextInputLayout layoutCustomColor;
+
     private ChipGroup chipGroupStatus, chipGroupColor, chipGroupCategory;
+    private Chip chipColorOther;
 
     private ViewPager2 mediaViewPager;
     private MediaPagerAdapter mediaPagerAdapter;
@@ -53,7 +57,6 @@ public class activity_add_product extends AppCompatActivity {
     private final ArrayList<Uri> selectedMediaUris = new ArrayList<>();
     private ActivityResultLauncher<Intent> pickMediaLauncher;
 
-    // Firebase
     private FirebaseAuth mAuth;
     private FirebaseStorage storage;
     private DatabaseReference realtimeDb;
@@ -67,32 +70,32 @@ public class activity_add_product extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_add_product);
 
-        // Firebase Initialization
         mAuth = FirebaseAuth.getInstance();
-
-        // 🔹 AUTH SAFETY GUARD (only addition)
         if (mAuth.getCurrentUser() == null) {
             startActivity(new Intent(this, activity_signin.class));
             finish();
             return;
         }
-        // 🔹 END auth guard
 
         storage = FirebaseStorage.getInstance();
         realtimeDb = FirebaseDatabase.getInstance().getReference();
 
-        // UI references
         btnSelectImage = findViewById(R.id.btnSelectImage);
         btnSave = findViewById(R.id.btnSave);
+        btnBack = findViewById(R.id.btnBack);
+
         etItemName = findViewById(R.id.etItemName);
         etPrice = findViewById(R.id.etPrice);
         spinnerSize = findViewById(R.id.spinnerSize);
         etDescription = findViewById(R.id.etDescription);
-        btnBack = findViewById(R.id.btnBack);
 
         chipGroupStatus = findViewById(R.id.chipGroupStatus);
         chipGroupColor = findViewById(R.id.chipGroupColor);
         chipGroupCategory = findViewById(R.id.chipGroupCategory);
+
+        chipColorOther = findViewById(R.id.chipColorOther);
+        etCustomColor = findViewById(R.id.etCustomColor);
+        layoutCustomColor = findViewById(R.id.layoutCustomColor);
 
         mediaViewPager = findViewById(R.id.mediaViewPager);
         tvMediaCount = findViewById(R.id.tvMediaCount);
@@ -100,11 +103,17 @@ public class activity_add_product extends AppCompatActivity {
         mediaPagerAdapter = new MediaPagerAdapter(this, new ArrayList<>());
         mediaViewPager.setAdapter(mediaPagerAdapter);
 
-        mediaViewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
-            @Override
-            public void onPageSelected(int position) {
-                updateMediaCountText();
-            }
+        mediaViewPager.registerOnPageChangeCallback(
+                new ViewPager2.OnPageChangeCallback() {
+                    @Override
+                    public void onPageSelected(int position) {
+                        updateMediaCountText();
+                    }
+                });
+
+        chipColorOther.setOnCheckedChangeListener((b, checked) -> {
+            layoutCustomColor.setVisibility(checked ? View.VISIBLE : View.GONE);
+            if (!checked) etCustomColor.setText("");
         });
 
         progressDialog = new ProgressDialog(this);
@@ -112,28 +121,23 @@ public class activity_add_product extends AppCompatActivity {
 
         pickMediaLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
-                result -> {
-                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                        handlePickedImages(result.getData());
+                r -> {
+                    if (r.getResultCode() == RESULT_OK && r.getData() != null) {
+                        handlePickedMedia(r.getData());
                     }
-                }
-        );
+                });
 
         btnSelectImage.setOnClickListener(v -> openMediaPicker());
         btnSave.setOnClickListener(v -> saveProduct());
-        btnBack.setOnClickListener(v -> {
-            onBackPressed(); // or finish();
-        });
+        btnBack.setOnClickListener(v -> finish());
 
         updateMediaCountText();
     }
 
-
-
-private void updateMediaCountText() {
+    private void updateMediaCountText() {
         int count = selectedMediaUris.size();
         if (count > 0) {
-            tvMediaCount.setText(String.format("%d / %d", mediaViewPager.getCurrentItem() + 1, count));
+            tvMediaCount.setText((mediaViewPager.getCurrentItem() + 1) + " / " + count);
             tvMediaCount.setVisibility(View.VISIBLE);
             btnSelectImage.setVisibility(View.GONE);
         } else {
@@ -144,210 +148,143 @@ private void updateMediaCountText() {
 
     private void openMediaPicker() {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-
         intent.setType("*/*");
-        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/*", "video/*"});
+        intent.putExtra(Intent.EXTRA_MIME_TYPES,
+                new String[]{"image/*", "video/*"});
         intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-
-        pickMediaLauncher.launch(
-                Intent.createChooser(intent, "Select photos or videos (Max " + MAX_MEDIA + ")")
-        );
+        pickMediaLauncher.launch(Intent.createChooser(intent, "Select media"));
     }
 
-    private void handlePickedImages(Intent data) {
-        ArrayList<Uri> newUris = new ArrayList<>();
+    private void handlePickedMedia(Intent data) {
+        selectedMediaUris.clear();
 
         ClipData clip = data.getClipData();
         if (clip != null) {
-            int count = Math.min(clip.getItemCount(), MAX_MEDIA);
-            for (int i = 0; i < count; i++) {
-                ClipData.Item item = clip.getItemAt(i);
-                if (item == null) continue;
-                Uri uri = item.getUri();
-                if (uri != null) {
-                    newUris.add(uri);
-                }
+            for (int i = 0; i < Math.min(clip.getItemCount(), MAX_MEDIA); i++) {
+                selectedMediaUris.add(clip.getItemAt(i).getUri());
             }
-        } else {
-            Uri uri = data.getData();
-            if (uri != null) {
-                newUris.add(uri);
-            }
+        } else if (data.getData() != null) {
+            selectedMediaUris.add(data.getData());
         }
-
-        selectedMediaUris.clear();
-        selectedMediaUris.addAll(newUris);
 
         mediaPagerAdapter.updateMedia(selectedMediaUris);
-
-        if (!selectedMediaUris.isEmpty()) {
-            mediaViewPager.setCurrentItem(0, false);
-        }
-
         updateMediaCountText();
-
-        if (selectedMediaUris.isEmpty()) {
-            Toast.makeText(this, "No media selected", Toast.LENGTH_SHORT).show();
-        } else {
-            Toast.makeText(this, selectedMediaUris.size() + " media item(s) selected", Toast.LENGTH_SHORT).show();
-        }
     }
 
     private void saveProduct() {
-        String name = etItemName.getText() != null ? etItemName.getText().toString().trim() : "";
-        String priceStr = etPrice.getText() != null ? etPrice.getText().toString().trim() : "";
-        String size = spinnerSize.getText() != null ? spinnerSize.getText().toString().trim() : "";
-        String desc = etDescription.getText() != null ? etDescription.getText().toString().trim() : "";
+        String name = etItemName.getText().toString().trim();
+        String priceStr = etPrice.getText().toString().trim();
+        String size = spinnerSize.getText().toString().trim();
+        String desc = etDescription.getText().toString().trim();
 
-        if (TextUtils.isEmpty(name)) {
-            etItemName.setError("Enter item name");
-            return;
-        }
-        if (TextUtils.isEmpty(priceStr)) {
-            etPrice.setError("Enter price");
+        if (TextUtils.isEmpty(name) || TextUtils.isEmpty(priceStr)) {
+            Toast.makeText(this, "Fill required fields", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        double price;
-        try {
-            price = Double.parseDouble(priceStr);
-            if (price < 0) throw new NumberFormatException();
-        } catch (NumberFormatException e) {
-            etPrice.setError("Invalid price");
-            return;
-        }
+        double price = Double.parseDouble(priceStr);
 
-        // status
-        int checkedStatusId = chipGroupStatus.getCheckedChipId();
-        String status = "Available";
-        if (checkedStatusId != -1) {
-            Chip c = findViewById(checkedStatusId);
-            if (c != null) status = c.getText().toString();
-        }
+        String status =
+                ((Chip) findViewById(chipGroupStatus.getCheckedChipId()))
+                        .getText().toString();
 
-        // colors (multi)
+        String category =
+                ((Chip) findViewById(chipGroupCategory.getCheckedChipId()))
+                        .getText().toString();
+
         List<String> colors = new ArrayList<>();
         for (int i = 0; i < chipGroupColor.getChildCount(); i++) {
             View v = chipGroupColor.getChildAt(i);
-            if (v instanceof Chip) {
-                Chip chip = (Chip) v;
-                if (chip.isChecked()) colors.add(chip.getText().toString());
+            if (!(v instanceof Chip)) continue;
+
+            Chip chip = (Chip) v;
+            if (!chip.isChecked()) continue;
+
+            if (chip.getId() == R.id.chipColorOther) {
+                String custom = etCustomColor.getText().toString().trim();
+                if (TextUtils.isEmpty(custom)) {
+                    Toast.makeText(this, "Enter custom color", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                colors.add(custom);
+            } else {
+                colors.add(chip.getText().toString());
             }
         }
 
-        // category single
-        int checkedCategoryId = chipGroupCategory.getCheckedChipId();
-        String category = "Other";
-        if (checkedCategoryId != -1) {
-            Chip c = findViewById(checkedCategoryId);
-            if (c != null) category = c.getText().toString();
+        if (colors.isEmpty()) {
+            Toast.makeText(this, "Select at least one color", Toast.LENGTH_SHORT).show();
+            return;
         }
 
         FirebaseUser user = mAuth.getCurrentUser();
-        if (user == null) {
-            Toast.makeText(this, "Please sign in first.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        progressDialog.setMessage("Uploading media...");
+        progressDialog.setMessage("Uploading product...");
         progressDialog.show();
 
         if (selectedMediaUris.isEmpty()) {
-            createProductInRealtimeDb(user.getUid(), name, price, size, status, colors, category, desc, new ArrayList<>());
+            createProduct(user.getUid(), name, price, size, status,
+                    colors, category, desc, new ArrayList<>());
         } else {
-            uploadImagesThenSave(user.getUid(), name, price, size, status, colors, category, desc);
+            uploadMediaThenSave(user.getUid(), name, price, size,
+                    status, colors, category, desc);
         }
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (mediaPagerAdapter != null) {
-            mediaPagerAdapter.releasePlayers();
-        }
-    }
+    private void uploadMediaThenSave(String uid, String name, double price,
+                                     String size, String status,
+                                     List<String> colors, String category,
+                                     String desc) {
 
-    private void uploadImagesThenSave(String uid,
-                                      String name,
-                                      double price,
-                                      String size,
-                                      String status,
-                                      List<String> colors,
-                                      String category,
-                                      String desc) {
-
-        StorageReference rootRef = storage.getReference();
-        List<Task<Uri>> urlTasks = new ArrayList<>();
+        StorageReference root = storage.getReference();
+        List<Task<Uri>> tasks = new ArrayList<>();
 
         for (Uri uri : selectedMediaUris) {
-            String filename = UUID.randomUUID().toString();
-            String extension = ".dat";
-
-            String mimeType = getContentResolver().getType(uri);
-            if (mimeType != null) {
-                if (mimeType.contains("image")) extension = ".jpg";
-                else if (mimeType.contains("video")) extension = ".mp4";
+            String ext = ".dat";
+            String mime = getContentResolver().getType(uri);
+            if (mime != null) {
+                if (mime.startsWith("image")) ext = ".jpg";
+                else if (mime.startsWith("video")) ext = ".mp4";
             }
 
-            StorageReference fileRef = rootRef.child("products").child(uid).child(filename + extension);
-            UploadTask uploadTask = fileRef.putFile(uri);
+            StorageReference ref =
+                    root.child("products")
+                            .child(uid)
+                            .child(UUID.randomUUID() + ext);
 
-            Task<Uri> urlTask = uploadTask.continueWithTask(
-                    new Continuation<UploadTask.TaskSnapshot, Task<Uri>>() {
-                        @Override
-                        public Task<Uri> then(@NonNull Task<UploadTask.TaskSnapshot> task) throws Exception {
-                            if (!task.isSuccessful()) {
-                                Exception e = task.getException();
-                                throw e != null ? e : new Exception("Upload failed");
-                            }
-                            return fileRef.getDownloadUrl();
-                        }
-                    }
-            );
-
-            urlTasks.add(urlTask);
+            UploadTask upload = ref.putFile(uri);
+            Task<Uri> urlTask = upload.continueWithTask(t -> {
+                if (!t.isSuccessful()) throw t.getException();
+                return ref.getDownloadUrl();
+            });
+            tasks.add(urlTask);
         }
 
-        Tasks.whenAllSuccess(urlTasks)
-                .addOnSuccessListener(objects -> {
-                    List<String> downloadUrls = new ArrayList<>();
-                    for (Object obj : objects) {
-                        if (obj instanceof Uri) {
-                            downloadUrls.add(((Uri) obj).toString());
-                        }
-                    }
-                    createProductInRealtimeDb(uid, name, price, size, status, colors, category, desc, downloadUrls);
+        Tasks.whenAllSuccess(tasks)
+                .addOnSuccessListener(res -> {
+                    List<String> urls = new ArrayList<>();
+                    for (Object o : res) urls.add(o.toString());
+
+                    createProduct(uid, name, price, size,
+                            status, colors, category, desc, urls);
                 })
                 .addOnFailureListener(e -> {
                     progressDialog.dismiss();
-                    Toast.makeText(activity_add_product.this, "Upload failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(this,
+                            "Upload failed: " + e.getMessage(),
+                            Toast.LENGTH_LONG).show();
                 });
     }
 
-    private void createProductInRealtimeDb(String uid,
-                                           String name,
-                                           double price,
-                                           String size,
-                                           String status,
-                                           List<String> colors,
-                                           String category,
-                                           String desc,
-                                           List<String> imageUrls) {
+    private void createProduct(String uid, String name, double price,
+                               String size, String status,
+                               List<String> colors, String category,
+                               String desc, List<String> imageUrls) {
 
-        progressDialog.setMessage("Saving product...");
-
-        DatabaseReference productsRef = realtimeDb.child("products");
-        String productId = productsRef.push().getKey();
-
-        if (productId == null) {
-            progressDialog.dismiss();
-            Toast.makeText(this, "Failed to generate product id", Toast.LENGTH_SHORT).show();
-            return;
-        }
+        DatabaseReference ref = realtimeDb.child("products");
+        String id = ref.push().getKey();
 
         Map<String, Object> product = new HashMap<>();
-        product.put("id", productId);
+        product.put("id", id);
         product.put("userId", uid);
         product.put("name", name);
         product.put("price", price);
@@ -359,16 +296,19 @@ private void updateMediaCountText() {
         product.put("imageUrls", imageUrls);
         product.put("createdAt", System.currentTimeMillis());
 
-        productsRef.child(productId)
-                .setValue(product)
-                .addOnSuccessListener(aVoid -> {
+        ref.child(id).setValue(product)
+                .addOnSuccessListener(v -> {
                     progressDialog.dismiss();
-                    Toast.makeText(activity_add_product.this, "Product added successfully!", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this,
+                            "Product added successfully",
+                            Toast.LENGTH_SHORT).show();
                     finish();
                 })
                 .addOnFailureListener(e -> {
                     progressDialog.dismiss();
-                    Toast.makeText(activity_add_product.this, "Failed to save product: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(this,
+                            e.getMessage(),
+                            Toast.LENGTH_LONG).show();
                 });
     }
 }

@@ -67,7 +67,13 @@ public class activity_inspection extends AppCompatActivity {
         productId = intent.getStringExtra("productId");
         renterId = intent.getStringExtra("renterId");
 
-        if (bookingId == null) {
+        // Debug logging
+        Log.d(TAG, "Received from intent:");
+        Log.d(TAG, "- bookingId: " + bookingId);
+        Log.d(TAG, "- productId: " + productId);
+        Log.d(TAG, "- renterId: " + renterId);
+
+        if (bookingId == null || bookingId.isEmpty()) {
             Toast.makeText(this, "Booking ID not provided", Toast.LENGTH_SHORT).show();
             finish();
             return;
@@ -171,7 +177,21 @@ public class activity_inspection extends AppCompatActivity {
                 if (snapshot.exists()) {
                     try {
                         updateBookingUI(snapshot);
-                        loadBorrowerInfo();
+
+                        // If renterId wasn't passed in intent, try to get it from booking data
+                        if (renterId == null || renterId.isEmpty()) {
+                            renterId = getStringValue(snapshot, "renterId");
+                            Log.d(TAG, "Extracted renterId from booking: " + renterId);
+                        }
+
+                        // Load borrower info if we have renterId
+                        if (renterId != null && !renterId.isEmpty()) {
+                            loadBorrowerInfo();
+                        } else {
+                            tvBorrowerName.setText("Unknown Borrower");
+                            Log.w(TAG, "No renterId available to load borrower info");
+                        }
+
                         checkAndCalculateLatePenalty(snapshot);
                     } catch (Exception e) {
                         Toast.makeText(activity_inspection.this, "Error loading booking details", Toast.LENGTH_SHORT).show();
@@ -192,7 +212,12 @@ public class activity_inspection extends AppCompatActivity {
 
     private void updateBookingUI(DataSnapshot bookingSnapshot) {
         // Basic booking info
-        tvProductName.setText(getStringValue(bookingSnapshot, "productName"));
+        String productName = getStringValue(bookingSnapshot, "productName");
+        if (productName != null && !productName.isEmpty()) {
+            tvProductName.setText(productName);
+        } else {
+            tvProductName.setText("Product name not available");
+        }
 
         // Rental period
         Long startDate = getLongValue(bookingSnapshot, "startDate");
@@ -201,6 +226,8 @@ public class activity_inspection extends AppCompatActivity {
         if (startDate != null && endDate != null) {
             String periodText = formatDate(startDate) + " - " + formatDate(endDate);
             tvRentalPeriod.setText(periodText);
+        } else {
+            tvRentalPeriod.setText("Date not available");
         }
 
         // Return method
@@ -219,6 +246,7 @@ public class activity_inspection extends AppCompatActivity {
             originalDepositAmount = depositAmount;
             tvOriginalDeposit.setText(String.format("RM %.2f", depositAmount));
         } else {
+            // Try to get it from another field or use default
             originalDepositAmount = 50.0;
             tvOriginalDeposit.setText("RM 50.00");
         }
@@ -307,6 +335,12 @@ public class activity_inspection extends AppCompatActivity {
 
             // Initial calculation
             calculateRefundAmount();
+        } else {
+            // No end date found
+            tvDueDateStatus.setText("Date Not Available");
+            tvDueDateLabel.setText("Due Date:");
+            tvDueDateValue.setText("N/A");
+            cvDueDateIndicator.setCardBackgroundColor(Color.parseColor("#FF9800")); // Orange for unknown
         }
     }
 
@@ -327,23 +361,55 @@ public class activity_inspection extends AppCompatActivity {
     }
 
     private void loadBorrowerInfo() {
-        if (renterId != null) {
+        if (renterId != null && !renterId.isEmpty()) {
             usersRef.child(renterId).addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
                 public void onDataChange(@NonNull DataSnapshot snapshot) {
                     if (snapshot.exists()) {
                         String borrowerName = getStringValue(snapshot, "fullName");
-                        if (borrowerName != null) {
+                        if (borrowerName != null && !borrowerName.isEmpty()) {
                             tvBorrowerName.setText(borrowerName);
+                            Log.d(TAG, "Borrower name loaded: " + borrowerName);
+                        } else {
+                            // Try alternative field names
+                            borrowerName = getStringValue(snapshot, "name");
+                            if (borrowerName != null && !borrowerName.isEmpty()) {
+                                tvBorrowerName.setText(borrowerName);
+                            } else {
+                                // Try username or email as fallback
+                                String username = getStringValue(snapshot, "username");
+                                String email = getStringValue(snapshot, "email");
+
+                                if (username != null && !username.isEmpty()) {
+                                    tvBorrowerName.setText(username);
+                                } else if (email != null && !email.isEmpty()) {
+                                    // Show first part of email
+                                    String[] parts = email.split("@");
+                                    if (parts.length > 0) {
+                                        tvBorrowerName.setText(parts[0]);
+                                    } else {
+                                        tvBorrowerName.setText("Unknown");
+                                    }
+                                } else {
+                                    tvBorrowerName.setText("Unknown");
+                                }
+                            }
                         }
+                    } else {
+                        tvBorrowerName.setText("User not found");
+                        Log.w(TAG, "User not found with ID: " + renterId);
                     }
                 }
 
                 @Override
                 public void onCancelled(@NonNull DatabaseError error) {
-                    // ignore
+                    tvBorrowerName.setText("Error loading");
+                    Log.e(TAG, "Failed to load user info: " + error.getMessage());
                 }
             });
+        } else {
+            tvBorrowerName.setText("Unknown");
+            Log.w(TAG, "Cannot load borrower info - renterId is null or empty");
         }
     }
 
@@ -430,11 +496,17 @@ public class activity_inspection extends AppCompatActivity {
         updates.put("depositReturned", true);
         updates.put("depositReturnDate", System.currentTimeMillis());
 
+        // Also save the borrower ID for reference
+        if (renterId != null && !renterId.isEmpty()) {
+            updates.put("renterId", renterId);
+        }
+
         Log.d(TAG, "Saving to Firebase:");
         Log.d(TAG, "- latePenalty: " + latePenaltyAmount);
         Log.d(TAG, "- daysLate: " + daysLate);
         Log.d(TAG, "- isLateReturn: " + isLateReturn);
         Log.d(TAG, "- refundAmount: " + refundAmount);
+        Log.d(TAG, "- renterId: " + renterId);
 
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
@@ -447,19 +519,24 @@ public class activity_inspection extends AppCompatActivity {
                         completionMessage = "Rental completed successfully!";
                     }
 
-                    NotificationHelper.sendBookingNotification(
-                            bookingId,
-                            "Rental Completed",
-                            completionMessage,
-                            "rental_completed",
-                            renterId,
-                            mAuth.getCurrentUser().getUid()
-                    );
+                    // Only send notification if we have renterId
+                    if (renterId != null && !renterId.isEmpty()) {
+                        NotificationHelper.sendBookingNotification(
+                                bookingId,
+                                "Rental Completed",
+                                completionMessage,
+                                "rental_completed",
+                                renterId,
+                                mAuth.getCurrentUser().getUid()
+                        );
 
-                    // 🔔 SEND REVIEW REMINDER (after 1 day)
-                    new android.os.Handler().postDelayed(() -> {
-                        NotificationHelper.sendReviewReminder(bookingId, renterId);
-                    }, 24 * 60 * 60 * 1000); // 24 hours
+                        // 🔔 SEND REVIEW REMINDER (after 1 day)
+                        new android.os.Handler().postDelayed(() -> {
+                            NotificationHelper.sendReviewReminder(bookingId, renterId);
+                        }, 24 * 60 * 60 * 1000); // 24 hours
+                    } else {
+                        Log.w(TAG, "Cannot send notification - renterId is null");
+                    }
 
                     String message = "Rental completed successfully";
                     if (isLateReturn && latePenaltyAmount > 0) {
@@ -500,11 +577,12 @@ public class activity_inspection extends AppCompatActivity {
         Log.d(TAG, "- daysLate: " + daysLate);
         Log.d(TAG, "- refundAmount: " + refundAmount);
         Log.d(TAG, "- isLateReturn: " + isLateReturn);
+        Log.d(TAG, "- renterId: " + renterId);
 
         Intent intent = new Intent(this, activity_refund_payment.class);
         intent.putExtra("bookingId", bookingId);
         intent.putExtra("productId", productId);
-        intent.putExtra("renterId", renterId);
+        intent.putExtra("renterId", renterId != null ? renterId : "");
         intent.putExtra("itemCondition", itemCondition);
         intent.putExtra("damageNotes", damageNotes);
         intent.putExtra("repairCost", repairCostAmount);
@@ -526,6 +604,7 @@ public class activity_inspection extends AppCompatActivity {
         if (child.exists()) {
             Object value = child.getValue();
             if (value instanceof Long) return (Long) value;
+            if (value instanceof Integer) return ((Integer) value).longValue();
             if (value instanceof String) {
                 try { return Long.parseLong((String) value); } catch (NumberFormatException e) { return null; }
             }

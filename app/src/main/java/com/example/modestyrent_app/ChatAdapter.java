@@ -9,7 +9,6 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-
 import com.bumptech.glide.Glide;
 
 import java.text.SimpleDateFormat;
@@ -21,6 +20,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
     private List<ChatMessage> messages;
     private String currentUserId;
+
     private static final int TYPE_SENT = 1;
     private static final int TYPE_RECEIVED = 2;
 
@@ -31,18 +31,26 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
     @NonNull
     @Override
-    public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+    public RecyclerView.ViewHolder onCreateViewHolder(
+            @NonNull ViewGroup parent,
+            int viewType
+    ) {
         if (viewType == TYPE_SENT) {
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_message_sent, parent, false);
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_message_sent, parent, false);
             return new SentMessageViewHolder(view);
         } else {
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_message_received, parent, false);
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_message_received, parent, false);
             return new ReceivedMessageViewHolder(view);
         }
     }
 
     @Override
-    public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+    public void onBindViewHolder(
+            @NonNull RecyclerView.ViewHolder holder,
+            int position
+    ) {
         ChatMessage message = messages.get(position);
 
         if (holder.getItemViewType() == TYPE_SENT) {
@@ -61,12 +69,16 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     public int getItemViewType(int position) {
         ChatMessage message = messages.get(position);
         if (message.getSenderId() != null) {
-            return message.getSenderId().equals(currentUserId) ? TYPE_SENT : TYPE_RECEIVED;
+            return message.getSenderId().equals(currentUserId)
+                    ? TYPE_SENT
+                    : TYPE_RECEIVED;
         }
         return TYPE_RECEIVED;
     }
 
+    /* ================= SENT ================= */
     static class SentMessageViewHolder extends RecyclerView.ViewHolder {
+
         TextView tvMessage, tvTime;
         ImageView ivImage;
 
@@ -78,26 +90,49 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         }
 
         void bind(ChatMessage message) {
-            if (message.getType() != null && message.getType().equals("image")) {
+
+            if ("image".equals(message.getType())) {
                 tvMessage.setVisibility(View.GONE);
                 ivImage.setVisibility(View.VISIBLE);
+
                 Glide.with(itemView.getContext())
                         .load(message.getFileUrl())
                         .centerCrop()
                         .into(ivImage);
+
+                ivImage.setOnClickListener(v -> {
+                    chat_fullscreen_media dialog =
+                            new chat_fullscreen_media(
+                                    v.getContext(),
+                                    message.getFileUrl()
+                            );
+                    dialog.show();
+                });
+
             } else {
                 ivImage.setVisibility(View.GONE);
                 tvMessage.setVisibility(View.VISIBLE);
-                tvMessage.setText(message.getMessage() != null ? message.getMessage() : "");
+                tvMessage.setText(
+                        message.getMessage() != null
+                                ? message.getMessage()
+                                : ""
+                );
+                ivImage.setOnClickListener(null);
             }
 
-            SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.getDefault());
-            String timeText = message.getTimestamp() > 0 ? sdf.format(new Date(message.getTimestamp())) : "";
-            tvTime.setText(timeText);
+            SimpleDateFormat sdf =
+                    new SimpleDateFormat("HH:mm", Locale.getDefault());
+            tvTime.setText(
+                    message.getTimestamp() > 0
+                            ? sdf.format(new Date(message.getTimestamp()))
+                            : ""
+            );
         }
     }
 
+    /* ================= RECEIVED ================= */
     static class ReceivedMessageViewHolder extends RecyclerView.ViewHolder {
+
         TextView tvMessage, tvTime;
         ImageView ivImage;
 
@@ -109,22 +144,43 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         }
 
         void bind(ChatMessage message) {
-            if (message.getType() != null && message.getType().equals("image")) {
+
+            if ("image".equals(message.getType())) {
                 tvMessage.setVisibility(View.GONE);
                 ivImage.setVisibility(View.VISIBLE);
+
                 Glide.with(itemView.getContext())
                         .load(message.getFileUrl())
                         .centerCrop()
                         .into(ivImage);
+
+                ivImage.setOnClickListener(v -> {
+                    chat_fullscreen_media dialog =
+                            new chat_fullscreen_media(
+                                    v.getContext(),
+                                    message.getFileUrl()
+                            );
+                    dialog.show();
+                });
+
             } else {
                 ivImage.setVisibility(View.GONE);
                 tvMessage.setVisibility(View.VISIBLE);
-                tvMessage.setText(message.getMessage() != null ? message.getMessage() : "");
+                tvMessage.setText(
+                        message.getMessage() != null
+                                ? message.getMessage()
+                                : ""
+                );
+                ivImage.setOnClickListener(null);
             }
 
-            SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.getDefault());
-            String timeText = message.getTimestamp() > 0 ? sdf.format(new Date(message.getTimestamp())) : "";
-            tvTime.setText(timeText);
+            SimpleDateFormat sdf =
+                    new SimpleDateFormat("HH:mm", Locale.getDefault());
+            tvTime.setText(
+                    message.getTimestamp() > 0
+                            ? sdf.format(new Date(message.getTimestamp()))
+                            : ""
+            );
         }
     }
 }

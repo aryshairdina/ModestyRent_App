@@ -270,68 +270,52 @@
                         android:layout_marginTop="8dp">
 
                         <com.google.android.material.chip.Chip
-                            android:id="@+id/chipColorWhite"
-                            style="@style/Widget.MaterialComponents.Chip.Filter"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="White"
-                            android:textColor="@color/textcolor"
-                            app:chipBackgroundColor="@color/secondary"/>
+                            style="@style/Widget.MaterialComponents.Chip.Filter"/>
 
                         <com.google.android.material.chip.Chip
-                            android:id="@+id/chipColorBlack"
-                            style="@style/Widget.MaterialComponents.Chip.Filter"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Black"
-                            android:textColor="@color/textcolor"
-                            app:chipBackgroundColor="@color/secondary"/>
+                            style="@style/Widget.MaterialComponents.Chip.Filter"/>
 
                         <com.google.android.material.chip.Chip
-                            android:id="@+id/chipColorNavy"
-                            style="@style/Widget.MaterialComponents.Chip.Filter"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Navy"
-                            android:textColor="@color/textcolor"
-                            app:chipBackgroundColor="@color/secondary"/>
+                            style="@style/Widget.MaterialComponents.Chip.Filter"/>
 
                         <com.google.android.material.chip.Chip
-                            android:id="@+id/chipColorPink"
-                            style="@style/Widget.MaterialComponents.Chip.Filter"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Pastel Pink"
-                            android:textColor="@color/textcolor"
-                            app:chipBackgroundColor="@color/secondary"/>
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/chipColorBeige"
-                            style="@style/Widget.MaterialComponents.Chip.Filter"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Beige"
-                            android:textColor="@color/textcolor"
-                            app:chipBackgroundColor="@color/secondary"/>
+                            style="@style/Widget.MaterialComponents.Chip.Filter"/>
 
                         <com.google.android.material.chip.Chip
-                            android:id="@+id/chipColorOlive"
-                            style="@style/Widget.MaterialComponents.Chip.Filter"
+                            android:id="@+id/chipColorOther"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Olive"
-                            android:textColor="@color/textcolor"
-                            app:chipBackgroundColor="@color/secondary"/>
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/chipColorMaroon"
-                            style="@style/Widget.MaterialComponents.Chip.Filter"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Maroon"
-                            android:textColor="@color/textcolor"
-                            app:chipBackgroundColor="@color/secondary"/>
+                            android:text="Other"
+                            style="@style/Widget.MaterialComponents.Chip.Filter"/>
                     </com.google.android.material.chip.ChipGroup>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/layoutCustomColor"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:visibility="gone">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etCustomColor"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="Enter custom color"/>
+                    </com.google.android.material.textfield.TextInputLayout>
+
+
 
                     <!-- Category -->
                     <TextView

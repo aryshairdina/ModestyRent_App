@@ -34,8 +34,10 @@ import com.google.android.material.slider.RangeSlider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -49,9 +51,8 @@ import java.util.Set;
 
 public class activity_home extends AppCompatActivity {
 
-    private static final String TAG = "activity_homepage";
+    private static final String TAG = "activity_home";
 
-    private TextView welcomeText;
     private FirebaseAuth mAuth;
 
     private RecyclerView recyclerProducts;
@@ -78,6 +79,19 @@ public class activity_home extends AppCompatActivity {
     // Store color per productId (from database "color" field)
     private final Map<String, String> productColorMap = new HashMap<>();
 
+    // ================= COLOR GROUPS =================
+    private static final Map<String, List<String>> COLOR_GROUPS = new HashMap<>();
+
+    static {
+        COLOR_GROUPS.put("White", List.of("white", "ivory", "off white", "cream", "off-white"));
+        COLOR_GROUPS.put("Black", List.of("black", "charcoal", "dark", "ebony"));
+        COLOR_GROUPS.put("Pink", List.of("pink", "pastel pink", "rose", "blush", "pinkish", "rosy", "light pink", "dark pink"));
+        COLOR_GROUPS.put("Blue", List.of("blue", "navy", "sky blue", "light blue", "dark blue", "navy blue", "royal blue", "baby blue"));
+        COLOR_GROUPS.put("Green", List.of("green", "olive", "emerald", "light green", "dark green", "forest green", "lime green", "mint green"));
+        COLOR_GROUPS.put("Brown", List.of("brown", "beige", "khaki", "tan", "light brown", "dark brown", "chocolate", "caramel"));
+        COLOR_GROUPS.put("Red", List.of("red", "maroon", "burgundy", "wine red"));
+    }
+
     // Top chips group
     private ChipGroup topCategoryGroup;
 
@@ -85,12 +99,14 @@ public class activity_home extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
+
+        Log.d(TAG, "onCreate called");
+
         BottomNavigationView bottomNav = findViewById(R.id.bottomNavigation);
         searchBar = findViewById(R.id.searchBar);
         btnFilter = findViewById(R.id.btnFilter);
 
         mAuth = FirebaseAuth.getInstance();
-        FirebaseUser currentUser = mAuth.getCurrentUser();
 
 
         if (bottomNav == null) {
@@ -110,11 +126,20 @@ public class activity_home extends AppCompatActivity {
 
         // --- NEW: wire top category chips to filters ---
         setupCategoryChips();
+
+        Log.d(TAG, "onCreate completed");
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        Log.d(TAG, "onResume called");
+
+        BottomNavigationView bottomNav = findViewById(R.id.bottomNavigation);
+        if (bottomNav != null) {
+            bottomNav.setSelectedItemId(R.id.nav_home);
+        }
+
         try {
             if (productsRef != null) {
                 loadProducts();
@@ -171,7 +196,7 @@ public class activity_home extends AppCompatActivity {
     }
 
     /**
-     * Hook top category chips (the ChipGroup in activity_homepage.xml) so when user taps a chip
+     * Hook top category chips (the ChipGroup in activity_home.xml) so when user taps a chip
      * the selectedCategory value updates and filtering is immediately applied.
      */
     private void setupCategoryChips() {
@@ -253,7 +278,6 @@ public class activity_home extends AppCompatActivity {
             }
         }
     }
-
 
     private void openFilterDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -381,6 +405,7 @@ public class activity_home extends AppCompatActivity {
             // If top chips exist, keep them in sync: check matching chip on top (optional)
             syncTopCategorySelectionWithDialog(selectedCategory);
 
+            Log.d(TAG, "Filter applied - Color: " + selectedColor + ", Category: " + selectedCategory + ", Size: " + selectedSize);
             applySearchAndFilters();
             dialog.dismiss();
         });
@@ -455,8 +480,22 @@ public class activity_home extends AppCompatActivity {
         }
 
         List<Product> filtered = new ArrayList<>();
+        int totalProducts = allProducts.size();
+        int passedColorFilter = 0;
+
+        Log.d(TAG, "========== APPLYING FILTERS ==========");
+        Log.d(TAG, "Selected Color: " + selectedColor);
+        Log.d(TAG, "Selected Category: " + selectedCategory);
+        Log.d(TAG, "Selected Size: " + selectedSize);
+        Log.d(TAG, "Search text: " + search);
+        Log.d(TAG, "Total products: " + totalProducts);
+        Log.d(TAG, "Products in color map: " + productColorMap.size());
+
         for (Product p : allProducts) {
             if (p == null) continue;
+
+            boolean passes = true;
+            String productName = p.getName() != null ? p.getName() : "Unnamed";
 
             // search
             if (!search.isEmpty()) {
@@ -464,48 +503,85 @@ public class activity_home extends AppCompatActivity {
                 String desc = p.getDescription() != null ? p.getDescription().toLowerCase(Locale.getDefault()) : "";
                 String cat = p.getCategory() != null ? p.getCategory().toLowerCase(Locale.getDefault()) : "";
                 if (!name.contains(search) && !desc.contains(search) && !cat.contains(search)) {
-                    continue;
+                    passes = false;
+                    Log.d(TAG, productName + " failed search filter");
                 }
             }
 
             // category filter
-            if (!"All".equalsIgnoreCase(selectedCategory)) {
+            if (passes && !"All".equalsIgnoreCase(selectedCategory)) {
                 String cat = p.getCategory() != null ? p.getCategory() : "";
                 if (!cat.equalsIgnoreCase(selectedCategory)) {
-                    continue;
+                    passes = false;
+                    Log.d(TAG, productName + " failed category filter. Has: " + cat + ", Need: " + selectedCategory);
                 }
             }
 
             // size filter
-            if (!"All".equalsIgnoreCase(selectedSize)) {
+            if (passes && !"All".equalsIgnoreCase(selectedSize)) {
                 String size = p.getSize() != null ? p.getSize() : "";
                 if (!size.equalsIgnoreCase(selectedSize)) {
-                    continue;
+                    passes = false;
+                    Log.d(TAG, productName + " failed size filter. Has: " + size + ", Need: " + selectedSize);
                 }
             }
 
-            // color filter (using productColorMap instead of getColor())
-            if (!"All".equalsIgnoreCase(selectedColor)) {
-                String color = "";
+            // color filter - IMPORTANT: Same as in Homepage
+            if (passes && !"All".equalsIgnoreCase(selectedColor)) {
+                String productColor = "";
+
+                // Try to get color from map first
                 if (p.getId() != null && productColorMap.containsKey(p.getId())) {
-                    color = productColorMap.get(p.getId());
+                    productColor = productColorMap.get(p.getId());
+                    Log.d(TAG, productName + " - Color from map: " + productColor);
                 }
-                if (color == null) color = "";
-                if (!color.equalsIgnoreCase(selectedColor)) {
-                    continue;
+                // If not in map, try to get from Product object
+                else if (p.getColor() != null && !p.getColor().isEmpty()) {
+                    productColor = p.getColor().toLowerCase(Locale.getDefault()).trim();
+                    Log.d(TAG, productName + " - Color from Product.color: " + productColor);
+                }
+                // Last resort: check colors array
+                else if (p.getColors() != null && !p.getColors().isEmpty()) {
+                    productColor = p.getColors().get(0).toLowerCase(Locale.getDefault()).trim();
+                    Log.d(TAG, productName + " - Color from Product.colors[0]: " + productColor);
+                } else {
+                    Log.d(TAG, productName + " - No color found");
+                }
+
+                // If no color found, skip this product when color filter is active
+                if (productColor.isEmpty()) {
+                    passes = false;
+                    Log.d(TAG, productName + " - No color data, skipping");
+                } else if (matchesColorFilter(productColor, selectedColor)) {
+                    passedColorFilter++;
+                    Log.d(TAG, "✓ " + productName + " passed color filter. Color: " + productColor + " matches " + selectedColor);
+                } else {
+                    passes = false;
+                    Log.d(TAG, productName + " failed color filter. Has: '" + productColor + "', Need: '" + selectedColor + "'");
                 }
             }
 
             // price range
-            double price = p.getPrice();
-            if (filterMinPrice > 0 || filterMaxPrice > 0) {
-                if (price < filterMinPrice || price > filterMaxPrice) {
-                    continue;
+            if (passes) {
+                double price = p.getPrice();
+                if (filterMinPrice > 0 || filterMaxPrice > 0) {
+                    if (price < filterMinPrice || price > filterMaxPrice) {
+                        passes = false;
+                        Log.d(TAG, productName + " failed price filter. Price: " + price + ", Range: " + filterMinPrice + "-" + filterMaxPrice);
+                    }
                 }
             }
 
-            filtered.add(p);
+            if (passes) {
+                filtered.add(p);
+                Log.d(TAG, "✓ " + productName + " added to filtered list");
+            }
         }
+
+        Log.d(TAG, "========== FILTER RESULTS ==========");
+        Log.d(TAG, "Products after filtering: " + filtered.size());
+        Log.d(TAG, "Products passed color filter: " + passedColorFilter);
+        Log.d(TAG, "===================================");
 
         // sort
         if ("LowToHigh".equals(selectedPriceSort)) {
@@ -517,6 +593,81 @@ public class activity_home extends AppCompatActivity {
         if (adapter != null) {
             adapter.setList(filtered);
         }
+
+        if (filtered.isEmpty() && !selectedColor.equals("All")) {
+            Toast.makeText(this, "No products found with color: " + selectedColor, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private boolean matchesColorFilter(String productColor, String selectedColor) {
+        if (productColor == null || selectedColor == null || productColor.isEmpty()) {
+            return false;
+        }
+
+        // "All" always passes
+        if ("All".equalsIgnoreCase(selectedColor)) {
+            return true;
+        }
+
+        productColor = productColor.trim().toLowerCase(Locale.getDefault());
+        selectedColor = selectedColor.trim().toLowerCase(Locale.getDefault());
+
+        Log.d(TAG, "Color matching - Product: '" + productColor + "', Selected: '" + selectedColor + "'");
+
+        // Check direct match first
+        if (productColor.equals(selectedColor)) {
+            Log.d(TAG, "  Direct match!");
+            return true;
+        }
+
+        // Check group match
+        for (Map.Entry<String, List<String>> entry : COLOR_GROUPS.entrySet()) {
+            String groupName = entry.getKey().toLowerCase(Locale.getDefault());
+
+            // If selected color matches a group name
+            if (selectedColor.equals(groupName)) {
+                List<String> groupColors = entry.getValue();
+                for (String colorInGroup : groupColors) {
+                    String colorInGroupLower = colorInGroup.toLowerCase(Locale.getDefault());
+                    if (productColor.equals(colorInGroupLower)) {
+                        Log.d(TAG, "  Matched in group " + entry.getKey() + ": exact match with " + colorInGroup);
+                        return true;
+                    }
+                    // Check if product color contains group color or vice versa
+                    if (productColor.contains(colorInGroupLower) || colorInGroupLower.contains(productColor)) {
+                        Log.d(TAG, "  Matched in group " + entry.getKey() + ": contains match with " + colorInGroup);
+                        return true;
+                    }
+                }
+            }
+
+            // Also check if product color matches this group name
+            if (productColor.equals(groupName)) {
+                // Check if any color in this group matches the selected color
+                for (String colorInGroup : entry.getValue()) {
+                    if (selectedColor.equals(colorInGroup.toLowerCase(Locale.getDefault()))) {
+                        Log.d(TAG, "  Product group name matches selected color " + selectedColor);
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // Additional fuzzy matching - split by spaces
+        String[] productColorWords = productColor.split("\\s+");
+        String[] selectedColorWords = selectedColor.split("\\s+");
+
+        for (String productWord : productColorWords) {
+            for (String selectedWord : selectedColorWords) {
+                if (productWord.equals(selectedWord)) {
+                    Log.d(TAG, "  Word match: '" + productWord + "' = '" + selectedWord + "'");
+                    return true;
+                }
+            }
+        }
+
+        Log.d(TAG, "  No match found");
+        return false;
     }
 
     // ---------------- Product grid ----------------
@@ -541,9 +692,11 @@ public class activity_home extends AppCompatActivity {
             } else {
                 productsRef = rootRef.child("products");
             }
+            Log.d(TAG, "Using database reference: " + productsRef.toString());
             loadProducts();
         }).addOnFailureListener(e -> {
             productsRef = rootRef.child("products");
+            Log.d(TAG, "Using fallback database reference: " + productsRef.toString());
             loadProducts();
         });
     }
@@ -561,8 +714,11 @@ public class activity_home extends AppCompatActivity {
         } catch (Exception ignored) {}
         final String finalCurrentUid = currentUid;
 
+        Log.d(TAG, "Loading products from: " + productsRef.toString());
+
         productsRef.get().addOnCompleteListener(task -> {
             if (!task.isSuccessful() || task.getResult() == null) {
+                Log.e(TAG, "Failed loading products: " + (task.getException() != null ? task.getException().getMessage() : "unknown"));
                 Toast.makeText(this, "Failed loading products: " +
                                 (task.getException() != null ? task.getException().getMessage() : "unknown"),
                         Toast.LENGTH_LONG).show();
@@ -577,14 +733,21 @@ public class activity_home extends AppCompatActivity {
             float maxPrice = Float.MIN_VALUE;
 
             if (snapshot.exists()) {
+                Log.d(TAG, "Found " + snapshot.getChildrenCount() + " product(s) in database");
+
                 for (DataSnapshot child : snapshot.getChildren()) {
                     try {
                         Product p = child.getValue(Product.class);
-                        if (p == null) p = new Product();
+                        if (p == null) {
+                            Log.d(TAG, "Product is null, creating new");
+                            p = new Product();
+                        }
 
                         if (p.getId() == null || p.getId().isEmpty()) {
                             p.setId(child.getKey());
                         }
+
+                        Log.d(TAG, "Processing product: " + p.getName() + " (ID: " + p.getId() + ")");
 
                         String ownerId = p.getUserId();
                         if (ownerId == null || ownerId.isEmpty()) {
@@ -601,18 +764,22 @@ public class activity_home extends AppCompatActivity {
                             if (ownerId != null) p.setUserId(ownerId);
                         }
 
-                        if (finalCurrentUid != null && ownerId != null && finalCurrentUid.equals(ownerId)) {
-                            continue; // don’t show own products
-                        }
-
+                        // For Home page, we don't skip own products since user may not be logged in
+                        // But we should filter by availability
                         String status = p.getStatus();
                         if (status == null && child.child("status").exists()) {
                             Object sObj = child.child("status").getValue();
                             status = sObj != null ? String.valueOf(sObj) : null;
                             p.setStatus(status);
                         }
-                        if (status == null) continue;
-                        if (!"available".equalsIgnoreCase(status.trim())) continue;
+                        if (status == null) {
+                            Log.d(TAG, "Skipping - no status: " + p.getName());
+                            continue;
+                        }
+                        if (!"available".equalsIgnoreCase(status.trim())) {
+                            Log.d(TAG, "Skipping - not available: " + p.getName() + " (status: " + status + ")");
+                            continue;
+                        }
 
                         if (p.getPrice() == 0.0) {
                             if (child.child("price / day").exists()) {
@@ -658,13 +825,61 @@ public class activity_home extends AppCompatActivity {
                             }
                         }
 
-                        // Read color from DB "color" field and store in map
-                        String colorDb = child.child("color").getValue(String.class);
-                        if (colorDb != null && p.getId() != null) {
-                            productColorMap.put(p.getId(), colorDb);
+                        // CRITICAL: Extract color from Firebase - Same as Homepage
+                        String extractedColor = null;
+
+                        Log.d(TAG, "--- Color extraction for: " + p.getName() + " ---");
+
+                        // Try direct "color" field first
+                        if (child.child("color").exists()) {
+                            Object colorObj = child.child("color").getValue();
+                            if (colorObj != null) {
+                                extractedColor = colorObj.toString().trim();
+                                Log.d(TAG, "✓ Found 'color' field: " + extractedColor);
+                            } else {
+                                Log.d(TAG, "✗ 'color' field exists but is null");
+                            }
+                        } else {
+                            Log.d(TAG, "✗ No 'color' field");
                         }
 
+                        // Try "colour" field (British spelling)
+                        if ((extractedColor == null || extractedColor.isEmpty()) && child.child("colour").exists()) {
+                            Object colorObj = child.child("colour").getValue();
+                            if (colorObj != null) {
+                                extractedColor = colorObj.toString().trim();
+                                Log.d(TAG, "✓ Found 'colour' field: " + extractedColor);
+                            }
+                        }
+
+                        // Try from Product object's color field
+                        if ((extractedColor == null || extractedColor.isEmpty()) && p.getColor() != null) {
+                            extractedColor = p.getColor().trim();
+                            Log.d(TAG, "✓ Using Product.color: " + extractedColor);
+                        }
+
+                        // Try from Product object's colors array
+                        if ((extractedColor == null || extractedColor.isEmpty()) &&
+                                p.getColors() != null && !p.getColors().isEmpty()) {
+                            extractedColor = p.getColors().get(0).trim();
+                            Log.d(TAG, "✓ Using Product.colors[0]: " + extractedColor);
+                        }
+
+                        // Store in map if we found a color
+                        if (extractedColor != null && !extractedColor.isEmpty() && p.getId() != null) {
+                            String normalizedColor = extractedColor.toLowerCase(Locale.getDefault()).trim();
+                            productColorMap.put(p.getId(), normalizedColor);
+                            // Also set it in the Product object for consistency
+                            p.setColor(normalizedColor);
+                            Log.d(TAG, "✓ Stored color: " + normalizedColor + " for product ID: " + p.getId());
+                        } else {
+                            Log.d(TAG, "✗ No color found for this product");
+                        }
+
+                        Log.d(TAG, "--- End color extraction ---");
+
                         allProducts.add(p);
+                        Log.d(TAG, "Added product to list: " + p.getName());
 
                         float price = (float) p.getPrice();
                         if (price > 0) {
@@ -676,6 +891,8 @@ public class activity_home extends AppCompatActivity {
                         Log.e(TAG, "Skipping product node due to error", ex);
                     }
                 }
+            } else {
+                Log.d(TAG, "No products found in database");
             }
 
             if (minPrice == Float.MAX_VALUE || maxPrice == Float.MIN_VALUE) {
@@ -691,12 +908,25 @@ public class activity_home extends AppCompatActivity {
                 filterMaxPrice = allProductsMaxPrice;
             }
 
+            Log.d(TAG, "========== LOAD SUMMARY ==========");
+            Log.d(TAG, "Total products loaded: " + allProducts.size());
+            Log.d(TAG, "Products with colors: " + productColorMap.size());
+            Log.d(TAG, "Price range: " + allProductsMinPrice + " - " + allProductsMaxPrice);
+
+            // List all products with their colors
+            for (Product p : allProducts) {
+                String color = productColorMap.get(p.getId());
+                Log.d(TAG, "Product: " + p.getName() + " | Color: " + (color != null ? color : "No color"));
+            }
+            Log.d(TAG, "=================================");
+
             applySearchAndFilters();
 
             if (allProducts.isEmpty()) {
                 Toast.makeText(this, "No available products found.", Toast.LENGTH_SHORT).show();
             }
         }).addOnFailureListener(e -> {
+            Log.e(TAG, "Error loading products: " + e.getMessage());
             Toast.makeText(this, "Error loading products: " + e.getMessage(), Toast.LENGTH_LONG).show();
         });
     }
@@ -783,17 +1013,6 @@ public class activity_home extends AppCompatActivity {
                 }
             }
 
-            boolean isLiked = p.getId() != null && likedIds.contains(p.getId());
-            if (holder.btnLove != null) {
-                holder.btnLove.setImageResource(isLiked ? R.drawable.ic_favorite : R.drawable.ic_favorite_border);
-                holder.btnLove.setOnClickListener(v -> {
-                    if (auth.getCurrentUser() == null) {
-                        Toast.makeText(ctx, "Please sign in to like products", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    toggleLike(p);
-                });
-            }
 
             holder.itemView.setOnClickListener(v -> {
                 Context c = v.getContext();
@@ -872,7 +1091,7 @@ public class activity_home extends AppCompatActivity {
         static class VH extends RecyclerView.ViewHolder {
             ImageView imgProduct;
             TextView tvTitle, tvPrice, tvPerDay;
-            ImageButton btnLove;
+
 
             VH(@NonNull View itemView) {
                 super(itemView);
@@ -880,7 +1099,6 @@ public class activity_home extends AppCompatActivity {
                 try { tvTitle = itemView.findViewById(R.id.tvTitle); } catch (Exception e) { tvTitle = null; }
                 try { tvPrice = itemView.findViewById(R.id.tvPrice); } catch (Exception e) { tvPrice = null; }
                 try { tvPerDay = itemView.findViewById(R.id.tvPerDay); } catch (Exception e) { tvPerDay = null; }
-                try { btnLove = itemView.findViewById(R.id.btnLove); } catch (Exception e) { btnLove = null; }
             }
         }
     }

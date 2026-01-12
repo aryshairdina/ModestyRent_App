@@ -29,7 +29,7 @@ import java.util.Map;
 
 public class activity_rentals_details_owner extends AppCompatActivity {
 
-    private String bookingId, productId, ownerId, currentUserId;
+    private String bookingId, productId, ownerId, currentUserId, renterId;
     private String deliveryOption = "";
 
     private ImageView backButton;
@@ -136,6 +136,10 @@ public class activity_rentals_details_owner extends AppCompatActivity {
                         String productId = getStringValue(snapshot, "productId");
                         String ownerId = getStringValue(snapshot, "ownerId");
                         deliveryOption = getStringValue(snapshot, "deliveryOption");
+
+                        // Store renterId from booking data
+                        renterId = getStringValue(snapshot, "renterId");
+                        Log.d("BookingDetails", "Loaded renterId: " + renterId);
 
                         updateBookingUI(snapshot);
                         loadDeliveryInformation(snapshot, ownerId);
@@ -588,9 +592,57 @@ public class activity_rentals_details_owner extends AppCompatActivity {
     }
 
     private void inspectReturnedItem() {
-        Intent intent = new Intent(this, activity_inspection.class);
-        intent.putExtra("bookingId", bookingId);
-        startActivity(intent);
+        // Check if we have the renterId already loaded
+        if (renterId != null && !renterId.isEmpty()) {
+            openInspectionScreen();
+        } else {
+            // If renterId is not loaded yet, fetch it from Firebase
+            bookingsRef.child(bookingId).addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    if (snapshot.exists()) {
+                        String extractedRenterId = getStringValue(snapshot, "renterId");
+                        String extractedProductId = getStringValue(snapshot, "productId");
+
+                        if (extractedRenterId != null && !extractedRenterId.isEmpty()) {
+                            renterId = extractedRenterId;
+                            if (extractedProductId != null) {
+                                productId = extractedProductId;
+                            }
+                            openInspectionScreen();
+                        } else {
+                            Toast.makeText(activity_rentals_details_owner.this,
+                                    "Error: Could not find borrower information", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    Toast.makeText(activity_rentals_details_owner.this,
+                            "Failed to load booking details", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+    }
+
+    private void openInspectionScreen() {
+        if (renterId != null && !renterId.isEmpty()) {
+            Intent intent = new Intent(activity_rentals_details_owner.this, activity_inspection.class);
+            intent.putExtra("bookingId", bookingId);
+            intent.putExtra("productId", productId != null ? productId : "");
+            intent.putExtra("renterId", renterId);
+
+            Log.d("InspectionDebug", "Opening inspection with:");
+            Log.d("InspectionDebug", "- bookingId: " + bookingId);
+            Log.d("InspectionDebug", "- productId: " + productId);
+            Log.d("InspectionDebug", "- renterId: " + renterId);
+
+            startActivity(intent);
+        } else {
+            Toast.makeText(activity_rentals_details_owner.this,
+                    "Error: Could not find borrower information", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void markReturnAsReceived() {
@@ -602,6 +654,9 @@ public class activity_rentals_details_owner extends AppCompatActivity {
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Return marked as received", Toast.LENGTH_SHORT).show();
+
+                    // After marking as received, open inspection screen
+                    openInspectionScreen();
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to update return status", Toast.LENGTH_SHORT).show();
