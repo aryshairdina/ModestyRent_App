@@ -161,7 +161,7 @@ public class activity_booking extends AppCompatActivity {
     }
 
     // =========================
-    // PDF RECEIPT (PROFESSIONAL)
+    // PDF RECEIPT
     // =========================
 
     private void generatePdfReceipt() {
@@ -200,14 +200,10 @@ public class activity_booking extends AppCompatActivity {
 
         paint.setTextSize(12);
 
-        drawRow(canvas, paint, "Booking Number", tvBookingNumber.getText().toString(), y);
-        y += 25;
-        drawRow(canvas, paint, "Product", tvProductName.getText().toString(), y);
-        y += 25;
-        drawRow(canvas, paint, "Rental Period", tvRentalPeriod.getText().toString(), y);
-        y += 25;
-        drawRow(canvas, paint, "Delivery Option", tvDeliveryOption.getText().toString(), y);
-        y += 25;
+        drawRow(canvas, paint, "Booking Number", tvBookingNumber.getText().toString(), y); y += 25;
+        drawRow(canvas, paint, "Product", tvProductName.getText().toString(), y); y += 25;
+        drawRow(canvas, paint, "Rental Period", tvRentalPeriod.getText().toString(), y); y += 25;
+        drawRow(canvas, paint, "Delivery Option", tvDeliveryOption.getText().toString(), y); y += 25;
         drawRow(canvas, paint, "Payment Method", tvPaymentMethod.getText().toString(), y);
 
         y += 30;
@@ -222,6 +218,17 @@ public class activity_booking extends AppCompatActivity {
         paint.setFakeBoldText(false);
         paint.setTextSize(12);
         drawRow(canvas, paint, "Status", tvBookingStatus.getText().toString(), y);
+
+        // PAYMENT POLICY TEXT (NEW)
+        y += 40;
+        paint.setTextSize(11);
+        canvas.drawText(
+                "The payment will be held securely until the rental process is completed.",
+                x, y, paint);
+        y += 15;
+        canvas.drawText(
+                "Any refundable deposit will be returned after the item is successfully returned.",
+                x, y, paint);
 
         // FOOTER
         y = 760;

@@ -12,6 +12,12 @@
     <color name="chat_time_sent">#666666</color>
     <color name="chat_time_received">#999999</color>
 
+    <!-- Add these colors to your existing colors.xml file -->
+    <color name="success">#10B981</color>
+    <color name="success_light">#D1FAE5</color>
+    <color name="success_very_light">#ECFDF5</color>
+    <color name="success_dark">#047857</color>
+
     <!-- Error/Alert Colors for Late Return Warning -->
     <color name="error">#F44336</color>
     <color name="error_dark">#D32F2F</color>

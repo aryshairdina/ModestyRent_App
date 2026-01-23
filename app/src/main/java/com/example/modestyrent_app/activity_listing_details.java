@@ -24,6 +24,7 @@ import com.google.android.gms.tasks.Tasks;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
@@ -61,8 +62,12 @@ public class activity_listing_details extends AppCompatActivity {
     private ChipGroup ld_chipGroupStatus, ld_chipGroupCategory, ld_chipGroupColor;
     private Chip ld_chipAvailable, ld_chipReserved, ld_chipUnavailable;
     private Chip ld_chipCategoryKurung, ld_chipCategoryJubah, ld_chipCategoryKebaya;
-    private Chip ld_chipColorWhite, ld_chipColorBlack, ld_chipColorNavy, ld_chipColorPink;
     private ProgressBar ld_progress;
+
+    // Color selection (EXACTLY like add product)
+    private Chip ld_chipColorWhite, ld_chipColorBlack, ld_chipColorNavy, ld_chipColorBeige, ld_chipColorOther;
+    private TextInputEditText ld_etCustomColor;
+    private TextInputLayout ld_layoutCustomColor;
 
     // Firebase
     private FirebaseAuth auth;
@@ -115,10 +120,14 @@ public class activity_listing_details extends AppCompatActivity {
         ld_chipCategoryJubah = findViewById(R.id.ld_chipCategoryJubah);
         ld_chipCategoryKebaya = findViewById(R.id.ld_chipCategoryKebaya);
 
+        // Color selection views (EXACTLY like add product)
         ld_chipColorWhite = findViewById(R.id.ld_chipColorWhite);
         ld_chipColorBlack = findViewById(R.id.ld_chipColorBlack);
         ld_chipColorNavy = findViewById(R.id.ld_chipColorNavy);
-        ld_chipColorPink = findViewById(R.id.ld_chipColorPink);
+        ld_chipColorBeige = findViewById(R.id.ld_chipColorBeige);
+        ld_chipColorOther = findViewById(R.id.ld_chipColorOther);
+        ld_etCustomColor = findViewById(R.id.ld_etCustomColor);
+        ld_layoutCustomColor = findViewById(R.id.ld_layoutCustomColor);
 
         ld_progress = findViewById(R.id.ld_progress);
 
@@ -160,6 +169,14 @@ public class activity_listing_details extends AppCompatActivity {
 
         ld_btnPickImage.setOnClickListener(v -> openMediaPicker());
         ld_btnUpdate.setOnClickListener(v -> attemptUpdate());
+
+        // Set up Other chip listener (EXACTLY like add product)
+        ld_chipColorOther.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            ld_layoutCustomColor.setVisibility(isChecked ? View.VISIBLE : View.GONE);
+            if (!isChecked) {
+                ld_etCustomColor.setText("");
+            }
+        });
 
         // Load product data
         loadProductAndPopulate();
@@ -323,21 +340,36 @@ public class activity_listing_details extends AppCompatActivity {
                     else ld_chipGroupCategory.clearCheck();
                 }
 
-                // Colors
+                // Colors (EXACTLY like add product logic)
+                // Clear all color selections first
                 ld_chipColorWhite.setChecked(false);
                 ld_chipColorBlack.setChecked(false);
                 ld_chipColorNavy.setChecked(false);
-                ld_chipColorPink.setChecked(false);
+                ld_chipColorBeige.setChecked(false);
+                ld_chipColorOther.setChecked(false);
+                ld_layoutCustomColor.setVisibility(View.GONE);
+                ld_etCustomColor.setText("");
 
                 if (snapshot.child("colors").exists()) {
                     for (DataSnapshot c : snapshot.child("colors").getChildren()) {
                         String color = c.getValue(String.class);
                         if (color == null) continue;
-                        String lower = color.toLowerCase();
-                        if (lower.contains("white")) ld_chipColorWhite.setChecked(true);
-                        else if (lower.contains("black")) ld_chipColorBlack.setChecked(true);
-                        else if (lower.contains("navy")) ld_chipColorNavy.setChecked(true);
-                        else if (lower.contains("pink")) ld_chipColorPink.setChecked(true);
+
+                        // Check for predefined colors
+                        if (color.equalsIgnoreCase("white")) {
+                            ld_chipColorWhite.setChecked(true);
+                        } else if (color.equalsIgnoreCase("black")) {
+                            ld_chipColorBlack.setChecked(true);
+                        } else if (color.equalsIgnoreCase("navy")) {
+                            ld_chipColorNavy.setChecked(true);
+                        } else if (color.equalsIgnoreCase("beige")) {
+                            ld_chipColorBeige.setChecked(true);
+                        } else {
+                            // Custom color
+                            ld_chipColorOther.setChecked(true);
+                            ld_etCustomColor.setText(color);
+                            ld_layoutCustomColor.setVisibility(View.VISIBLE);
+                        }
                     }
                 }
 
@@ -432,12 +464,30 @@ public class activity_listing_details extends AppCompatActivity {
         else if (checkedCatId == ld_chipCategoryJubah.getId()) category = "Jubah";
         else if (checkedCatId == ld_chipCategoryKebaya.getId()) category = "Kebaya";
 
-        // colors
+        // colors (EXACTLY like add product logic)
         List<String> colors = new ArrayList<>();
+
+        // Check predefined colors
         if (ld_chipColorWhite.isChecked()) colors.add("White");
         if (ld_chipColorBlack.isChecked()) colors.add("Black");
         if (ld_chipColorNavy.isChecked()) colors.add("Navy");
-        if (ld_chipColorPink.isChecked()) colors.add("Pastel Pink");
+        if (ld_chipColorBeige.isChecked()) colors.add("Beige");
+
+        // Check custom color (Other chip)
+        if (ld_chipColorOther.isChecked()) {
+            String customColor = ld_etCustomColor.getText() != null ? ld_etCustomColor.getText().toString().trim() : "";
+            if (TextUtils.isEmpty(customColor)) {
+                Toast.makeText(this, "Enter custom color", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            colors.add(customColor);
+        }
+
+        // Validate at least one color selected
+        if (colors.isEmpty()) {
+            Toast.makeText(this, "Select at least one color", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         // prepare updates
         Map<String, Object> updates = new HashMap<>();

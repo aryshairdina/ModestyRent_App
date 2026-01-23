@@ -21,7 +21,7 @@ import com.example.modestyrent_app.NotificationHelper;
 
 public class activity_inspection extends AppCompatActivity {
 
-    private String bookingId, productId, renterId;
+    private String bookingId, productId, renterId, ownerId, currentProductName, currentOwnerName, currentBorrowerName;
 
     // UI Components
     private ImageView backButton;
@@ -80,6 +80,7 @@ public class activity_inspection extends AppCompatActivity {
         }
 
         mAuth = FirebaseAuth.getInstance();
+        ownerId = mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : null;
 
         initializeViews();
         setupFirebase();
@@ -184,6 +185,18 @@ public class activity_inspection extends AppCompatActivity {
                             Log.d(TAG, "Extracted renterId from booking: " + renterId);
                         }
 
+                        // Get ownerId from booking if not already set
+                        String bookingOwnerId = getStringValue(snapshot, "ownerId");
+                        if (bookingOwnerId != null && !bookingOwnerId.isEmpty()) {
+                            ownerId = bookingOwnerId;
+                        }
+
+                        // Get product name for notifications
+                        currentProductName = getStringValue(snapshot, "productName");
+                        if (currentProductName == null) {
+                            currentProductName = "the product";
+                        }
+
                         // Load borrower info if we have renterId
                         if (renterId != null && !renterId.isEmpty()) {
                             loadBorrowerInfo();
@@ -191,6 +204,9 @@ public class activity_inspection extends AppCompatActivity {
                             tvBorrowerName.setText("Unknown Borrower");
                             Log.w(TAG, "No renterId available to load borrower info");
                         }
+
+                        // Load owner info for notifications
+                        loadOwnerInfoForNotifications();
 
                         checkAndCalculateLatePenalty(snapshot);
                     } catch (Exception e) {
@@ -215,8 +231,10 @@ public class activity_inspection extends AppCompatActivity {
         String productName = getStringValue(bookingSnapshot, "productName");
         if (productName != null && !productName.isEmpty()) {
             tvProductName.setText(productName);
+            currentProductName = productName;
         } else {
             tvProductName.setText("Product name not available");
+            currentProductName = "the product";
         }
 
         // Rental period
@@ -369,12 +387,14 @@ public class activity_inspection extends AppCompatActivity {
                         String borrowerName = getStringValue(snapshot, "fullName");
                         if (borrowerName != null && !borrowerName.isEmpty()) {
                             tvBorrowerName.setText(borrowerName);
+                            currentBorrowerName = borrowerName;
                             Log.d(TAG, "Borrower name loaded: " + borrowerName);
                         } else {
                             // Try alternative field names
                             borrowerName = getStringValue(snapshot, "name");
                             if (borrowerName != null && !borrowerName.isEmpty()) {
                                 tvBorrowerName.setText(borrowerName);
+                                currentBorrowerName = borrowerName;
                             } else {
                                 // Try username or email as fallback
                                 String username = getStringValue(snapshot, "username");
@@ -382,21 +402,26 @@ public class activity_inspection extends AppCompatActivity {
 
                                 if (username != null && !username.isEmpty()) {
                                     tvBorrowerName.setText(username);
+                                    currentBorrowerName = username;
                                 } else if (email != null && !email.isEmpty()) {
                                     // Show first part of email
                                     String[] parts = email.split("@");
                                     if (parts.length > 0) {
                                         tvBorrowerName.setText(parts[0]);
+                                        currentBorrowerName = parts[0];
                                     } else {
                                         tvBorrowerName.setText("Unknown");
+                                        currentBorrowerName = "Unknown";
                                     }
                                 } else {
                                     tvBorrowerName.setText("Unknown");
+                                    currentBorrowerName = "Unknown";
                                 }
                             }
                         }
                     } else {
                         tvBorrowerName.setText("User not found");
+                        currentBorrowerName = "User not found";
                         Log.w(TAG, "User not found with ID: " + renterId);
                     }
                 }
@@ -404,12 +429,51 @@ public class activity_inspection extends AppCompatActivity {
                 @Override
                 public void onCancelled(@NonNull DatabaseError error) {
                     tvBorrowerName.setText("Error loading");
+                    currentBorrowerName = "Error loading";
                     Log.e(TAG, "Failed to load user info: " + error.getMessage());
                 }
             });
         } else {
             tvBorrowerName.setText("Unknown");
+            currentBorrowerName = "Unknown";
             Log.w(TAG, "Cannot load borrower info - renterId is null or empty");
+        }
+    }
+
+    private void loadOwnerInfoForNotifications() {
+        if (ownerId != null && !ownerId.isEmpty()) {
+            usersRef.child(ownerId).addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    if (snapshot.exists()) {
+                        currentOwnerName = getStringValue(snapshot, "fullName");
+                        if (currentOwnerName == null || currentOwnerName.isEmpty()) {
+                            currentOwnerName = getStringValue(snapshot, "name");
+                            if (currentOwnerName == null || currentOwnerName.isEmpty()) {
+                                String username = getStringValue(snapshot, "username");
+                                if (username != null && !username.isEmpty()) {
+                                    currentOwnerName = username;
+                                } else {
+                                    currentOwnerName = "Owner";
+                                }
+                            }
+                        }
+                        Log.d(TAG, "Owner name loaded for notifications: " + currentOwnerName);
+                    } else {
+                        currentOwnerName = "Owner";
+                        Log.w(TAG, "Owner not found with ID: " + ownerId);
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    currentOwnerName = "Owner";
+                    Log.e(TAG, "Failed to load owner info: " + error.getMessage());
+                }
+            });
+        } else {
+            currentOwnerName = "Owner";
+            Log.w(TAG, "Cannot load owner info - ownerId is null or empty");
         }
     }
 
@@ -521,19 +585,22 @@ public class activity_inspection extends AppCompatActivity {
 
                     // Only send notification if we have renterId
                     if (renterId != null && !renterId.isEmpty()) {
-                        NotificationHelper.sendBookingNotification(
-                                bookingId,
-                                "Rental Completed",
+                        // 🔔 SEND COMPREHENSIVE NOTIFICATIONS
+                        sendInspectionCompleteNotifications(
                                 completionMessage,
-                                "rental_completed",
-                                renterId,
-                                mAuth.getCurrentUser().getUid()
+                                itemCondition,
+                                repairCostAmount,
+                                latePenaltyAmount,
+                                daysLate,
+                                refundAmount
                         );
 
-                        // 🔔 SEND REVIEW REMINDER (after 1 day)
-                        new android.os.Handler().postDelayed(() -> {
-                            NotificationHelper.sendReviewReminder(bookingId, renterId);
-                        }, 24 * 60 * 60 * 1000); // 24 hours
+
+                        // 🔔 UPDATE PRODUCT STATUS TO AVAILABLE
+                        updateProductStatusToAvailable();
+
+                        // 🔔 SEND FCM NOTIFICATION
+                        sendFCMInspectionCompleteNotification(completionMessage);
                     } else {
                         Log.w(TAG, "Cannot send notification - renterId is null");
                     }
@@ -558,6 +625,132 @@ public class activity_inspection extends AppCompatActivity {
                 });
     }
 
+    // 🔔 NEW METHOD: Send comprehensive inspection completion notifications
+    private void sendInspectionCompleteNotifications(String completionMessage,
+                                                     String itemCondition,
+                                                     double repairCost,
+                                                     double penalty,
+                                                     long daysLate,
+                                                     double refundAmount) {
+
+        // Use the stored names (loaded earlier)
+        String ownerName = currentOwnerName != null ? currentOwnerName : "Owner";
+        String borrowerName = currentBorrowerName != null ? currentBorrowerName : "Borrower";
+        String productName = currentProductName != null ? currentProductName : "the product";
+
+        // 🔔 NOTIFICATION FOR BORROWER: Inspection completed
+        String borrowerTitle = "Inspection Completed";
+        String borrowerMsg = "Owner " + ownerName + " has completed inspection of " + productName + ". ";
+
+        if (penalty > 0) {
+            borrowerMsg += "Late penalty applied: RM " + String.format("%.2f", penalty);
+        } else if (repairCost > 0) {
+            borrowerMsg += "Repair cost deducted: RM " + String.format("%.2f", repairCost);
+        } else {
+            borrowerMsg += "Item returned in good condition.";
+        }
+
+        if (refundAmount > 0) {
+            borrowerMsg += " Refund: RM " + String.format("%.2f", refundAmount);
+        }
+
+        NotificationHelper.sendNotification(
+                renterId,
+                borrowerTitle,
+                borrowerMsg,
+                "inspection_completed",
+                bookingId
+        );
+
+        // 🔔 NOTIFICATION FOR OWNER: Confirmation
+        String ownerTitle = "Inspection Saved";
+        String ownerMsg = "Inspection for " + productName + " completed. ";
+        ownerMsg += "Condition: " + itemCondition + ". ";
+
+        if (penalty > 0) {
+            ownerMsg += "Late penalty: RM " + String.format("%.2f", penalty);
+        }
+        if (repairCost > 0) {
+            ownerMsg += " Repair cost: RM " + String.format("%.2f", repairCost);
+        }
+
+        NotificationHelper.sendNotification(
+                ownerId,
+                ownerTitle,
+                ownerMsg,
+                "inspection_saved",
+                bookingId
+        );
+
+        // 🔔 SEND LATE RETURN NOTIFICATION IF APPLICABLE
+        if (isLateReturn && penalty > 0) {
+            NotificationHelper.sendLateReturnNotification(
+                    bookingId,
+                    (int) daysLate,
+                    penalty,
+                    renterId
+            );
+
+            // Also notify owner about late penalty
+            NotificationHelper.sendNotification(
+                    ownerId,
+                    "Late Penalty Applied",
+                    "Late penalty of RM " + String.format("%.2f", penalty) +
+                            " applied to " + borrowerName + "'s booking.",
+                    "penalty_applied",
+                    bookingId
+            );
+        }
+
+        // 🔔 SEND REFUND NOTIFICATION IF NO REFUND NEEDED
+        if (refundAmount == 0) {
+            NotificationHelper.sendNotification(
+                    renterId,
+                    "Deposit Fully Used",
+                    "Your deposit has been fully used for repairs/penalty.",
+                    "deposit_used",
+                    bookingId
+            );
+        }
+
+        Log.d(TAG, "Notifications sent:");
+        Log.d(TAG, "- To borrower: " + borrowerName);
+        Log.d(TAG, "- To owner: " + ownerName);
+        Log.d(TAG, "- Product: " + productName);
+    }
+
+    // 🔔 NEW METHOD: Update product status to available
+    private void updateProductStatusToAvailable() {
+        if (productId != null) {
+            productsRef.child(productId).child("status").setValue("Available")
+                    .addOnSuccessListener(aVoid -> {
+                        Log.d(TAG, "Product status updated to Available: " + productId);
+
+                        // 🔔 NOTIFICATION FOR OWNER: Product available
+                        NotificationHelper.sendNotification(
+                                ownerId,
+                                "Product Available",
+                                "Your product is now available for rent again.",
+                                "product_available",
+                                productId
+                        );
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to update product status: " + e.getMessage());
+                    });
+        }
+    }
+
+    // 🔔 NEW METHOD: Send FCM notification
+    private void sendFCMInspectionCompleteNotification(String completionMessage) {
+        // This would call your FCM service
+        // For now, we'll log it
+        Log.d(TAG, "FCM Inspection Notification would be sent:");
+        Log.d(TAG, "- Booking: " + bookingId);
+        Log.d(TAG, "- Renter: " + renterId);
+        Log.d(TAG, "- Message: " + completionMessage);
+    }
+
     /**
      * Case 2: Refund > 0 – go to dummy payment page.
      */
@@ -579,6 +772,9 @@ public class activity_inspection extends AppCompatActivity {
         Log.d(TAG, "- isLateReturn: " + isLateReturn);
         Log.d(TAG, "- renterId: " + renterId);
 
+        // 🔔 SEND REFUND PENDING NOTIFICATION
+        sendRefundPendingNotification(refundAmount);
+
         Intent intent = new Intent(this, activity_refund_payment.class);
         intent.putExtra("bookingId", bookingId);
         intent.putExtra("productId", productId);
@@ -591,6 +787,38 @@ public class activity_inspection extends AppCompatActivity {
         intent.putExtra("isLateReturn", isLateReturn); // Add this flag
         intent.putExtra("refundAmount", refundAmount);
         startActivity(intent);
+    }
+
+    // 🔔 NEW METHOD: Send refund pending notification
+    private void sendRefundPendingNotification(double refundAmount) {
+        // Use stored product name
+        String productName = currentProductName != null ? currentProductName : "the product";
+
+        // 🔔 NOTIFICATION FOR BORROWER: Refund pending
+        String borrowerMessage = "Refund of RM " + String.format("%.2f", refundAmount) +
+                " pending for " + productName + ". Proceed to payment page.";
+
+        NotificationHelper.sendNotification(
+                renterId,
+                "Refund Available",
+                borrowerMessage,
+                "refund_pending",
+                bookingId
+        );
+
+        // 🔔 NOTIFICATION FOR OWNER: Refund processing
+        String ownerMessage = "Refund of RM " + String.format("%.2f", refundAmount) +
+                " needs to be processed for " + productName + ".";
+
+        NotificationHelper.sendNotification(
+                ownerId,
+                "Refund Required",
+                ownerMessage,
+                "refund_required",
+                bookingId
+        );
+
+        Log.d(TAG, "Refund notifications sent for RM " + refundAmount);
     }
 
     // Helper methods

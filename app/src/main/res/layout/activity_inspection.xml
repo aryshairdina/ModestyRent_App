@@ -400,6 +400,7 @@
                         android:orientation="vertical"
                         android:layout_marginBottom="16dp">
 
+                        <!-- Excellent Condition -->
                         <com.google.android.material.card.MaterialCardView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -409,17 +410,61 @@
                             app:strokeColor="@color/secondary"
                             app:strokeWidth="1dp">
 
-                            <RadioButton
-                                android:id="@+id/rbExcellent"
+                            <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:text="Excellent - No visible wear"
-                                android:buttonTint="@color/primary"
-                                android:textColor="@color/textcolor"
-                                android:padding="16dp" />
+                                android:orientation="vertical"
+                                android:padding="8dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical"
+                                    android:padding="8dp">
+
+                                    <RadioButton
+                                        android:id="@+id/rbExcellent"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="Excellent"
+                                        android:buttonTint="@color/primary"
+                                        android:textColor="@color/textcolor"
+                                        android:textSize="16sp"
+                                        android:textStyle="bold" />
+
+                                    <View
+                                        android:layout_width="0dp"
+                                        android:layout_height="0dp"
+                                        android:layout_weight="1" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="RM150"
+                                        android:textColor="@color/primary"
+                                        android:textSize="16sp"
+                                        android:textStyle="bold"
+                                        android:padding="4dp" />
+
+                                </LinearLayout>
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:text="The item is returned in its original condition with no stains, no damage, no missing accessories, no noticeable odor, and no visible changes to fabric, colour, or shape."
+                                    android:textColor="@color/textcolor"
+                                    android:textSize="12sp"
+                                    android:lineSpacingExtra="4dp"
+                                    android:padding="8dp"
+                                    android:paddingStart="48dp"
+                                    android:alpha="0.8" />
+
+                            </LinearLayout>
 
                         </com.google.android.material.card.MaterialCardView>
 
+                        <!-- Good Condition -->
                         <com.google.android.material.card.MaterialCardView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -429,17 +474,61 @@
                             app:strokeColor="@color/secondary"
                             app:strokeWidth="1dp">
 
-                            <RadioButton
-                                android:id="@+id/rbGood"
+                            <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:text="Good - Minor wear"
-                                android:buttonTint="@color/primary"
-                                android:textColor="@color/textcolor"
-                                android:padding="16dp" />
+                                android:orientation="vertical"
+                                android:padding="8dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical"
+                                    android:padding="8dp">
+
+                                    <RadioButton
+                                        android:id="@+id/rbGood"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="Good (Minor Defect)"
+                                        android:buttonTint="@color/primary"
+                                        android:textColor="@color/textcolor"
+                                        android:textSize="16sp"
+                                        android:textStyle="bold" />
+
+                                    <View
+                                        android:layout_width="0dp"
+                                        android:layout_height="0dp"
+                                        android:layout_weight="1" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="RM120"
+                                        android:textColor="@color/primary"
+                                        android:textSize="16sp"
+                                        android:textStyle="bold"
+                                        android:padding="4dp" />
+
+                                </LinearLayout>
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:text="The item shows very minor signs of use that do not affect its appearance or wearability, such as light wrinkles, slight fading, small loose threads, or minor marks that can be removed through normal cleaning."
+                                    android:textColor="@color/textcolor"
+                                    android:textSize="12sp"
+                                    android:lineSpacingExtra="4dp"
+                                    android:padding="8dp"
+                                    android:paddingStart="48dp"
+                                    android:alpha="0.8" />
+
+                            </LinearLayout>
 
                         </com.google.android.material.card.MaterialCardView>
 
+                        <!-- Fair Condition -->
                         <com.google.android.material.card.MaterialCardView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -449,17 +538,61 @@
                             app:strokeColor="@color/secondary"
                             app:strokeWidth="1dp">
 
-                            <RadioButton
-                                android:id="@+id/rbFair"
+                            <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:text="Fair - Noticeable wear"
-                                android:buttonTint="@color/primary"
-                                android:textColor="@color/textcolor"
-                                android:padding="16dp" />
+                                android:orientation="vertical"
+                                android:padding="8dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical"
+                                    android:padding="8dp">
+
+                                    <RadioButton
+                                        android:id="@+id/rbFair"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="Fair (Noticeable Defect)"
+                                        android:buttonTint="@color/primary"
+                                        android:textColor="@color/textcolor"
+                                        android:textSize="16sp"
+                                        android:textStyle="bold" />
+
+                                    <View
+                                        android:layout_width="0dp"
+                                        android:layout_height="0dp"
+                                        android:layout_weight="1" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="RM80"
+                                        android:textColor="@color/primary"
+                                        android:textSize="16sp"
+                                        android:textStyle="bold"
+                                        android:padding="4dp" />
+
+                                </LinearLayout>
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:text="The item has visible defects that can be noticed during inspection and slightly affect its appearance, such as small stains that cannot be fully removed, loose stitching, missing buttons, or fabric snags, but the item is still wearable."
+                                    android:textColor="@color/textcolor"
+                                    android:textSize="12sp"
+                                    android:lineSpacingExtra="4dp"
+                                    android:padding="8dp"
+                                    android:paddingStart="48dp"
+                                    android:alpha="0.8" />
+
+                            </LinearLayout>
 
                         </com.google.android.material.card.MaterialCardView>
 
+                        <!-- Poor Condition -->
                         <com.google.android.material.card.MaterialCardView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -468,14 +601,57 @@
                             app:strokeColor="@color/secondary"
                             app:strokeWidth="1dp">
 
-                            <RadioButton
-                                android:id="@+id/rbPoor"
+                            <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:text="Poor - Significant damage"
-                                android:buttonTint="@color/primary"
-                                android:textColor="@color/textcolor"
-                                android:padding="16dp" />
+                                android:orientation="vertical"
+                                android:padding="8dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical"
+                                    android:padding="8dp">
+
+                                    <RadioButton
+                                        android:id="@+id/rbPoor"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="Poor (Significant Damage)"
+                                        android:buttonTint="@color/primary"
+                                        android:textColor="@color/textcolor"
+                                        android:textSize="16sp"
+                                        android:textStyle="bold" />
+
+                                    <View
+                                        android:layout_width="0dp"
+                                        android:layout_height="0dp"
+                                        android:layout_weight="1" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="RM0"
+                                        android:textColor="#F44336"
+                                        android:textSize="16sp"
+                                        android:textStyle="bold"
+                                        android:padding="4dp" />
+
+                                </LinearLayout>
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:text="The item is returned in poor condition with significant damage that affects usability or rental value, including large stains, torn fabric, broken zips, strong persistent odor, burn marks, or unauthorised alterations."
+                                    android:textColor="@color/textcolor"
+                                    android:textSize="12sp"
+                                    android:lineSpacingExtra="4dp"
+                                    android:padding="8dp"
+                                    android:paddingStart="48dp"
+                                    android:alpha="0.8" />
+
+                            </LinearLayout>
 
                         </com.google.android.material.card.MaterialCardView>
 
@@ -529,7 +705,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="Repair/Damage Cost"
+                            android:text="Additional Repair/Damage Cost"
                             android:textColor="@color/textcolor"
                             android:textSize="14sp" />
 
@@ -556,6 +732,18 @@
                         app:trackColorInactive="@color/secondary"
                         app:trackColorActive="@color/primary"
                         android:layout_marginBottom="16dp" />
+
+                    <!-- Note about condition-based deductions -->
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Note: Condition-based deductions are automatically applied based on the selected condition. Additional repair costs can be added using the slider above."
+                        android:textColor="@color/textcolor"
+                        android:textSize="12sp"
+                        android:alpha="0.7"
+                        android:lineSpacingExtra="4dp"
+                        android:padding="8dp"
+                        android:background="@drawable/bg_info_note" />
 
                 </LinearLayout>
 

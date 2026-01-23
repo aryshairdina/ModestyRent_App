@@ -8,6 +8,8 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.google.android.exoplayer2.util.Log;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.*;
 import java.util.ArrayList;
@@ -24,6 +26,7 @@ public class activity_notifications extends AppCompatActivity {
     private NotificationAdapter adapter;
     private List<NotificationModel> notificationList;
     private DatabaseReference notificationsRef;
+    private String currentUserId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,10 +55,8 @@ public class activity_notifications extends AppCompatActivity {
     }
 
     private void setupFirebase() {
-        String currentUserId = FirebaseAuth.getInstance().getCurrentUser() != null ?
-                FirebaseAuth.getInstance().getCurrentUser().getUid() : null;
-
-        if (currentUserId != null) {
+        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
+            currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
             notificationsRef = FirebaseDatabase.getInstance()
                     .getReference("notifications")
                     .child(currentUserId);
@@ -63,18 +64,26 @@ public class activity_notifications extends AppCompatActivity {
     }
 
     private void loadNotifications() {
-        if (notificationsRef == null) return;
+        if (notificationsRef == null || currentUserId == null) {
+            showEmptyState();
+            return;
+        }
 
-        notificationsRef.orderByChild("timestamp").addValueEventListener(new ValueEventListener() {
+        notificationsRef.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 notificationList.clear();
 
                 for (DataSnapshot notificationSnapshot : snapshot.getChildren()) {
-                    NotificationModel notification = notificationSnapshot.getValue(NotificationModel.class);
-                    if (notification != null) {
-                        notification.setId(notificationSnapshot.getKey());
-                        notificationList.add(notification);
+                    String key = notificationSnapshot.getKey();
+
+                    // Skip the notification_count field
+                    if (key != null && !key.equals("notification_count")) {
+                        NotificationModel notification = notificationSnapshot.getValue(NotificationModel.class);
+                        if (notification != null) {
+                            notification.setId(key);
+                            notificationList.add(notification);
+                        }
                     }
                 }
 
@@ -84,11 +93,15 @@ public class activity_notifications extends AppCompatActivity {
 
                 adapter.notifyDataSetChanged();
                 updateEmptyState();
+
+                // Also clear the notification count when user views notifications
+                clearNotificationCount();
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
                 // Handle error
+                showEmptyState();
             }
         });
     }
@@ -97,20 +110,66 @@ public class activity_notifications extends AppCompatActivity {
         if (notificationList.isEmpty()) {
             emptyState.setVisibility(View.VISIBLE);
             rvNotifications.setVisibility(View.GONE);
+            tvClearAll.setVisibility(View.GONE);
         } else {
             emptyState.setVisibility(View.GONE);
             rvNotifications.setVisibility(View.VISIBLE);
+            tvClearAll.setVisibility(View.VISIBLE);
         }
+    }
+
+    private void showEmptyState() {
+        emptyState.setVisibility(View.VISIBLE);
+        rvNotifications.setVisibility(View.GONE);
+        tvClearAll.setVisibility(View.GONE);
     }
 
     private void clearAllNotifications() {
         if (notificationsRef != null) {
-            notificationsRef.removeValue()
-                    .addOnSuccessListener(aVoid -> {
-                        notificationList.clear();
-                        adapter.notifyDataSetChanged();
-                        updateEmptyState();
-                    });
+            // Remove all notifications except the notification_count field
+            notificationsRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    for (DataSnapshot childSnapshot : snapshot.getChildren()) {
+                        String key = childSnapshot.getKey();
+                        // Only delete actual notifications, not the count field
+                        if (key != null && !key.equals("notification_count")) {
+                            childSnapshot.getRef().removeValue();
+                        }
+                    }
+                    // Also reset the count
+                    if (snapshot.child("notification_count").exists()) {
+                        snapshot.child("notification_count").getRef().setValue(0);
+                    }
+
+                    notificationList.clear();
+                    adapter.notifyDataSetChanged();
+                    updateEmptyState();
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    // Handle error
+                }
+            });
         }
+    }
+
+    private void clearNotificationCount() {
+        if (notificationsRef != null) {
+            // Reset notification count to 0 when user views notifications
+            notificationsRef.child("notification_count").setValue(0)
+                    .addOnSuccessListener(aVoid ->
+                            Log.d("Notifications", "Notification count cleared"))
+                    .addOnFailureListener(e ->
+                            Log.e("Notifications", "Failed to clear count: " + e.getMessage()));
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // Clear notification count when activity is destroyed
+        clearNotificationCount();
     }
 }

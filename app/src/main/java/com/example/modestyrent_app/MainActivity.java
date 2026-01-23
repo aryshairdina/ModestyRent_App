@@ -30,6 +30,6 @@ public class MainActivity extends AppCompatActivity {
 
             finish();
 
-        }, 2000); // 2 seconds logo display
+        }, 2500); // 2 seconds logo display
     }
 }

@@ -31,12 +31,14 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
-import com.example.modestyrent_app.NotificationHelper;
 
 public class activity_rentals_details_borrower extends AppCompatActivity {
 
     private String bookingId, productId, ownerId, currentUserId;
     private String deliveryOption = "";
+    private String productNameStr = "";
+    private String bookingNumberStr = "";
+    private String ownerName = "";
 
     private ImageView backButton;
     private LinearLayout statusTimeline;
@@ -64,13 +66,21 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
     private TextView tvLateWarningMessage, tvCompletedPenaltyMessage;
     private LinearLayout llPenaltyPolicy;
 
+    // New: Refund Completed Section
+    private CardView cvRefundCompleted;
+    private ImageView ivRefundIcon;
+    private TextView tvRefundTitle, tvRefundMessage, tvRefundThankYou;
+    private LinearLayout llRefundDetails;
+    private TextView tvRefundAmount, tvRefundMethod;
+    private MaterialButton btnViewTransactionDetails;
+
     private DatabaseReference bookingsRef, productsRef, usersRef, reviewsRef;
     private FirebaseAuth mAuth;
 
     // Constants for penalty calculation
     private static final double PENALTY_PER_DAY = 5.0; // RM 5 per day
     private static final int PENALTY_CAP = 50; // Maximum penalty
-    private static final String TAG = "LateReturnWarning";
+    private static final String TAG = "BorrowerDetails";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -144,6 +154,16 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         tvCompletedPenaltyMessage = findViewById(R.id.tvCompletedPenaltyMessage);
         llPenaltyPolicy = findViewById(R.id.llPenaltyPolicy);
 
+        // New: Refund Completed views
+        cvRefundCompleted = findViewById(R.id.cvRefundCompleted);
+        ivRefundIcon = findViewById(R.id.ivRefundIcon);
+        tvRefundTitle = findViewById(R.id.tvRefundTitle);
+        tvRefundMessage = findViewById(R.id.tvRefundMessage);
+        tvRefundThankYou = findViewById(R.id.tvRefundThankYou);
+        llRefundDetails = findViewById(R.id.llRefundDetails);
+        tvRefundAmount = findViewById(R.id.tvRefundAmount);
+        btnViewTransactionDetails = findViewById(R.id.btnViewTransactionDetails);
+
         backButton.setOnClickListener(v -> finish());
         setupButtonListeners();
     }
@@ -159,6 +179,13 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         btnPrimaryAction.setOnClickListener(v -> handleBorrowerPrimaryAction());
         btnSecondaryAction.setOnClickListener(v -> startReturnProcess());
         btnLeaveReview.setOnClickListener(v -> leaveReview());
+
+        // New: Transaction details button
+        if (btnViewTransactionDetails != null) {
+            btnViewTransactionDetails.setOnClickListener(v -> {
+                Toast.makeText(this, "Transaction details will be shown here", Toast.LENGTH_SHORT).show();
+            });
+        }
     }
 
     private void loadBookingDetails() {
@@ -170,13 +197,23 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
                 if (snapshot.exists()) {
                     try {
                         Log.d(TAG, "Booking snapshot exists");
-                        String productId = getStringValue(snapshot, "productId");
-                        String ownerId = getStringValue(snapshot, "ownerId");
+                        productId = getStringValue(snapshot, "productId");
+                        ownerId = getStringValue(snapshot, "ownerId");
                         deliveryOption = getStringValue(snapshot, "deliveryOption");
+
+                        // Store product name and booking number for notifications
+                        productNameStr = getStringValue(snapshot, "productName");
+                        bookingNumberStr = getStringValue(snapshot, "bookingNumber");
+
+                        // Load owner name for notifications
+                        loadOwnerInfo(ownerId);
 
                         updateBookingUI(snapshot);
                         loadDeliveryInformation(snapshot, ownerId);
                         checkLateReturn(snapshot); // Check for late return
+
+                        // Check and show refund completed section
+                        checkAndShowRefundCompleted(snapshot);
 
                     } catch (Exception e) {
                         Log.e(TAG, "Error loading booking details", e);
@@ -195,6 +232,59 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
                 Toast.makeText(activity_rentals_details_borrower.this, "Failed to load booking", Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    private void checkAndShowRefundCompleted(DataSnapshot bookingSnapshot) {
+        String status = getStringValue(bookingSnapshot, "status");
+        Double refundAmount = getDoubleValue(bookingSnapshot, "refundAmount");
+        String refundStatus = getStringValue(bookingSnapshot, "refundStatus");
+        String paymentMethod = getStringValue(bookingSnapshot, "paymentMethod");
+
+        // Show refund completed section if status is "Completed"
+        if ("Completed".equals(status) && cvRefundCompleted != null) {
+            cvRefundCompleted.setVisibility(View.VISIBLE);
+
+            // If refund amount exists, show details
+            if (refundAmount != null && refundAmount > 0) {
+                llRefundDetails.setVisibility(View.VISIBLE);
+                tvRefundAmount.setText(String.format("RM %.2f", refundAmount));
+            } else {
+                llRefundDetails.setVisibility(View.GONE);
+            }
+
+            // Set the main refund message
+            tvRefundMessage.setText("The refund has already been returned by the owner. Please check your bank account.");
+            tvRefundThankYou.setText("Thank you for choosing us!");
+
+        } else if (cvRefundCompleted != null) {
+            cvRefundCompleted.setVisibility(View.GONE);
+        }
+    }
+
+    private void loadOwnerInfo(String ownerId) {
+        if (ownerId != null) {
+            usersRef.child(ownerId).addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    if (snapshot.exists()) {
+                        ownerName = getStringValue(snapshot, "fullName");
+                        if (ownerName == null) {
+                            ownerName = getStringValue(snapshot, "name");
+                        }
+                        if (ownerName == null) {
+                            ownerName = "Owner";
+                        }
+                    } else {
+                        ownerName = "Owner";
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    ownerName = "Owner";
+                }
+            });
+        }
     }
 
     private void updateBookingUI(DataSnapshot bookingSnapshot) {
@@ -243,6 +333,169 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         }
     }
 
+    // ============= NOTIFICATION-ENABLED ACTION METHODS =============
+
+    private void handleBorrowerPrimaryAction() {
+        bookingsRef.child(bookingId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                String status = getStringValue(snapshot, "status");
+                String deliveryOption = getStringValue(snapshot, "deliveryOption");
+                String deliveryStatus = getStringValue(snapshot, "deliveryStatus");
+
+                if ("Delivery".equals(deliveryOption) && "OutForDelivery".equals(deliveryStatus)) {
+                    markAsReceived();
+                } else if ("Pickup".equals(deliveryOption) && "ReadyForPickup".equals(deliveryStatus)) {
+                    markAsPickedUp();
+                } else {
+                    Toast.makeText(activity_rentals_details_borrower.this, "Action not available in current status", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Toast.makeText(activity_rentals_details_borrower.this, "Failed to verify status", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void markAsPickedUp() {
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("status", "OnRent");
+        updates.put("deliveryStatus", "");
+        updates.put("pickupTime", System.currentTimeMillis());
+
+        bookingsRef.child(bookingId).updateChildren(updates)
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(this, "Item marked as picked up", Toast.LENGTH_SHORT).show();
+
+                    // AUTO-GENERATE NOTIFICATION TO OWNER
+                    if (ownerId != null && productNameStr != null) {
+                        String title = "Item Picked Up";
+                        String message = currentUserId + " has picked up " + productNameStr;
+
+                        NotificationHelper.sendNotification(
+                                ownerId,
+                                title,
+                                message,
+                                "status",
+                                bookingId
+                        );
+
+                        // Also notify borrower (yourself)
+                        NotificationHelper.sendStatusNotification(
+                                bookingId,
+                                "On Rent",
+                                currentUserId,
+                                "borrower",
+                                productNameStr
+                        );
+                    }
+
+                    loadBookingDetails();
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, "Failed to update status", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void markAsReceived() {
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("status", "OnRent");
+        updates.put("deliveryStatus", "");
+        updates.put("deliveryTime", System.currentTimeMillis());
+
+        bookingsRef.child(bookingId).updateChildren(updates)
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(this, "Item marked as received", Toast.LENGTH_SHORT).show();
+
+                    // AUTO-GENERATE NOTIFICATION TO OWNER
+                    if (ownerId != null && productNameStr != null) {
+                        String title = "Item Received by Borrower";
+                        String message = "Your item " + productNameStr + " has been received by the borrower";
+
+                        NotificationHelper.sendNotification(
+                                ownerId,
+                                title,
+                                message,
+                                "status",
+                                bookingId
+                        );
+
+                        // Also notify borrower (yourself)
+                        NotificationHelper.sendStatusNotification(
+                                bookingId,
+                                "On Rent",
+                                currentUserId,
+                                "borrower",
+                                productNameStr
+                        );
+                    }
+
+                    loadBookingDetails();
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, "Failed to update status", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void startReturnProcess() {
+        // First update status to ReturnRequested
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("status", "ReturnRequested");
+        updates.put("returnTime", System.currentTimeMillis());
+
+        bookingsRef.child(bookingId).updateChildren(updates)
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(this, "Return process started", Toast.LENGTH_SHORT).show();
+
+                    // AUTO-GENERATE NOTIFICATION TO OWNER
+                    if (ownerId != null && productNameStr != null) {
+                        String title = "Return Requested";
+                        String message = "Borrower has requested to return " + productNameStr;
+
+                        NotificationHelper.sendNotification(
+                                ownerId,
+                                title,
+                                message,
+                                "status",
+                                bookingId
+                        );
+
+                        // Also notify borrower (yourself)
+                        NotificationHelper.sendStatusNotification(
+                                bookingId,
+                                "Return Requested",
+                                currentUserId,
+                                "borrower",
+                                productNameStr
+                        );
+                    }
+
+                    // Open return activity
+                    Intent intent = new Intent(this, activity_arrange_return.class);
+                    intent.putExtra("bookingId", bookingId);
+                    intent.putExtra("productId", productId);
+                    intent.putExtra("ownerId", ownerId);
+                    startActivity(intent);
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, "Failed to start return process", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void leaveReview() {
+        Intent intent = new Intent(this, activity_leave_review.class);
+        intent.putExtra("bookingId", bookingId);
+        intent.putExtra("productId", productId);
+        intent.putExtra("ownerId", ownerId);
+        intent.putExtra("productName", productNameStr);
+        intent.putExtra("ownerName", ownerName);
+        startActivity(intent);
+    }
+
+    // ============= LATE RETURN NOTIFICATION METHODS =============
+
     private void checkLateReturn(DataSnapshot bookingSnapshot) {
         Log.d(TAG, "checkLateReturn() called");
 
@@ -279,8 +532,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         }
     }
 
-
-
     private void calculateAndShowLateWarning(Long endDate, String status) {
         Log.d(TAG, "calculateAndShowLateWarning() called for status: " + status);
 
@@ -300,7 +551,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         Calendar now = Calendar.getInstance();
 
         Log.d(TAG, "Due date (end of day): " + sdf.format(dueDateCal.getTime()));
-        Log.d(TAG, "Now: " + sdf.format(now.getTime()));
 
         // Check if current time is AFTER the due date
         if (now.getTimeInMillis() > dueDateCal.getTimeInMillis()) {
@@ -328,7 +578,7 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
             if (daysLate > 0) {
                 double penaltyAmount = Math.min(daysLate * PENALTY_PER_DAY, PENALTY_CAP);
 
-                // Send late notification
+                // AUTO-GENERATE LATE RETURN NOTIFICATION
                 NotificationHelper.sendLateReturnNotification(
                         bookingId,
                         (int) daysLate,
@@ -336,11 +586,11 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
                         currentUserId
                 );
 
-                // Also notify owner
+                // Also notify owner about late return
                 NotificationHelper.sendNotification(
                         ownerId,
-                        "Late Return",
-                        "Borrower is " + daysLate + " days late returning the item.",
+                        "Late Return Alert",
+                        "Borrower is " + daysLate + " days late returning " + productNameStr,
                         "penalty_alert",
                         bookingId
                 );
@@ -560,6 +810,8 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         });
     }
 
+    // ============= DELIVERY INFORMATION METHODS =============
+
     private void loadDeliveryInformation(DataSnapshot bookingSnapshot, String ownerId) {
         String deliveryOpt = getStringValue(bookingSnapshot, "deliveryOption");
 
@@ -620,6 +872,8 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
             });
         }
     }
+
+    // ============= STATUS TIMELINE METHODS =============
 
     private void updateStatusTimeline(DataSnapshot bookingSnapshot) {
         statusTimeline.removeAllViews();
@@ -913,117 +1167,7 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         }
     }
 
-    private void handleBorrowerPrimaryAction() {
-        bookingsRef.child(bookingId).addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                String status = getStringValue(snapshot, "status");
-                String deliveryOption = getStringValue(snapshot, "deliveryOption");
-                String deliveryStatus = getStringValue(snapshot, "deliveryStatus");
-
-                if ("Delivery".equals(deliveryOption) && "OutForDelivery".equals(deliveryStatus)) {
-                    markAsReceived();
-                } else if ("Pickup".equals(deliveryOption) && "ReadyForPickup".equals(deliveryStatus)) {
-                    markAsPickedUp();
-                } else {
-                    Toast.makeText(activity_rentals_details_borrower.this, "Action not available in current status", Toast.LENGTH_SHORT).show();
-                }
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Toast.makeText(activity_rentals_details_borrower.this, "Failed to verify status", Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    private void markAsPickedUp() {
-        Map<String, Object> updates = new HashMap<>();
-        updates.put("status", "OnRent");
-        updates.put("deliveryStatus", "");
-        updates.put("pickupTime", System.currentTimeMillis());
-
-        bookingsRef.child(bookingId).updateChildren(updates)
-                .addOnSuccessListener(aVoid -> {
-                    // Send notification using NotificationHelper
-                    NotificationHelper.sendBookingNotification(
-                            bookingId,
-                            "Item Picked Up",
-                            "You have picked up the rented item. Rental period has started.",
-                            "delivery_update",
-                            currentUserId,
-                            ownerId
-                    );
-
-                    loadBookingDetails();
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Failed to update status", Toast.LENGTH_SHORT).show();
-                });
-    }
-
-    private void markAsReceived() {
-        Map<String, Object> updates = new HashMap<>();
-        updates.put("status", "OnRent");
-        updates.put("deliveryStatus", "");
-        updates.put("deliveryTime", System.currentTimeMillis());
-
-        bookingsRef.child(bookingId).updateChildren(updates)
-                .addOnSuccessListener(aVoid -> {
-                    // Send notification using NotificationHelper
-                    NotificationHelper.sendBookingNotification(
-                            bookingId,
-                            "Item Received",
-                            "You have received the rented item. Rental period has started.",
-                            "delivery_update",
-                            currentUserId,
-                            ownerId
-                    );
-
-                    loadBookingDetails();
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Failed to update status", Toast.LENGTH_SHORT).show();
-                });
-    }
-
-    private void startReturnProcess() {
-        // First update status to ReturnRequested
-        Map<String, Object> updates = new HashMap<>();
-        updates.put("status", "ReturnRequested");
-        updates.put("returnTime", System.currentTimeMillis());
-
-        bookingsRef.child(bookingId).updateChildren(updates)
-                .addOnSuccessListener(aVoid -> {
-                    // Send notification
-                    NotificationHelper.sendBookingNotification(
-                            bookingId,
-                            "Return Requested",
-                            "You have requested to return the item. Please arrange return.",
-                            "return_update",
-                            currentUserId,
-                            ownerId
-                    );
-
-                    // Open return activity
-                    Intent intent = new Intent(this, activity_arrange_return.class);
-                    intent.putExtra("bookingId", bookingId);
-                    intent.putExtra("productId", productId);
-                    intent.putExtra("ownerId", ownerId);
-                    startActivity(intent);
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Failed to start return process", Toast.LENGTH_SHORT).show();
-                });
-    }
-
-    private void leaveReview() {
-        Intent intent = new Intent(this, activity_leave_review.class);
-        intent.putExtra("bookingId", bookingId);
-        intent.putExtra("productId", productId);
-        intent.putExtra("ownerId", ownerId);
-        startActivity(intent);
-    }
+    // ============= REVIEW METHODS =============
 
     private void loadReviewSummary() {
         if (reviewsRef == null || bookingId == null || currentUserId == null) return;
@@ -1115,7 +1259,8 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         }
     }
 
-    // Helper methods
+    // ============= HELPER METHODS =============
+
     private String getStringValue(DataSnapshot snapshot, String key) {
         DataSnapshot child = snapshot.child(key);
         return child.exists() && child.getValue() != null ? child.getValue().toString() : null;
@@ -1202,10 +1347,20 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
                     long daysUntilDue = timeUntilDue / (1000 * 60 * 60 * 24);
 
                     if (daysUntilDue <= 2 && daysUntilDue >= 0) {
+                        // Send reminder notification to borrower
                         NotificationHelper.sendNotification(
                                 currentUserId,
                                 "Return Reminder",
                                 "Your rental period ends in " + daysUntilDue + " day(s). Please prepare to return the item.",
+                                "return_reminder",
+                                bookingId
+                        );
+
+                        // Also notify owner about upcoming return
+                        NotificationHelper.sendNotification(
+                                ownerId,
+                                "Return Reminder",
+                                "Rental for " + productNameStr + " ends in " + daysUntilDue + " day(s)",
                                 "return_reminder",
                                 bookingId
                         );
@@ -1219,7 +1374,4 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
             }
         });
     }
-
-
-
 }

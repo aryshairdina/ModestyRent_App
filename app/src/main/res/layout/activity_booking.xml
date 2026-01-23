@@ -269,7 +269,7 @@
 
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- ✅ ADDED PDF BUTTON (ONLY ADDITION) -->
+    <!-- Download Receipt Button -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnDownloadReceipt"
         android:layout_width="match_parent"
@@ -277,8 +277,7 @@
         android:text="Download Receipt (PDF)"
         android:textColor="@color/background"
         android:backgroundTint="@color/primary"
-        app:cornerRadius="24dp"
-        android:layout_marginBottom="16dp" />
+        app:cornerRadius="24dp"/>
 
     <!-- Action Buttons -->
     <LinearLayout
@@ -311,7 +310,17 @@
             android:backgroundTint="@color/primary"
             app:cornerRadius="24dp"
             style="@style/Widget.Material3.Button" />
-
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvPaymentNote"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="The payment will be held securely until the rental process is completed. Any refundable deposit will be returned after the item is successfully returned."
+        android:textSize="13sp"
+        android:textColor="@color/neutral"
+        android:gravity="center"
+        android:lineSpacingExtra="2dp"
+        android:layout_marginTop="10dp" />
 
 </LinearLayout>

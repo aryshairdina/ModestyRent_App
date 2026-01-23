@@ -2,7 +2,7 @@ package com.example.modestyrent_app;
 
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.Color;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -10,10 +10,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-import com.google.android.material.button.MaterialButton;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.*;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -23,6 +21,8 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
 
     private List<NotificationModel> notificationList;
     private Context context;
+    private String currentUserId;
+    private static final String TAG = "NotificationAdapter";
 
     public NotificationAdapter(List<NotificationModel> notificationList) {
         this.notificationList = notificationList;
@@ -55,7 +55,6 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
         private TextView tvNotificationTitle;
         private TextView tvNotificationMessage;
         private TextView tvNotificationTime;
-        private MaterialButton btnAction;
         private View unreadIndicator;
 
         public NotificationViewHolder(@NonNull View itemView) {
@@ -66,20 +65,39 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
             tvNotificationTitle = itemView.findViewById(R.id.tvNotificationTitle);
             tvNotificationMessage = itemView.findViewById(R.id.tvNotificationMessage);
             tvNotificationTime = itemView.findViewById(R.id.tvNotificationTime);
-            btnAction = itemView.findViewById(R.id.btnAction);
             unreadIndicator = itemView.findViewById(R.id.unreadIndicator);
+
+            if (FirebaseAuth.getInstance().getCurrentUser() != null) {
+                currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+            }
+
+            itemView.setOnClickListener(v -> {
+                int position = getAdapterPosition();
+                if (position != RecyclerView.NO_POSITION) {
+                    NotificationModel notification = notificationList.get(position);
+                    markAsRead(notification.getId());
+                    handleNotificationClick(notification);
+                }
+            });
         }
 
         public void bind(NotificationModel notification) {
-            // Set notification data
             tvNotificationTitle.setText(notification.getTitle());
             tvNotificationMessage.setText(notification.getMessage());
-            tvNotificationTime.setText(getTimeAgo(notification.getTimestamp()));
+            tvNotificationTime.setText(formatTimestamp(notification.getTimestamp()));
 
-            // Set icon based on notification type
-            setNotificationIcon(notification.getType());
+            // Set icon
+            int iconResId = R.drawable.ic_notifications;
+            if (notification.getType() != null) {
+                switch (notification.getType()) {
+                    case "chat":
+                    case "new_message":
+                        iconResId = R.drawable.ic_chat;
+                        break;
+                }
+            }
+            ivNotificationIcon.setImageResource(iconResId);
 
-            // Set background based on read status
             if (notification.isRead()) {
                 notificationCard.setBackgroundColor(
                         context.getResources().getColor(R.color.notification_read));
@@ -89,131 +107,250 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
                         context.getResources().getColor(R.color.notification_new));
                 unreadIndicator.setVisibility(View.VISIBLE);
             }
-
-            // Set up action button
-            setupActionButton(notification);
-
-            // Click listener
-            itemView.setOnClickListener(v -> {
-                markAsRead(notification.getId());
-                handleNotificationClick(notification);
-            });
-        }
-
-        private void setNotificationIcon(String type) {
-            int iconResId = android.R.drawable.ic_dialog_info;
-            int iconColor = R.color.neutral;
-
-            if (type != null) {
-                switch (type) {
-                    case "booking_confirmed":
-                        iconResId = android.R.drawable.ic_lock_lock;
-                        iconColor = R.color.notification_success;
-                        break;
-                    case "payment_received":
-                        iconResId = android.R.drawable.ic_menu_save;
-                        iconColor = R.color.notification_success;
-                        break;
-                    case "delivery_update":
-                        iconResId = android.R.drawable.ic_menu_directions;
-                        iconColor = R.color.primary;
-                        break;
-                    case "return_reminder":
-                        iconResId = android.R.drawable.ic_menu_recent_history;
-                        iconColor = R.color.notification_warning;
-                        break;
-                    case "review_request":
-                        iconResId = android.R.drawable.star_big_on;
-                        iconColor = R.color.notification_warning;
-                        break;
-                    case "new_message":
-                        iconResId = android.R.drawable.ic_dialog_email;
-                        iconColor = R.color.primary;
-                        break;
-                    case "special_offer":
-                        iconResId = android.R.drawable.ic_menu_share;
-                        iconColor = R.color.notification_sale;
-                        break;
-                    case "penalty_alert":
-                        iconResId = android.R.drawable.ic_delete;
-                        iconColor = R.color.error;
-                        break;
-                }
-            }
-
-            ivNotificationIcon.setImageResource(iconResId);
-            ivNotificationIcon.setColorFilter(
-                    context.getResources().getColor(iconColor));
-        }
-
-        private void setupActionButton(NotificationModel notification) {
-            if (notification.getType() != null) {
-                switch (notification.getType()) {
-                    case "booking_confirmed":
-                    case "delivery_update":
-                        btnAction.setText("View Booking");
-                        btnAction.setVisibility(View.VISIBLE);
-                        break;
-                    case "new_message":
-                        btnAction.setText("Reply");
-                        btnAction.setVisibility(View.VISIBLE);
-                        break;
-                    case "review_request":
-                        btnAction.setText("Leave Review");
-                        btnAction.setVisibility(View.VISIBLE);
-                        break;
-                    default:
-                        btnAction.setVisibility(View.GONE);
-                        return;
-                }
-
-                btnAction.setOnClickListener(v -> {
-                    markAsRead(notification.getId());
-                    handleNotificationClick(notification);
-                });
-            }
         }
 
         private void handleNotificationClick(NotificationModel notification) {
-            if (notification.getType() == null) return;
+            String type = notification.getType();
+            String bookingId = notification.getBookingId();
+            String chatId = notification.getChatId();
+            String clickAction = notification.getClickAction();
 
-            Intent intent = null;
+            Log.d(TAG, "Notification clicked - Type: " + type +
+                    ", ClickAction: " + clickAction +
+                    ", ChatId: " + chatId);
 
-            switch (notification.getType()) {
-                case "booking_confirmed":
-                case "delivery_update":
-                    intent = new Intent(context, activity_rentals_details_borrower.class);
-                    intent.putExtra("bookingId", notification.getBookingId());
-                    break;
-                case "new_message":
-                    intent = new Intent(context, activity_chat_owner.class);
-                    intent.putExtra("chatId", notification.getChatId());
-                    break;
-                case "review_request":
-                    intent = new Intent(context, activity_leave_review.class);
-                    intent.putExtra("bookingId", notification.getBookingId());
-                    break;
+            try {
+                // FIRST: Always try to use clickAction if available
+                if (clickAction != null && !clickAction.isEmpty()) {
+                    Log.d(TAG, "Using clickAction: " + clickAction);
+                    openActivityByClickAction(clickAction, bookingId, chatId);
+                    return;
+                }
+
+                // SECOND: If no clickAction, check type specifically for chat
+                if (type != null) {
+                    Log.d(TAG, "Using type-based navigation for: " + type);
+                    if (type.equals("chat") || type.equals("new_message")) {
+                        // FIXED: Always open chat list for chat notifications
+                        openChatListActivity();
+                        return;
+                    }
+
+                    // Handle other types
+                    switch (type) {
+                        case "booking":
+                            openActivity(activity_booking_requests.class);
+                            break;
+                        case "booking_confirmed":
+                        case "payment_success":
+                            openActivity(activity_myrentals.class);
+                            break;
+                        case "status":
+                        case "status_update":
+                        case "completed":
+                        case "refund":
+                        case "penalty_alert":
+                        case "return_reminder":
+                            if (bookingId != null) {
+                                checkUserRoleAndOpenRentalDetails(bookingId);
+                            } else {
+                                openMainActivity();
+                            }
+                            break;
+                        case "inspection":
+                            openActivityWithExtra(activity_inspection.class, "bookingId", bookingId);
+                            break;
+                        case "review_request":
+                        case "review":
+                            openActivity(activity_myrentals.class);
+                            break;
+                        default:
+                            openMainActivity();
+                            break;
+                    }
+                } else {
+                    Log.d(TAG, "Type is null, opening main activity");
+                    openMainActivity();
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error handling notification click: " + e.getMessage());
+                e.printStackTrace();
+                openMainActivity();
+            }
+        }
+
+        private void openActivityByClickAction(String clickAction, String bookingId, String chatId) {
+            try {
+                Intent intent = null;
+                Log.d(TAG, "Opening activity by click action: " + clickAction);
+
+                switch (clickAction) {
+                    case "activity_myrentals":
+                        intent = new Intent(context, activity_myrentals.class);
+                        break;
+                    case "activity_booking_requests":
+                        intent = new Intent(context, activity_booking_requests.class);
+                        break;
+                    case "activity_rentals_details_owner":
+                        intent = new Intent(context, activity_rentals_details_owner.class);
+                        intent.putExtra("bookingId", bookingId);
+                        break;
+                    case "activity_chat_list":
+                        // FIXED: Directly open chat list
+                        intent = new Intent(context, activity_chat_list.class);
+                        Log.d(TAG, "Opening chat list activity");
+                        break;
+                    case "activity_chat_owner":
+                        intent = new Intent(context, activity_chat_owner.class);
+                        if (chatId != null) {
+                            intent.putExtra("chatId", chatId);
+                        }
+                        break;
+                    case "activity_inspection":
+                        intent = new Intent(context, activity_inspection.class);
+                        intent.putExtra("bookingId", bookingId);
+                        break;
+                    default:
+                        Log.w(TAG, "Unknown click action: " + clickAction + ", opening main activity");
+                        intent = new Intent(context, MainActivity.class);
+                        break;
+                }
+
+                if (intent != null) {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                    context.startActivity(intent);
+                    Log.d(TAG, "Activity started: " + clickAction);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error opening activity by click action: " + clickAction, e);
+                e.printStackTrace();
+                openMainActivity();
+            }
+        }
+
+        // FIXED: Direct chat list opening method
+        private void openChatListActivity() {
+            try {
+                Log.d(TAG, "Attempting to open chat list activity");
+                Intent intent = new Intent(context, activity_chat_list.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                context.startActivity(intent);
+                Log.d(TAG, "Chat list activity opened successfully");
+            } catch (Exception e) {
+                Log.e(TAG, "Error opening chat list activity: " + e.getMessage());
+                e.printStackTrace();
+
+                // Try chat owner as fallback
+                try {
+                    Log.d(TAG, "Trying chat owner as fallback");
+                    Intent intent = new Intent(context, activity_chat_owner.class);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                    context.startActivity(intent);
+                } catch (Exception ex) {
+                    Log.e(TAG, "Error opening chat owner activity: " + ex.getMessage());
+                    openMainActivity();
+                }
+            }
+        }
+
+        private void openActivity(Class<?> activityClass) {
+            try {
+                Intent intent = new Intent(context, activityClass);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                context.startActivity(intent);
+            } catch (Exception e) {
+                Log.e(TAG, "Error opening activity: " + e.getMessage());
+                openMainActivity();
+            }
+        }
+
+        private void openActivityWithExtra(Class<?> activityClass, String extraKey, String extraValue) {
+            try {
+                Intent intent = new Intent(context, activityClass);
+                if (extraValue != null) {
+                    intent.putExtra(extraKey, extraValue);
+                }
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                context.startActivity(intent);
+            } catch (Exception e) {
+                Log.e(TAG, "Error opening activity with extra: " + e.getMessage());
+                openMainActivity();
+            }
+        }
+
+        private void checkUserRoleAndOpenRentalDetails(String bookingId) {
+            if (currentUserId == null || bookingId == null) {
+                openMainActivity();
+                return;
             }
 
-            if (intent != null) {
+            DatabaseReference bookingRef = FirebaseDatabase.getInstance()
+                    .getReference("bookings")
+                    .child(bookingId);
+
+            bookingRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    Intent intent = null;
+                    if (snapshot.exists()) {
+                        String ownerId = snapshot.child("ownerId").getValue(String.class);
+                        String renterId = snapshot.child("renterId").getValue(String.class);
+
+                        if (ownerId != null && ownerId.equals(currentUserId)) {
+                            intent = new Intent(context, activity_rentals_details_owner.class);
+                        } else if (renterId != null && renterId.equals(currentUserId)) {
+                            intent = new Intent(context, activity_myrentals.class);
+                        }
+                    }
+
+                    if (intent != null) {
+                        intent.putExtra("bookingId", bookingId);
+                        context.startActivity(intent);
+                    } else {
+                        openMainActivity();
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    openMainActivity();
+                }
+            });
+        }
+
+        private void openMainActivity() {
+            try {
+                Log.d(TAG, "Opening main activity as fallback");
+                Intent intent = new Intent(context, MainActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
                 context.startActivity(intent);
+            } catch (Exception e) {
+                Log.e(TAG, "Error opening main activity: " + e.getMessage());
             }
         }
 
         private void markAsRead(String notificationId) {
-            String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-            if (userId == null) return;
+            String userId = currentUserId;
+            if (userId == null || notificationId == null) return;
 
-            DatabaseReference notificationsRef = FirebaseDatabase.getInstance()
+            DatabaseReference notificationRef = FirebaseDatabase.getInstance()
                     .getReference("notifications")
                     .child(userId)
                     .child(notificationId)
                     .child("read");
 
-            notificationsRef.setValue(true);
+            notificationRef.setValue(true)
+                    .addOnSuccessListener(aVoid -> {
+                        unreadIndicator.setVisibility(View.GONE);
+                        notificationCard.setBackgroundColor(
+                                context.getResources().getColor(R.color.notification_read));
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to mark notification as read: " + e.getMessage());
+                    });
         }
 
-        private String getTimeAgo(long timestamp) {
+        private String formatTimestamp(long timestamp) {
             long now = System.currentTimeMillis();
             long diff = now - timestamp;
 
@@ -222,7 +359,10 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
             long hours = minutes / 60;
             long days = hours / 24;
 
-            if (days > 0) {
+            if (days > 7) {
+                SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy", Locale.getDefault());
+                return sdf.format(new Date(timestamp));
+            } else if (days > 0) {
                 return days + "d ago";
             } else if (hours > 0) {
                 return hours + "h ago";

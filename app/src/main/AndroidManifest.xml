@@ -8,9 +8,9 @@
 
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
+        android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -47,19 +47,10 @@
             android:name=".activity_refund_payment"
             android:exported="false" />
         <activity
-            android:name=".activity_return_rentals"
-            android:exported="false" />
-        <activity
             android:name=".activity_rentals_details_owner"
             android:exported="false" />
         <activity
             android:name=".activity_rentals_details_borrower"
-            android:exported="false" />
-        <activity
-            android:name=".activity_dispute_details"
-            android:exported="false" />
-        <activity
-            android:name=".activity_transaction_details"
             android:exported="false" />
         <activity
             android:name=".activity_leave_review"
@@ -69,9 +60,6 @@
             android:exported="false" />
         <activity
             android:name=".activity_inspection"
-            android:exported="false" />
-        <activity
-            android:name=".activity_rating_review"
             android:exported="false" />
         <activity
             android:name=".activity_chat_list"

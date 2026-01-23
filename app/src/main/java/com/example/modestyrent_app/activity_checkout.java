@@ -13,7 +13,9 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.*;
 
 import java.text.SimpleDateFormat;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Random;
 import com.example.modestyrent_app.NotificationHelper;
 
@@ -23,7 +25,7 @@ public class activity_checkout extends AppCompatActivity {
             tvDaysCount, tvUnitPrice, tvFinalTotal, tvDeposit, tvSubtotal;
     private TextInputEditText etFullName, etPhone, etAddress;
     private RadioGroup rgDeliveryOption, rgPaymentMethod;
-    private RadioButton rbPickup, rbDelivery, rbQRBanking, rbCOD;
+    private RadioButton rbPickup, rbDelivery, rbOnlineBanking;
     private Button btnConfirmCheckout;
     private ImageView backIcon;
 
@@ -33,7 +35,7 @@ public class activity_checkout extends AppCompatActivity {
     private double unitPrice, totalAmount, depositAmount, subtotalAmount;
     private String currentUserId;
 
-    private DatabaseReference usersRef, productsRef, bookingsRef;
+    private DatabaseReference usersRef, productsRef, bookingsRef, chatsRef;
     private FirebaseAuth mAuth;
 
     private final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd MMM yyyy", Locale.getDefault());
@@ -60,7 +62,6 @@ public class activity_checkout extends AppCompatActivity {
         updateUI();
     }
 
-
     private void initializeViews() {
         // TextViews
         tvProductName = findViewById(R.id.tvProductName);
@@ -86,8 +87,7 @@ public class activity_checkout extends AppCompatActivity {
         // Radio Buttons
         rbPickup = findViewById(R.id.rbPickup);
         rbDelivery = findViewById(R.id.rbDelivery);
-        rbQRBanking = findViewById(R.id.rbQRBanking);
-        rbCOD = findViewById(R.id.rbCOD);
+        rbOnlineBanking = findViewById(R.id.rbOnlineBanking);
 
         // Buttons
         btnConfirmCheckout = findViewById(R.id.btnConfirmCheckout);
@@ -95,7 +95,7 @@ public class activity_checkout extends AppCompatActivity {
 
         // Default selections
         rbPickup.setChecked(true);
-        rbQRBanking.setChecked(true);
+        rbOnlineBanking.setChecked(true);
 
         // Ensure mutual exclusivity is fine (RadioGroup already ensures this, but keep your logic)
         rgDeliveryOption.setOnCheckedChangeListener((group, checkedId) -> {
@@ -103,14 +103,6 @@ public class activity_checkout extends AppCompatActivity {
                 rbDelivery.setChecked(false);
             } else if (checkedId == R.id.rbDelivery) {
                 rbPickup.setChecked(false);
-            }
-        });
-
-        rgPaymentMethod.setOnCheckedChangeListener((group, checkedId) -> {
-            if (checkedId == R.id.rbQRBanking) {
-                rbCOD.setChecked(false);
-            } else if (checkedId == R.id.rbCOD) {
-                rbQRBanking.setChecked(false);
             }
         });
     }
@@ -126,7 +118,7 @@ public class activity_checkout extends AppCompatActivity {
 
         // Calculate amounts
         totalAmount = unitPrice * days;
-        depositAmount = 50.00; // Fixed RM 50 deposit
+        depositAmount = 150.00; // Fixed RM 150 deposit
         subtotalAmount = totalAmount + depositAmount;
     }
 
@@ -138,6 +130,7 @@ public class activity_checkout extends AppCompatActivity {
         usersRef = database.getReference("users");
         productsRef = database.getReference("products");
         bookingsRef = database.getReference("bookings");
+        chatsRef = database.getReference("chats");
     }
 
     private void loadUserData() {
@@ -215,6 +208,13 @@ public class activity_checkout extends AppCompatActivity {
         return "MR" + timestamp + randomDigits;
     }
 
+    private String generateChatId(String userId1, String userId2, String productId) {
+        // Create consistent chat ID for two users and a product
+        String[] ids = {userId1, userId2};
+        java.util.Arrays.sort(ids);
+        return "chat_" + ids[0] + "_" + ids[1] + "_" + productId;
+    }
+
     private void updateProductStatusToUnavailable() {
         if (productId != null) {
             productsRef.child(productId).child("status").setValue("Unavailable")
@@ -225,12 +225,86 @@ public class activity_checkout extends AppCompatActivity {
         }
     }
 
-    /**
-     * New logic:
-     * - For QR Banking (online banking): DO NOT insert booking here. Go to dummy payment,
-     *   and booking will be created AFTER user taps Pay Now.
-     * - For COD: Insert booking now and go directly to confirmation.
-     */
+    private void createChatRoom(String bookingId, String renterId, String ownerId) {
+        String chatId = generateChatId(renterId, ownerId, productId);
+
+        Map<String, Object> chatRoomData = new HashMap<>();
+        Map<String, Object> participants = new HashMap<>();
+        participants.put(renterId, true);
+        participants.put(ownerId, true);
+
+        chatRoomData.put("participants", participants);
+        chatRoomData.put("createdAt", System.currentTimeMillis());
+        chatRoomData.put("productId", productId);
+        chatRoomData.put("bookingId", bookingId);
+        chatRoomData.put("productName", productName);
+        chatRoomData.put("lastMessage", "");
+        chatRoomData.put("lastMessageTime", 0L);
+        chatRoomData.put("lastMessageSender", "");
+        chatRoomData.put("renterId", renterId);
+        chatRoomData.put("ownerId", ownerId);
+
+        chatsRef.child(chatId).setValue(chatRoomData)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d("Checkout", "Chat room created: " + chatId);
+
+                    // 🔔 SEND CHAT AVAILABLE NOTIFICATION
+                    sendChatAvailableNotification(renterId, ownerId, chatId, bookingId);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e("Checkout", "Failed to create chat room: " + e.getMessage());
+                });
+    }
+
+    private void sendChatAvailableNotification(String renterId, String ownerId, String chatId, String bookingId) {
+        // Get renter name for owner notification
+        usersRef.child(renterId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                String renterName = "Borrower";
+                if (snapshot.exists()) {
+                    renterName = snapshot.child("fullName").getValue(String.class);
+                    if (renterName == null || renterName.isEmpty()) {
+                        renterName = "Borrower";
+                    }
+                }
+
+                // Also send standard booking notification
+                NotificationHelper.sendNotification(
+                        ownerId,
+                        "New Booking",
+                        renterName + " has booked your product: " + productName,
+                        "booking_confirmed",
+                        bookingId
+                );
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e("Checkout", "Failed to get renter info for notification");
+            }
+        });
+
+        // Get owner name for renter notification
+        usersRef.child(ownerId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                String ownerName = "Owner";
+                if (snapshot.exists()) {
+                    ownerName = snapshot.child("fullName").getValue(String.class);
+                    if (ownerName == null || ownerName.isEmpty()) {
+                        ownerName = "Owner";
+                    }
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e("Checkout", "Failed to get owner info for notification");
+            }
+        });
+    }
+
     private void confirmBooking() {
         // Validate input fields
         String fullName = etFullName.getText().toString().trim();
@@ -258,8 +332,8 @@ public class activity_checkout extends AppCompatActivity {
             return;
         }
 
-        // Payment method must be selected
-        if (!rbQRBanking.isChecked() && !rbCOD.isChecked()) {
+        // Payment method must be selected (only Online Banking available now)
+        if (!rbOnlineBanking.isChecked()) {
             Toast.makeText(this, "Please select a payment method", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -270,102 +344,85 @@ public class activity_checkout extends AppCompatActivity {
         }
 
         String deliveryOption = rbPickup.isChecked() ? "Pickup" : "Delivery";
-        boolean isOnlineBanking = rbQRBanking.isChecked();   // 👈 use this flag
-        String paymentMethod = isOnlineBanking ? "QR Banking" : "COD";
+        String paymentMethod = "Online Banking";  // Only payment method available
 
-        // 🔹 CASE 1: ONLINE BANKING (QR BANKING) – DO NOT INSERT BOOKING HERE
-        if (isOnlineBanking) {
-            Intent intent = new Intent(activity_checkout.this, activity_dummy_payment.class);
-            intent.putExtra("productId", productId);
-            intent.putExtra("ownerId", ownerId);
-            intent.putExtra("productName", productName);
-            intent.putExtra("renterName", fullName);
-            intent.putExtra("renterPhone", phone);
-            intent.putExtra("deliveryAddress", address);
-            intent.putExtra("deliveryOption", deliveryOption);
-            intent.putExtra("paymentMethod", paymentMethod);
-            intent.putExtra("startDateMillis", startDateMillis);
-            intent.putExtra("endDateMillis", endDateMillis);
-            intent.putExtra("days", days);
-            intent.putExtra("unitPrice", unitPrice);
-            intent.putExtra("rentalAmount", totalAmount);
-            intent.putExtra("depositAmount", depositAmount);
-            intent.putExtra("totalAmount", subtotalAmount);
-            startActivity(intent);
-
-            // ⚠️ IMPORTANT: DO NOT WRITE TO bookingsRef HERE
-            // 🔔 Add these extras for notifications
-            intent.putExtra("renterId", currentUserId);
-            intent.putExtra("bookingNumber", generateBookingNumber());
-            return;
-        }
-
-        // 🔹 CASE 2: COD – CREATE BOOKING NOW
-        String bookingId = bookingsRef.push().getKey();
-        if (bookingId == null) {
-            Toast.makeText(this, "Failed to create booking", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
+        // 🔹 ONLINE BANKING – DO NOT INSERT BOOKING HERE
         String bookingNumber = generateBookingNumber();
 
-        Booking booking = new Booking();
-        booking.setBookingId(bookingId);
-        booking.setBookingNumber(bookingNumber);
-        booking.setProductId(productId);
-        booking.setOwnerId(ownerId);
-        booking.setRenterId(currentUserId);
-        booking.setProductName(productName);
-        booking.setRenterName(fullName);
-        booking.setRenterPhone(phone);
-        booking.setDeliveryAddress(address);
-        booking.setDeliveryOption(deliveryOption);
-        booking.setPaymentMethod(paymentMethod);
-        booking.setStartDate(startDateMillis);
-        booking.setEndDate(endDateMillis);
-        booking.setRentalDays(days);
-        booking.setUnitPrice(unitPrice);
-        booking.setRentalAmount(totalAmount);
-        booking.setDepositAmount(depositAmount);
-        booking.setTotalAmount(subtotalAmount);
-        booking.setStatus("Confirmed");
-        booking.setBookingDate(System.currentTimeMillis());
-        booking.setPaymentStatus("cod_pending");
+        Intent intent = new Intent(activity_checkout.this, activity_dummy_payment.class);
+        intent.putExtra("productId", productId);
+        intent.putExtra("ownerId", ownerId);
+        intent.putExtra("productName", productName);
+        intent.putExtra("renterName", fullName);
+        intent.putExtra("renterPhone", phone);
+        intent.putExtra("deliveryAddress", address);
+        intent.putExtra("deliveryOption", deliveryOption);
+        intent.putExtra("paymentMethod", paymentMethod);
+        intent.putExtra("startDateMillis", startDateMillis);
+        intent.putExtra("endDateMillis", endDateMillis);
+        intent.putExtra("days", days);
+        intent.putExtra("unitPrice", unitPrice);
+        intent.putExtra("rentalAmount", totalAmount);
+        intent.putExtra("depositAmount", depositAmount);
+        intent.putExtra("totalAmount", subtotalAmount);
 
-        bookingsRef.child(bookingId).setValue(booking)
-                .addOnSuccessListener(aVoid -> {
-                    updateProductStatusToUnavailable();
+        // 🔔 Add these extras for notifications
+        intent.putExtra("renterId", currentUserId);
+        intent.putExtra("bookingNumber", bookingNumber);
 
-                    // 🔔 SEND BOOKING CONFIRMATION NOTIFICATION
-                    NotificationHelper.sendBookingNotification(
-                            bookingId,
-                            "Booking Confirmed!",
-                            "Your booking #" + bookingNumber + " has been confirmed.",
-                            "booking_confirmed",
-                            currentUserId,  // Borrower
-                            ownerId         // Owner
-                    );
+        startActivity(intent);
 
-                    // Also send payment status notification
-                    NotificationHelper.sendNotification(
-                            currentUserId,
-                            "Payment Pending",
-                            "Please pay via COD when you receive the item.",
-                            "payment_pending",
-                            bookingId
-                    );
-
-                    Intent intent = new Intent(activity_checkout.this, activity_booking.class);
-                    intent.putExtra("bookingId", bookingId);
-                    startActivity(intent);
-                    finish();
-
-
-                })
-                .addOnFailureListener(e ->
-                        Toast.makeText(activity_checkout.this,
-                                "Failed to confirm booking: " + e.getMessage(),
-                                Toast.LENGTH_SHORT).show());
+        // ⚠️ IMPORTANT: DO NOT WRITE TO bookingsRef HERE
+        // But we can send a pending notification to owner
+        sendPendingBookingNotification(bookingNumber, fullName);
     }
 
+    private void sendPendingBookingNotification(String bookingNumber, String renterName) {
+        // Get owner info for personalized notification
+        usersRef.child(ownerId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                String ownerName = "Owner";
+                if (snapshot.exists()) {
+                    ownerName = snapshot.child("fullName").getValue(String.class);
+                    if (ownerName == null || ownerName.isEmpty()) {
+                        ownerName = "Owner";
+                    }
+                }
+
+                // 🔔 NOTIFICATION FOR OWNER: Pending booking
+                NotificationHelper.sendNotification(
+                        ownerId,
+                        "Pending Booking",
+                        renterName + " is trying to book " + productName + ". Waiting for payment.",
+                        "pending_booking",
+                        null
+                );
+
+                // 🔔 NOTIFICATION FOR BORROWER: Proceed to payment
+                NotificationHelper.sendNotification(
+                        currentUserId,
+                        "Proceed to Payment",
+                        "Please complete payment for booking #" + bookingNumber,
+                        "payment_required",
+                        null
+                );
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e("Checkout", "Failed to send pending notification");
+            }
+        });
+    }
+
+    private void sendFCMBookingNotification(String bookingId, String bookingNumber,
+                                            String renterId, String ownerId, String renterName) {
+        // This would call your FCM service
+        // For now, we'll log it
+        Log.d("Checkout", "FCM Notification would be sent:");
+        Log.d("Checkout", "- Booking: " + bookingNumber);
+        Log.d("Checkout", "- Renter: " + renterName);
+        Log.d("Checkout", "- Owner ID: " + ownerId);
+    }
 }
