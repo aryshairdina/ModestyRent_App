@@ -135,7 +135,7 @@
 
             </androidx.cardview.widget.CardView>
 
-            <!-- Late Penalty Section (Hidden by default) - MOVED HERE for better flow -->
+            <!-- Late Penalty Section (Hidden by default) -->
             <LinearLayout
                 android:id="@+id/llLatePenaltySection"
                 android:layout_width="match_parent"
@@ -393,6 +393,15 @@
                         android:textStyle="bold"
                         android:layout_marginBottom="8dp" />
 
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Select the condition that best matches the returned item. Refund amount will be auto-deducted from deposit:"
+                        android:textColor="@color/textcolor"
+                        android:textSize="12sp"
+                        android:alpha="0.7"
+                        android:layout_marginBottom="12dp" />
+
                     <RadioGroup
                         android:id="@+id/rgItemCondition"
                         android:layout_width="match_parent"
@@ -441,7 +450,7 @@
                                     <TextView
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
-                                        android:text="RM150"
+                                        android:text="RM150 Refund"
                                         android:textColor="@color/primary"
                                         android:textSize="16sp"
                                         android:textStyle="bold"
@@ -505,7 +514,7 @@
                                     <TextView
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
-                                        android:text="RM120"
+                                        android:text="RM120 Refund"
                                         android:textColor="@color/primary"
                                         android:textSize="16sp"
                                         android:textStyle="bold"
@@ -569,7 +578,7 @@
                                     <TextView
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
-                                        android:text="RM80"
+                                        android:text="RM80 Refund"
                                         android:textColor="@color/primary"
                                         android:textSize="16sp"
                                         android:textStyle="bold"
@@ -632,7 +641,7 @@
                                     <TextView
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
-                                        android:text="RM0"
+                                        android:text="RM0 Refund"
                                         android:textColor="#F44336"
                                         android:textSize="16sp"
                                         android:textStyle="bold"
@@ -661,7 +670,7 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Damage Assessment"
+                        android:text="Damage Assessment Notes"
                         android:textColor="@color/textcolor"
                         android:textSize="16sp"
                         android:textStyle="bold"
@@ -693,51 +702,11 @@
 
                     </com.google.android.material.textfield.TextInputLayout>
 
-                    <!-- Repair Cost -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:layout_marginBottom="8dp">
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Additional Repair/Damage Cost"
-                            android:textColor="@color/textcolor"
-                            android:textSize="14sp" />
-
-                        <TextView
-                            android:id="@+id/tvRepairCost"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="RM 0.00"
-                            android:textColor="@color/primary"
-                            android:textSize="16sp"
-                            android:textStyle="bold" />
-
-                    </LinearLayout>
-
-                    <com.google.android.material.slider.Slider
-                        android:id="@+id/sliderRepairCost"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:valueFrom="0"
-                        android:valueTo="50"
-                        android:stepSize="10"
-                        android:value="0"
-                        app:thumbColor="@color/primary"
-                        app:trackColorInactive="@color/secondary"
-                        app:trackColorActive="@color/primary"
-                        android:layout_marginBottom="16dp" />
-
-                    <!-- Note about condition-based deductions -->
+                    <!-- Note about automatic deductions -->
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Note: Condition-based deductions are automatically applied based on the selected condition. Additional repair costs can be added using the slider above."
+                        android:text="Note: Refund amount is automatically calculated based on selected condition and deducted from the deposit. Late penalties (if any) are also automatically deducted."
                         android:textColor="@color/textcolor"
                         android:textSize="12sp"
                         android:alpha="0.7"
@@ -792,30 +761,32 @@
                             android:id="@+id/tvOriginalDeposit"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="RM 50.00"
+                            android:text="RM 150.00"
                             android:textColor="@color/neutral"
                             android:textSize="14sp"
                             android:textStyle="bold" />
 
                     </LinearLayout>
 
-                    <!-- Repair Cost Deduction -->
+                    <!-- Condition-Based Deduction -->
                     <LinearLayout
+                        android:id="@+id/llConditionDeduction"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:layout_marginBottom="8dp">
+                        android:layout_marginBottom="8dp"
+                        android:visibility="gone">
 
                         <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="Repair/Damage Cost"
+                            android:text="Condition-Based Deduction"
                             android:textColor="@color/textcolor"
                             android:textSize="14sp" />
 
                         <TextView
-                            android:id="@+id/tvRepairCostDeduction"
+                            android:id="@+id/tvConditionDeduction"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="RM 0.00"
@@ -910,7 +881,7 @@
                             android:id="@+id/tvRefundAmount"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="RM 50.00"
+                            android:text="RM 150.00"
                             android:textColor="@color/primary"
                             android:textSize="18sp"
                             android:textStyle="bold" />
@@ -961,7 +932,7 @@
                     android:id="@+id/tvFinalRefund"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="RM 50.00"
+                    android:text="RM 150.00"
                     android:textColor="@color/primary"
                     android:textSize="18sp"
                     android:textStyle="bold" />

@@ -273,7 +273,7 @@ public class activity_arrange_return extends AppCompatActivity {
         builder.setMessage("Are you sure you want to proceed with return?\n\n" +
                 "Return Method: " + returnMethodDisplay +
                 (instructions.isEmpty() ? "" : "\nInstructions: " + instructions) +
-                "\n\nThis will notify the owner about your return request.");
+                "\n\nThis will notify the owner about your return.");
 
         builder.setPositiveButton("Yes, Confirm Return", new DialogInterface.OnClickListener() {
             @Override
@@ -303,7 +303,7 @@ public class activity_arrange_return extends AppCompatActivity {
 
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(this, "Return request submitted successfully!", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Return submitted successfully!", Toast.LENGTH_SHORT).show();
 
                     // Navigate back to rental details with success message
                     Intent intent = new Intent(this, activity_rentals_details_borrower.class);
@@ -311,12 +311,12 @@ public class activity_arrange_return extends AppCompatActivity {
                     intent.putExtra("productId", productId);
                     intent.putExtra("ownerId", ownerId);
                     intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                    intent.putExtra("showSuccessMessage", "Return request submitted successfully!");
+                    intent.putExtra("showSuccessMessage", "Return submitted successfully!");
                     startActivity(intent);
                     finish();
                 })
                 .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Failed to submit return request: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Failed to submit return: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                     // Reset button state
                     btnConfirmReturn.setEnabled(true);
                     btnConfirmReturn.setText("Confirm Return");

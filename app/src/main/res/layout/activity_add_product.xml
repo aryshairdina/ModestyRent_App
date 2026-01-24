@@ -352,11 +352,19 @@
                             app:checkedIconVisible="true"/>
 
                         <com.google.android.material.chip.Chip
-                            android:id="@+id/chipCategoryKebaya"
+                            android:id="@+id/chipCategoryDress"
                             style="@style/Widget.MaterialComponents.Chip.Choice"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Kebaya"
+                            android:text="Dress"
+                            app:checkedIconVisible="true"/>
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chipCategoryShawl"
+                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Shawl"
                             app:checkedIconVisible="true"/>
 
                         <com.google.android.material.chip.Chip

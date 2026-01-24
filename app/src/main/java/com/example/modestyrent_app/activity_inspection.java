@@ -11,7 +11,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.slider.Slider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.*;
 
@@ -29,24 +28,22 @@ public class activity_inspection extends AppCompatActivity {
     private RadioGroup rgItemCondition;
     private RadioButton rbExcellent, rbGood, rbFair, rbPoor;
     private EditText etDamageNotes;
-    private Slider sliderRepairCost;
-    private TextView tvRepairCost, tvOriginalDeposit, tvDeductions, tvRefundAmount, tvFinalRefund;
+    private TextView tvOriginalDeposit, tvDeductions, tvRefundAmount, tvFinalRefund;
     private MaterialButton btnCompleteInspection;
 
     // New UI Components for late return indicator
     private CardView cvDueDateIndicator;
-    private TextView tvDueDateStatus, tvDueDateLabel, tvDueDateValue, tvLatePenaltyAmount, tvRepairCostDeduction, tvLatePenaltyDeduction;
-
-    private LinearLayout llLatePenaltySection, llLatePenaltyDeduction;
+    private TextView tvDueDateStatus, tvDueDateLabel, tvDueDateValue, tvLatePenaltyAmount, tvConditionDeduction, tvLatePenaltyDeduction;
+    private LinearLayout llLatePenaltySection, llLatePenaltyDeduction, llConditionDeduction;
 
     // Database References
     private DatabaseReference bookingsRef, usersRef, productsRef;
     private FirebaseAuth mAuth;
 
     // Calculation fields
-    private double originalDepositAmount = 50.0;
+    private double originalDepositAmount = 150.0;
     private double latePenaltyAmount = 0.0;
-    private double repairCostAmount = 0.0;
+    private double conditionRefundAmount = 150.0; // Default to excellent
     private boolean needsRefundPayment = false;
     private boolean isLateReturn = false;
     private long daysLate = 0;
@@ -102,10 +99,10 @@ public class activity_inspection extends AppCompatActivity {
         rbFair = findViewById(R.id.rbFair);
         rbPoor = findViewById(R.id.rbPoor);
 
-        // Damage and repair
+        // Damage notes
         etDamageNotes = findViewById(R.id.etDamageNotes);
-        sliderRepairCost = findViewById(R.id.sliderRepairCost);
-        tvRepairCost = findViewById(R.id.tvRepairCost);
+
+        // Deposit calculation views
         tvOriginalDeposit = findViewById(R.id.tvOriginalDeposit);
         tvDeductions = findViewById(R.id.tvDeductions);
         tvRefundAmount = findViewById(R.id.tvRefundAmount);
@@ -120,10 +117,11 @@ public class activity_inspection extends AppCompatActivity {
         tvLatePenaltyAmount = findViewById(R.id.tvLatePenaltyAmount);
         llLatePenaltySection = findViewById(R.id.llLatePenaltySection);
 
-        // Add these lines after initializing other views
-        tvRepairCostDeduction = findViewById(R.id.tvRepairCostDeduction);
+        // Condition deduction views
+        tvConditionDeduction = findViewById(R.id.tvConditionDeduction);
         tvLatePenaltyDeduction = findViewById(R.id.tvLatePenaltyDeduction);
         llLatePenaltyDeduction = findViewById(R.id.llLatePenaltyDeduction);
+        llConditionDeduction = findViewById(R.id.llConditionDeduction);
 
         backButton.setOnClickListener(v -> finish());
     }
@@ -135,23 +133,22 @@ public class activity_inspection extends AppCompatActivity {
     }
 
     private void setupListeners() {
-        // Repair cost slider listener
-        sliderRepairCost.addOnChangeListener((slider, value, fromUser) -> {
-            repairCostAmount = value;
-            tvRepairCost.setText(String.format("RM %.2f", value));
-            calculateRefundAmount();
-        });
-
-        // Condition radio buttons listener
+        // Condition radio buttons listener - KEEP YOUR ORIGINAL LOGIC
         CompoundButton.OnCheckedChangeListener conditionListener = (buttonView, isChecked) -> {
             if (!isChecked) return;
 
+            // Uncheck others
             if (buttonView != rbExcellent) rbExcellent.setChecked(false);
             if (buttonView != rbGood) rbGood.setChecked(false);
             if (buttonView != rbFair) rbFair.setChecked(false);
             if (buttonView != rbPoor) rbPoor.setChecked(false);
 
+            // Update RadioGroup
             rgItemCondition.check(buttonView.getId());
+
+            // Calculate refund based on selected condition
+            updateConditionDeduction(buttonView.getId());
+            calculateRefundAmount();
         };
 
         rbExcellent.setOnCheckedChangeListener(conditionListener);
@@ -169,6 +166,28 @@ public class activity_inspection extends AppCompatActivity {
                 completeInspectionWithoutPayment();
             }
         });
+    }
+
+    private void updateConditionDeduction(int checkedId) {
+        // Set refund amount based on condition
+        if (checkedId == rbExcellent.getId()) {
+            conditionRefundAmount = 150.0;
+        } else if (checkedId == rbGood.getId()) {
+            conditionRefundAmount = 120.0;
+        } else if (checkedId == rbFair.getId()) {
+            conditionRefundAmount = 80.0;
+        } else if (checkedId == rbPoor.getId()) {
+            conditionRefundAmount = 0.0;
+        } else {
+            conditionRefundAmount = 150.0; // Default to excellent
+            Log.w(TAG, "Unknown radio button selected, defaulting to excellent");
+        }
+
+        // Update condition deduction display
+        double conditionDeduction = originalDepositAmount - conditionRefundAmount;
+        if (tvConditionDeduction != null) {
+            tvConditionDeduction.setText(String.format("RM %.2f", conditionDeduction));
+        }
     }
 
     private void loadBookingDetails() {
@@ -265,8 +284,8 @@ public class activity_inspection extends AppCompatActivity {
             tvOriginalDeposit.setText(String.format("RM %.2f", depositAmount));
         } else {
             // Try to get it from another field or use default
-            originalDepositAmount = 50.0;
-            tvOriginalDeposit.setText("RM 50.00");
+            originalDepositAmount = 150.0;
+            tvOriginalDeposit.setText("RM 150.00");
         }
     }
 
@@ -478,14 +497,17 @@ public class activity_inspection extends AppCompatActivity {
     }
 
     private void calculateRefundAmount() {
-        // Get current repair cost from slider
-        repairCostAmount = (double) sliderRepairCost.getValue();
+        // Show condition deduction section
+        llConditionDeduction.setVisibility(View.VISIBLE);
 
-        // Update repair cost deduction display
-        tvRepairCostDeduction.setText(String.format("RM %.2f", repairCostAmount));
+        // Calculate condition deduction
+        double conditionDeduction = originalDepositAmount - conditionRefundAmount;
 
-        // Calculate total deductions (repair cost + late penalty)
-        double totalDeductions = repairCostAmount + latePenaltyAmount;
+        // Calculate total deductions (condition + late penalty)
+        double totalDeductions = conditionDeduction + latePenaltyAmount;
+
+        // Update condition deduction display
+        tvConditionDeduction.setText(String.format("RM %.2f", conditionDeduction));
 
         // Update late penalty UI if applicable
         if (isLateReturn && latePenaltyAmount > 0) {
@@ -495,8 +517,13 @@ public class activity_inspection extends AppCompatActivity {
             llLatePenaltyDeduction.setVisibility(View.GONE);
         }
 
-        // Calculate refund amount
-        double refundAmount = Math.max(0, originalDepositAmount - totalDeductions);
+        // Calculate refund amount (what will be returned to renter)
+        double refundAmount = conditionRefundAmount - latePenaltyAmount;
+
+        // Ensure refund is not negative
+        if (refundAmount < 0) {
+            refundAmount = 0;
+        }
 
         // Update UI
         tvDeductions.setText(String.format("RM %.2f", totalDeductions));
@@ -512,10 +539,13 @@ public class activity_inspection extends AppCompatActivity {
             btnCompleteInspection.setText("Complete Rental");
         }
 
-        Log.d(TAG, "Refund calculated: RM " + refundAmount +
-                " (Deposit: " + originalDepositAmount +
-                ", Repair: " + repairCostAmount +
-                ", Penalty: " + latePenaltyAmount + ")");
+        Log.d(TAG, "Refund calculated:");
+        Log.d(TAG, "- Original Deposit: RM " + originalDepositAmount);
+        Log.d(TAG, "- Condition Refund: RM " + conditionRefundAmount);
+        Log.d(TAG, "- Condition Deduction: RM " + conditionDeduction);
+        Log.d(TAG, "- Late Penalty: RM " + latePenaltyAmount);
+        Log.d(TAG, "- Total Deductions: RM " + totalDeductions);
+        Log.d(TAG, "- Final Refund: RM " + refundAmount);
     }
 
     private boolean validateItemCondition() {
@@ -550,12 +580,13 @@ public class activity_inspection extends AppCompatActivity {
         updates.put("completionTime", System.currentTimeMillis()); // Add completion time
         updates.put("itemCondition", itemCondition);
         updates.put("damageNotes", damageNotes);
-        updates.put("repairCost", repairCostAmount);
+        updates.put("conditionRefundAmount", conditionRefundAmount); // Save condition-based refund
 
         // CRITICAL: Always save penalty data if it exists (even if 0)
         updates.put("latePenalty", latePenaltyAmount);
         updates.put("daysLate", daysLate);
-        updates.put("totalDeductions", repairCostAmount + latePenaltyAmount);
+        updates.put("conditionDeduction", originalDepositAmount - conditionRefundAmount);
+        updates.put("totalDeductions", (originalDepositAmount - conditionRefundAmount) + latePenaltyAmount);
         updates.put("refundAmount", refundAmount);
         updates.put("depositReturned", true);
         updates.put("depositReturnDate", System.currentTimeMillis());
@@ -566,6 +597,8 @@ public class activity_inspection extends AppCompatActivity {
         }
 
         Log.d(TAG, "Saving to Firebase:");
+        Log.d(TAG, "- conditionRefundAmount: " + conditionRefundAmount);
+        Log.d(TAG, "- conditionDeduction: " + (originalDepositAmount - conditionRefundAmount));
         Log.d(TAG, "- latePenalty: " + latePenaltyAmount);
         Log.d(TAG, "- daysLate: " + daysLate);
         Log.d(TAG, "- isLateReturn: " + isLateReturn);
@@ -589,12 +622,11 @@ public class activity_inspection extends AppCompatActivity {
                         sendInspectionCompleteNotifications(
                                 completionMessage,
                                 itemCondition,
-                                repairCostAmount,
+                                conditionRefundAmount,
                                 latePenaltyAmount,
                                 daysLate,
                                 refundAmount
                         );
-
 
                         // 🔔 UPDATE PRODUCT STATUS TO AVAILABLE
                         updateProductStatusToAvailable();
@@ -628,7 +660,7 @@ public class activity_inspection extends AppCompatActivity {
     // 🔔 NEW METHOD: Send comprehensive inspection completion notifications
     private void sendInspectionCompleteNotifications(String completionMessage,
                                                      String itemCondition,
-                                                     double repairCost,
+                                                     double conditionRefund,
                                                      double penalty,
                                                      long daysLate,
                                                      double refundAmount) {
@@ -642,16 +674,24 @@ public class activity_inspection extends AppCompatActivity {
         String borrowerTitle = "Inspection Completed";
         String borrowerMsg = "Owner " + ownerName + " has completed inspection of " + productName + ". ";
 
+        // Add condition-based deduction info
+        double conditionDeduction = originalDepositAmount - conditionRefund;
+        if (conditionDeduction > 0) {
+            borrowerMsg += "Condition-based deduction: RM " + String.format("%.2f", conditionDeduction) + ". ";
+        }
+
         if (penalty > 0) {
-            borrowerMsg += "Late penalty applied: RM " + String.format("%.2f", penalty);
-        } else if (repairCost > 0) {
-            borrowerMsg += "Repair cost deducted: RM " + String.format("%.2f", repairCost);
+            borrowerMsg += "Late penalty applied: RM " + String.format("%.2f", penalty) + ". ";
+        } else if (conditionDeduction > 0) {
+            borrowerMsg += "Condition-based deduction applied: RM " + String.format("%.2f", conditionDeduction) + ". ";
         } else {
-            borrowerMsg += "Item returned in good condition.";
+            borrowerMsg += "Item returned in excellent condition. ";
         }
 
         if (refundAmount > 0) {
-            borrowerMsg += " Refund: RM " + String.format("%.2f", refundAmount);
+            borrowerMsg += "Refund: RM " + String.format("%.2f", refundAmount);
+        } else {
+            borrowerMsg += "No refund due.";
         }
 
         NotificationHelper.sendNotification(
@@ -667,12 +707,14 @@ public class activity_inspection extends AppCompatActivity {
         String ownerMsg = "Inspection for " + productName + " completed. ";
         ownerMsg += "Condition: " + itemCondition + ". ";
 
+        if (conditionDeduction > 0) {
+            ownerMsg += "Condition deduction: RM " + String.format("%.2f", conditionDeduction) + ". ";
+        }
         if (penalty > 0) {
-            ownerMsg += "Late penalty: RM " + String.format("%.2f", penalty);
+            ownerMsg += "Late penalty: RM " + String.format("%.2f", penalty) + ". ";
         }
-        if (repairCost > 0) {
-            ownerMsg += " Repair cost: RM " + String.format("%.2f", repairCost);
-        }
+
+        ownerMsg += "Total refund to renter: RM " + String.format("%.2f", refundAmount);
 
         NotificationHelper.sendNotification(
                 ownerId,
@@ -707,7 +749,7 @@ public class activity_inspection extends AppCompatActivity {
             NotificationHelper.sendNotification(
                     renterId,
                     "Deposit Fully Used",
-                    "Your deposit has been fully used for repairs/penalty.",
+                    "Your deposit has been fully used for condition deductions/penalty.",
                     "deposit_used",
                     bookingId
             );
@@ -766,6 +808,8 @@ public class activity_inspection extends AppCompatActivity {
         } catch (NumberFormatException ignored) {}
 
         Log.d(TAG, "Opening refund payment page:");
+        Log.d(TAG, "- Condition: " + itemCondition);
+        Log.d(TAG, "- Condition Refund: " + conditionRefundAmount);
         Log.d(TAG, "- latePenalty: " + latePenaltyAmount);
         Log.d(TAG, "- daysLate: " + daysLate);
         Log.d(TAG, "- refundAmount: " + refundAmount);
@@ -781,7 +825,7 @@ public class activity_inspection extends AppCompatActivity {
         intent.putExtra("renterId", renterId != null ? renterId : "");
         intent.putExtra("itemCondition", itemCondition);
         intent.putExtra("damageNotes", damageNotes);
-        intent.putExtra("repairCost", repairCostAmount);
+        intent.putExtra("conditionRefundAmount", conditionRefundAmount);
         intent.putExtra("latePenalty", latePenaltyAmount);
         intent.putExtra("daysLate", daysLate);
         intent.putExtra("isLateReturn", isLateReturn); // Add this flag

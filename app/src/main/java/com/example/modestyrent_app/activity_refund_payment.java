@@ -190,7 +190,7 @@ public class activity_refund_payment extends AppCompatActivity {
                         message += "\nLate penalty of RM " + String.format("%.2f", latePenalty) +
                                 " applied for " + daysLate + " day(s) late";
                     }
-                    Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                    //Toast.makeText(this, message, Toast.LENGTH_LONG).show();
 
                     Log.d(TAG, "Firebase updated successfully with penalty data");
 
