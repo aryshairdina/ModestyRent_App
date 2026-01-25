@@ -1,5 +1,8 @@
 package com.example.modestyrent_app;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class ChatMessage {
     private String messageId;
     private String senderId;
@@ -8,6 +11,7 @@ public class ChatMessage {
     private String fileType;
     private String type; // "text" or "image"
     private long timestamp;
+    private Map<String, Boolean> readBy = new HashMap<>();
 
     public ChatMessage() {}
 
@@ -17,6 +21,7 @@ public class ChatMessage {
         this.message = message;
         this.timestamp = timestamp;
         this.type = "text";
+        this.readBy = new HashMap<>();
     }
 
     public ChatMessage(String messageId, String senderId, String fileUrl, String fileType, long timestamp) {
@@ -26,6 +31,7 @@ public class ChatMessage {
         this.fileType = fileType;
         this.timestamp = timestamp;
         this.type = fileType != null && fileType.equals("image") ? "image" : "file";
+        this.readBy = new HashMap<>();
     }
 
     public String getMessageId() { return messageId; }
@@ -48,4 +54,18 @@ public class ChatMessage {
 
     public long getTimestamp() { return timestamp; }
     public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+
+    public Map<String, Boolean> getReadBy() { return readBy; }
+    public void setReadBy(Map<String, Boolean> readBy) { this.readBy = readBy; }
+
+    public boolean isReadBy(String userId) {
+        return readBy != null && readBy.containsKey(userId) && Boolean.TRUE.equals(readBy.get(userId));
+    }
+
+    public void markAsRead(String userId) {
+        if (readBy == null) {
+            readBy = new HashMap<>();
+        }
+        readBy.put(userId, true);
+    }
 }

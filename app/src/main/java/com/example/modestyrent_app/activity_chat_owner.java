@@ -53,34 +53,57 @@ public class activity_chat_owner extends AppCompatActivity {
 
     private String chatId, ownerId, productId;
     private String currentUserId;
-    private DatabaseReference chatRoomRef, messagesRef, usersRef;
+    private DatabaseReference chatRoomRef, messagesRef, usersRef, userUnreadRef;
     private StorageReference storageRef;
 
     private ChildEventListener messagesListener;
+    private ValueEventListener chatListener;
+    private UnreadCounterManager unreadCounterManager;
+
+    private boolean isMarkingAsRead = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat_owner);
 
-        // 🔒 AUTH GUARD (rule-related only)
+        // 🔒 AUTH GUARD
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user == null) {
             finish();
             return;
         }
-        // 🔒 END auth guard
 
         initializeViews();
         getIntentData();
         initializeFirebase();
         setupRecyclerView();
-        loadChatMessages();
         setupClickListeners();
         loadOwnerInfo();
         initializeChatRoom();
+
+        // Initialize unread counter manager
+        unreadCounterManager = UnreadCounterManager.getInstance(this);
+
+        // Mark chat as read when opened
+        markChatAsRead();
+
+        // Then load messages
+        loadChatMessages();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        markChatAsRead();
+        unreadCounterManager.startListening();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        unreadCounterManager.stopListening();
+    }
 
     @Override
     protected void onDestroy() {
@@ -88,6 +111,10 @@ public class activity_chat_owner extends AppCompatActivity {
         if (messagesRef != null && messagesListener != null) {
             messagesRef.removeEventListener(messagesListener);
         }
+        if (chatRoomRef != null && chatListener != null) {
+            chatRoomRef.removeEventListener(chatListener);
+        }
+        unreadCounterManager.removeListener();
     }
 
     private void initializeViews() {
@@ -129,13 +156,10 @@ public class activity_chat_owner extends AppCompatActivity {
         chatRoomRef = database.getReference("chats").child(chatId);
         messagesRef = chatRoomRef.child("messages");
         usersRef = database.getReference("users");
+        userUnreadRef = database.getReference("userUnreadCounts").child(currentUserId);
         storageRef = FirebaseStorage.getInstance().getReference("chat_files");
     }
 
-    /**
-     * Make sure chat room exists and has participants/current user + owner.
-     * This helps activity_chat_list detect the chat reliably.
-     */
     private void initializeChatRoom() {
         chatRoomRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
@@ -154,6 +178,12 @@ public class activity_chat_owner extends AppCompatActivity {
                     chatRoomData.put("lastMessageTime", 0L);
                     chatRoomData.put("lastMessageSender", "");
 
+                    // Initialize lastSeenBy
+                    Map<String, Object> lastSeenBy = new HashMap<>();
+                    lastSeenBy.put(currentUserId, System.currentTimeMillis());
+                    lastSeenBy.put(ownerId, 0L);
+                    chatRoomData.put("lastSeenBy", lastSeenBy);
+
                     chatRoomRef.setValue(chatRoomData)
                             .addOnSuccessListener(aVoid -> Log.d(TAG, "Chat room created"))
                             .addOnFailureListener(e -> Log.e(TAG, "Failed to create chat room: " + e.getMessage()));
@@ -162,9 +192,17 @@ public class activity_chat_owner extends AppCompatActivity {
                     Map<String, Object> updates = new HashMap<>();
                     updates.put("participants/" + currentUserId, true);
                     updates.put("participants/" + ownerId, true);
+
+                    // Initialize lastSeenBy if it doesn't exist
+                    if (!snapshot.hasChild("lastSeenBy")) {
+                        updates.put("lastSeenBy/" + currentUserId, System.currentTimeMillis());
+                        updates.put("lastSeenBy/" + ownerId, 0L);
+                    }
+
                     if (!snapshot.hasChild("productId") && productId != null) {
                         updates.put("productId", productId);
                     }
+
                     chatRoomRef.updateChildren(updates)
                             .addOnSuccessListener(aVoid -> Log.d(TAG, "Chat room participants ensured"))
                             .addOnFailureListener(e -> Log.e(TAG, "Failed to ensure participants: " + e.getMessage()));
@@ -174,6 +212,84 @@ public class activity_chat_owner extends AppCompatActivity {
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
                 Log.e(TAG, "Failed to check chat room: " + error.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Mark all messages in this chat as read for current user
+     */
+    private void markChatAsRead() {
+        if (currentUserId == null || chatId == null || isMarkingAsRead) return;
+
+        isMarkingAsRead = true;
+        Log.d(TAG, "Marking chat as read: " + chatId);
+
+        // Update last seen time
+        DatabaseReference lastSeenRef = chatRoomRef.child("lastSeenBy").child(currentUserId);
+        long currentTime = System.currentTimeMillis();
+        lastSeenRef.setValue(currentTime)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Updated lastSeen time: " + currentTime);
+
+                    // Mark all unread messages as read
+                    markAllMessagesAsRead();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to update lastSeen time: " + e.getMessage());
+                    isMarkingAsRead = false;
+                });
+    }
+
+    private void markAllMessagesAsRead() {
+        messagesRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (!snapshot.exists()) {
+                    isMarkingAsRead = false;
+                    return;
+                }
+
+                int unreadCount = 0;
+                int markedCount = 0;
+
+                for (DataSnapshot messageSnapshot : snapshot.getChildren()) {
+                    String messageId = messageSnapshot.getKey();
+                    String senderId = messageSnapshot.child("senderId").getValue(String.class);
+                    Long timestamp = messageSnapshot.child("timestamp").getValue(Long.class);
+
+                    if (messageId != null && senderId != null && timestamp != null) {
+                        // Only mark messages from other user that are unread
+                        if (!senderId.equals(currentUserId)) {
+                            DataSnapshot readBySnapshot = messageSnapshot.child("readBy").child(currentUserId);
+                            if (!readBySnapshot.exists() || !Boolean.TRUE.equals(readBySnapshot.getValue(Boolean.class))) {
+                                unreadCount++;
+                                // Mark as read
+                                DatabaseReference readByRef = messagesRef
+                                        .child(messageId)
+                                        .child("readBy")
+                                        .child(currentUserId);
+                                readByRef.setValue(true);
+                                markedCount++;
+                            }
+                        }
+                    }
+                }
+
+                Log.d(TAG, "Marked " + markedCount + " messages as read, total unread was: " + unreadCount);
+
+                // Update global unread count
+                if (unreadCount > 0) {
+                    unreadCounterManager.decrementUnreadCount(unreadCount);
+                }
+
+                isMarkingAsRead = false;
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Failed to mark messages as read: " + error.getMessage());
+                isMarkingAsRead = false;
             }
         });
     }
@@ -189,21 +305,37 @@ public class activity_chat_owner extends AppCompatActivity {
     }
 
     private void loadChatMessages() {
-        Log.d(TAG, "Loading messages from: messages");
+        Log.d(TAG, "Loading messages for chat: " + chatId);
 
-        // 1) Load existing messages once
-        messagesRef.addListenerForSingleValueEvent(new ValueEventListener() {
+        // Clear existing messages
+        chatMessages.clear();
+        if (chatAdapter != null) {
+            chatAdapter.notifyDataSetChanged();
+        }
+
+        // Remove previous listener
+        if (messagesListener != null) {
+            messagesRef.removeEventListener(messagesListener);
+        }
+
+        // Load existing messages
+        messagesRef.orderByChild("timestamp").addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                chatMessages.clear();
+                if (!snapshot.exists()) {
+                    Log.d(TAG, "No messages found");
+                    return;
+                }
+
                 for (DataSnapshot messageSnapshot : snapshot.getChildren()) {
                     ChatMessage message = messageSnapshot.getValue(ChatMessage.class);
                     if (message != null) {
                         chatMessages.add(message);
-                        Log.d(TAG, "Loaded message id=" + message.getMessageId() + " type=" + message.getType());
+                        Log.d(TAG, "Loaded message: " + message.getMessageId() + " - " + message.getMessage());
                     }
                 }
-                Log.d(TAG, "Total messages loaded (singleValue): " + chatMessages.size());
+
+                Log.d(TAG, "Total messages loaded: " + chatMessages.size());
                 chatAdapter.notifyDataSetChanged();
 
                 if (!chatMessages.isEmpty()) {
@@ -213,11 +345,11 @@ public class activity_chat_owner extends AppCompatActivity {
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "Failed to load existing messages: " + error.getMessage());
+                Log.e(TAG, "Failed to load messages: " + error.getMessage());
             }
         });
 
-        // 2) Listen for new messages in realtime
+        // Listen for new messages
         messagesListener = new ChildEventListener() {
             @Override
             public void onChildAdded(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
@@ -225,17 +357,51 @@ public class activity_chat_owner extends AppCompatActivity {
                 if (message != null && !messageExists(message.getMessageId())) {
                     chatMessages.add(message);
                     chatAdapter.notifyItemInserted(chatMessages.size() - 1);
-                    rvChatMessages.scrollToPosition(chatMessages.size() - 1);
-                    Log.d(TAG, "New message added: id=" + message.getMessageId() + " total=" + chatMessages.size());
-                } else {
-                    Log.d(TAG, "onChildAdded - message null or exists. snapshot key=" + snapshot.getKey());
+
+                    // Auto-scroll to new message
+                    rvChatMessages.post(() -> {
+                        rvChatMessages.scrollToPosition(chatMessages.size() - 1);
+                    });
+
+                    Log.d(TAG, "New message added: " + message.getMessageId() + " from " + message.getSenderId());
+
+                    // If message is from other user and not read yet, increment unread
+                    if (!message.getSenderId().equals(currentUserId) &&
+                            (message.getReadBy() == null || !message.getReadBy().containsKey(currentUserId))) {
+                        Log.d(TAG, "New unread message detected");
+                        unreadCounterManager.incrementUnreadCount();
+
+                        // Mark as read if user is currently viewing the chat
+                        DatabaseReference readByRef = messagesRef
+                                .child(message.getMessageId())
+                                .child("readBy")
+                                .child(currentUserId);
+                        readByRef.setValue(true);
+                    }
                 }
             }
 
-            @Override public void onChildChanged(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {}
+            @Override
+            public void onChildChanged(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
+                // Handle message updates (e.g., read status)
+                ChatMessage updatedMessage = snapshot.getValue(ChatMessage.class);
+                if (updatedMessage != null) {
+                    for (int i = 0; i < chatMessages.size(); i++) {
+                        ChatMessage existing = chatMessages.get(i);
+                        if (existing.getMessageId().equals(updatedMessage.getMessageId())) {
+                            chatMessages.set(i, updatedMessage);
+                            chatAdapter.notifyItemChanged(i);
+                            break;
+                        }
+                    }
+                }
+            }
+
             @Override public void onChildRemoved(@NonNull DataSnapshot snapshot) {}
             @Override public void onChildMoved(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {}
-            @Override public void onCancelled(@NonNull DatabaseError error) {
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
                 Log.e(TAG, "Failed to listen for new messages: " + error.getMessage());
             }
         };
@@ -256,10 +422,8 @@ public class activity_chat_owner extends AppCompatActivity {
     private void setupClickListeners() {
         backButton.setOnClickListener(v -> finish());
 
-        // Attach icon → pick image (image only)
         btnAttachLeft.setOnClickListener(v -> openImagePicker());
 
-        // Send button → send text
         btnSend.setOnClickListener(v -> sendTextMessage());
 
         etMessage.setOnClickListener(v -> {
@@ -269,16 +433,14 @@ public class activity_chat_owner extends AppCompatActivity {
         });
     }
 
-    // Open image picker
     private void openImagePicker() {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.setType("image/*"); // only images
+        intent.setType("image/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         Intent chooser = Intent.createChooser(intent, "Select Image to Send");
         startActivityForResult(chooser, PICK_IMAGE_REQUEST);
     }
 
-    // Handle image picker result
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -294,7 +456,6 @@ public class activity_chat_owner extends AppCompatActivity {
         }
     }
 
-    // Upload image to Storage and send as message
     private void uploadImage(Uri imageUri) {
         ProgressDialog progressDialog = new ProgressDialog(this);
         progressDialog.setTitle("Uploading Image");
@@ -343,13 +504,17 @@ public class activity_chat_owner extends AppCompatActivity {
         message.setFileType("image");
         message.setTimestamp(System.currentTimeMillis());
         message.setType("image");
-        message.setMessage(""); // no text
+        message.setMessage("");
+
+        // Initialize readBy with current user (sender)
+        Map<String, Boolean> readBy = new HashMap<>();
+        readBy.put(currentUserId, true);
+        message.setReadBy(readBy);
 
         messagesRef.child(messageId).setValue(message)
                 .addOnSuccessListener(aVoid -> {
                     updateLastMessage("[Image]");
                     Log.d(TAG, "Image message sent: " + messageId);
-                    rvChatMessages.post(() -> rvChatMessages.scrollToPosition(chatMessages.size() - 1));
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to send image: " + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -357,7 +522,6 @@ public class activity_chat_owner extends AppCompatActivity {
                 });
     }
 
-    // Send text message
     private void sendTextMessage() {
         String messageText = etMessage.getText() != null ? etMessage.getText().toString().trim() : "";
         if (TextUtils.isEmpty(messageText)) {
@@ -380,12 +544,16 @@ public class activity_chat_owner extends AppCompatActivity {
         message.setFileUrl(null);
         message.setFileType(null);
 
+        // Initialize readBy with current user (sender)
+        Map<String, Boolean> readBy = new HashMap<>();
+        readBy.put(currentUserId, true);
+        message.setReadBy(readBy);
+
         messagesRef.child(messageId).setValue(message)
                 .addOnSuccessListener(aVoid -> {
                     etMessage.setText("");
                     updateLastMessage(messageText);
                     Log.d(TAG, "Text message sent: " + messageId);
-                    rvChatMessages.post(() -> rvChatMessages.scrollToPosition(chatMessages.size() - 1));
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to send message: " + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -394,7 +562,6 @@ public class activity_chat_owner extends AppCompatActivity {
     }
 
     private void updateLastMessage(String lastMessageRaw) {
-        // Optional: shorten preview for chat list
         String preview = lastMessageRaw;
         if (preview != null && preview.length() > 60) {
             preview = preview.substring(0, 57) + "...";

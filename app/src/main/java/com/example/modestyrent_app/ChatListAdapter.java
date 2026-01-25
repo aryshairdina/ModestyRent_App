@@ -8,7 +8,6 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.bumptech.glide.Glide;
 import com.google.android.material.card.MaterialCardView;
 
 import java.text.SimpleDateFormat;
@@ -54,7 +53,7 @@ public class ChatListAdapter extends RecyclerView.Adapter<ChatListAdapter.ChatRo
     }
 
     static class ChatRoomViewHolder extends RecyclerView.ViewHolder {
-        private TextView tvUserName, tvLastMessage, tvTime, tvAvatar;
+        private TextView tvUserName, tvLastMessage, tvTime, tvAvatar, tvUnreadCount;
         private MaterialCardView badgeUnread;
 
         public ChatRoomViewHolder(@NonNull View itemView) {
@@ -63,16 +62,23 @@ public class ChatListAdapter extends RecyclerView.Adapter<ChatListAdapter.ChatRo
             tvLastMessage = itemView.findViewById(R.id.tvLastMessage);
             tvTime = itemView.findViewById(R.id.tvTime);
             tvAvatar = itemView.findViewById(R.id.tvAvatar);
+            tvUnreadCount = itemView.findViewById(R.id.tvUnreadCount);
             badgeUnread = itemView.findViewById(R.id.badgeUnread);
         }
 
         void bind(ChatRoom chatRoom) {
             // Set user name
-            tvUserName.setText(chatRoom.getOtherUserName());
+            String userName = chatRoom.getOtherUserName();
+            if (userName != null && !userName.isEmpty()) {
+                tvUserName.setText(userName);
+            } else {
+                tvUserName.setText("User");
+            }
 
             // Set last message
-            if (chatRoom.getLastMessage() != null && !chatRoom.getLastMessage().isEmpty()) {
-                tvLastMessage.setText(chatRoom.getLastMessage());
+            String lastMessage = chatRoom.getLastMessage();
+            if (lastMessage != null && !lastMessage.isEmpty()) {
+                tvLastMessage.setText(lastMessage);
             } else {
                 tvLastMessage.setText("Start a conversation");
             }
@@ -85,8 +91,18 @@ public class ChatListAdapter extends RecyclerView.Adapter<ChatListAdapter.ChatRo
             String initials = getInitials(chatRoom.getOtherUserName());
             tvAvatar.setText(initials);
 
-            // TODO: Implement unread message count logic
-            badgeUnread.setVisibility(View.GONE);
+            // Show/hide unread badge
+            int unreadCount = chatRoom.getUnreadCount();
+            if (unreadCount > 0) {
+                badgeUnread.setVisibility(View.VISIBLE);
+                if (unreadCount > 99) {
+                    tvUnreadCount.setText("99+");
+                } else {
+                    tvUnreadCount.setText(String.valueOf(unreadCount));
+                }
+            } else {
+                badgeUnread.setVisibility(View.GONE);
+            }
         }
 
         private String getInitials(String name) {

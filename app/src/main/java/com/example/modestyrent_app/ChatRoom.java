@@ -9,6 +9,7 @@ public class ChatRoom {
     private long lastMessageTime;
     private String lastMessageSender;
     private String productId;
+    private int unreadCount; // NEW: Track unread messages for this chat
 
     public ChatRoom() {}
 
@@ -36,4 +37,7 @@ public class ChatRoom {
 
     public String getProductId() { return productId; }
     public void setProductId(String productId) { this.productId = productId; }
+
+    public int getUnreadCount() { return unreadCount; }
+    public void setUnreadCount(int unreadCount) { this.unreadCount = unreadCount; }
 }
