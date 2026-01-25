@@ -2,7 +2,6 @@ package com.example.modestyrent_app;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ImageView;
@@ -135,13 +134,12 @@ public class activity_rentals_details_owner extends AppCompatActivity {
 
                         // Store renterId from booking data
                         renterId = getStringValue(snapshot, "renterId");
-                        Log.d("BookingDetails", "Loaded renterId: " + renterId);
 
-                        // Store product name and booking number for notifications
+                        // Store product name and booking number
                         productNameStr = getStringValue(snapshot, "productName");
                         bookingNumberStr = getStringValue(snapshot, "bookingNumber");
 
-                        // Load renter name for notifications
+                        // Load renter name
                         loadRenterInfo(renterId);
 
                         updateBookingUI(snapshot);
@@ -299,8 +297,6 @@ public class activity_rentals_details_owner extends AppCompatActivity {
         }
     }
 
-    // ============= NOTIFICATION-ENABLED ACTION METHODS =============
-
     private void markOutForDelivery() {
         Map<String, Object> updates = new HashMap<>();
         updates.put("deliveryStatus", "OutForDelivery");
@@ -310,26 +306,6 @@ public class activity_rentals_details_owner extends AppCompatActivity {
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Marked as out for delivery", Toast.LENGTH_SHORT).show();
-
-                    // AUTO-GENERATE NOTIFICATION TO BORROWER
-                    if (renterId != null && productNameStr != null) {
-                        NotificationHelper.sendStatusNotification(
-                                bookingId,
-                                "Out for Delivery",
-                                renterId,
-                                "borrower",
-                                productNameStr
-                        );
-
-                        // Also notify owner (yourself)
-                        NotificationHelper.sendStatusNotification(
-                                bookingId,
-                                "Out for Delivery",
-                                currentUserId,
-                                "owner",
-                                productNameStr
-                        );
-                    }
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to update delivery status", Toast.LENGTH_SHORT).show();
@@ -345,26 +321,6 @@ public class activity_rentals_details_owner extends AppCompatActivity {
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Item ready for pickup", Toast.LENGTH_SHORT).show();
-
-                    // AUTO-GENERATE NOTIFICATION TO BORROWER
-                    if (renterId != null && productNameStr != null) {
-                        NotificationHelper.sendStatusNotification(
-                                bookingId,
-                                "Ready for Pickup",
-                                renterId,
-                                "borrower",
-                                productNameStr
-                        );
-
-                        // Also notify owner (yourself)
-                        NotificationHelper.sendStatusNotification(
-                                bookingId,
-                                "Ready for Pickup",
-                                currentUserId,
-                                "owner",
-                                productNameStr
-                        );
-                    }
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to update status", Toast.LENGTH_SHORT).show();
@@ -408,26 +364,6 @@ public class activity_rentals_details_owner extends AppCompatActivity {
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Return marked as received", Toast.LENGTH_SHORT).show();
 
-                    // AUTO-GENERATE NOTIFICATION TO BORROWER
-                    if (renterId != null && productNameStr != null) {
-                        NotificationHelper.sendStatusNotification(
-                                bookingId,
-                                "Item Received - Awaiting Inspection",
-                                renterId,
-                                "borrower",
-                                productNameStr
-                        );
-
-                        // Also notify owner (yourself)
-                        NotificationHelper.sendStatusNotification(
-                                bookingId,
-                                "Item Received - Ready for Inspection",
-                                currentUserId,
-                                "owner",
-                                productNameStr
-                        );
-                    }
-
                     // Open inspection screen after marking as received
                     openInspectionScreen();
                 })
@@ -444,13 +380,8 @@ public class activity_rentals_details_owner extends AppCompatActivity {
             intent.putExtra("renterId", renterId);
             intent.putExtra("ownerId", currentUserId);
 
-            // Pass product name for notifications
+            // Pass product name
             intent.putExtra("productName", productNameStr);
-
-            Log.d("InspectionDebug", "Opening inspection with:");
-            Log.d("InspectionDebug", "- bookingId: " + bookingId);
-            Log.d("InspectionDebug", "- productId: " + productId);
-            Log.d("InspectionDebug", "- renterId: " + renterId);
 
             startActivity(intent);
         } else {
@@ -473,25 +404,6 @@ public class activity_rentals_details_owner extends AppCompatActivity {
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Rental completed successfully", Toast.LENGTH_SHORT).show();
-
-                    // AUTO-GENERATE COMPLETION NOTIFICATION TO BOTH PARTIES
-                    if (renterId != null && productNameStr != null) {
-                        // Notify borrower
-                        NotificationHelper.sendCompletionNotification(
-                                bookingId,
-                                productNameStr,
-                                renterId,
-                                "borrower"
-                        );
-
-                        // Notify owner
-                        NotificationHelper.sendCompletionNotification(
-                                bookingId,
-                                productNameStr,
-                                currentUserId,
-                                "owner"
-                        );
-                    }
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to complete rental", Toast.LENGTH_SHORT).show();
@@ -529,7 +441,6 @@ public class activity_rentals_details_owner extends AppCompatActivity {
                 btnInspectReturn.setVisibility(View.VISIBLE);
                 hasAction = true;
             } else if (statusLower.contains("complete") || statusLower.contains("finished") || statusLower.contains("done")) {
-                //checkAndShowRefundButton();
                 hasAction = true;
             }
         } else {
@@ -547,7 +458,6 @@ public class activity_rentals_details_owner extends AppCompatActivity {
                 btnInspectReturn.setVisibility(View.VISIBLE);
                 hasAction = true;
             } else if (statusLower.contains("complete") || statusLower.contains("finished") || statusLower.contains("done")) {
-                //checkAndShowRefundButton();
                 hasAction = true;
             }
         }
@@ -567,10 +477,7 @@ public class activity_rentals_details_owner extends AppCompatActivity {
         String status = getStringValue(bookingSnapshot, "status");
         String deliveryStatus = getStringValue(bookingSnapshot, "deliveryStatus");
 
-        // Debug logging
-        Log.d("StatusDebug", "status: " + status + ", deliveryStatus: " + deliveryStatus + ", deliveryOption: " + deliveryOption);
-
-        // Log all timestamps for debugging
+        // Get timestamps
         Long completionTime = getLongValue(bookingSnapshot, "completionTime");
         Long inspectionTime = getLongValue(bookingSnapshot, "inspectionTime");
         Long returnTime = getLongValue(bookingSnapshot, "returnTime");

@@ -17,7 +17,6 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
-import com.example.modestyrent_app.NotificationHelper;
 
 public class activity_checkout extends AppCompatActivity {
 
@@ -247,62 +246,10 @@ public class activity_checkout extends AppCompatActivity {
         chatsRef.child(chatId).setValue(chatRoomData)
                 .addOnSuccessListener(aVoid -> {
                     Log.d("Checkout", "Chat room created: " + chatId);
-
-                    // 🔔 SEND CHAT AVAILABLE NOTIFICATION
-                    sendChatAvailableNotification(renterId, ownerId, chatId, bookingId);
                 })
                 .addOnFailureListener(e -> {
                     Log.e("Checkout", "Failed to create chat room: " + e.getMessage());
                 });
-    }
-
-    private void sendChatAvailableNotification(String renterId, String ownerId, String chatId, String bookingId) {
-        // Get renter name for owner notification
-        usersRef.child(renterId).addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                String renterName = "Borrower";
-                if (snapshot.exists()) {
-                    renterName = snapshot.child("fullName").getValue(String.class);
-                    if (renterName == null || renterName.isEmpty()) {
-                        renterName = "Borrower";
-                    }
-                }
-
-                // Also send standard booking notification
-                NotificationHelper.sendNotification(
-                        ownerId,
-                        "New Booking",
-                        renterName + " has booked your product: " + productName,
-                        "booking_confirmed",
-                        bookingId
-                );
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.e("Checkout", "Failed to get renter info for notification");
-            }
-        });
-
-        // Get owner name for renter notification
-        usersRef.child(ownerId).addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                String ownerName = "Owner";
-                if (snapshot.exists()) {
-                    ownerName = snapshot.child("fullName").getValue(String.class);
-                    if (ownerName == null || ownerName.isEmpty()) {
-                        ownerName = "Owner";
-                    }
-                }
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.e("Checkout", "Failed to get owner info for notification");
-            }
-        });
     }
 
     private void confirmBooking() {
@@ -366,63 +313,10 @@ public class activity_checkout extends AppCompatActivity {
         intent.putExtra("depositAmount", depositAmount);
         intent.putExtra("totalAmount", subtotalAmount);
 
-        // 🔔 Add these extras for notifications
+        // Add these extras
         intent.putExtra("renterId", currentUserId);
         intent.putExtra("bookingNumber", bookingNumber);
 
         startActivity(intent);
-
-        // ⚠️ IMPORTANT: DO NOT WRITE TO bookingsRef HERE
-        // But we can send a pending notification to owner
-        sendPendingBookingNotification(bookingNumber, fullName);
-    }
-
-    private void sendPendingBookingNotification(String bookingNumber, String renterName) {
-        // Get owner info for personalized notification
-        usersRef.child(ownerId).addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                String ownerName = "Owner";
-                if (snapshot.exists()) {
-                    ownerName = snapshot.child("fullName").getValue(String.class);
-                    if (ownerName == null || ownerName.isEmpty()) {
-                        ownerName = "Owner";
-                    }
-                }
-
-                // 🔔 NOTIFICATION FOR OWNER: Pending booking
-                NotificationHelper.sendNotification(
-                        ownerId,
-                        "Pending Booking",
-                        renterName + " is trying to book " + productName + ". Waiting for payment.",
-                        "pending_booking",
-                        null
-                );
-
-                // 🔔 NOTIFICATION FOR BORROWER: Proceed to payment
-                NotificationHelper.sendNotification(
-                        currentUserId,
-                        "Proceed to Payment",
-                        "Please complete payment for booking #" + bookingNumber,
-                        "payment_required",
-                        null
-                );
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.e("Checkout", "Failed to send pending notification");
-            }
-        });
-    }
-
-    private void sendFCMBookingNotification(String bookingId, String bookingNumber,
-                                            String renterId, String ownerId, String renterName) {
-        // This would call your FCM service
-        // For now, we'll log it
-        Log.d("Checkout", "FCM Notification would be sent:");
-        Log.d("Checkout", "- Booking: " + bookingNumber);
-        Log.d("Checkout", "- Renter: " + renterName);
-        Log.d("Checkout", "- Owner ID: " + ownerId);
     }
 }

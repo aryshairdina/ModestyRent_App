@@ -3,7 +3,6 @@ package com.example.modestyrent_app;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ImageView;
@@ -80,7 +79,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
     // Constants for penalty calculation
     private static final double PENALTY_PER_DAY = 5.0; // RM 5 per day
     private static final int PENALTY_CAP = 50; // Maximum penalty
-    private static final String TAG = "BorrowerDetails";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -105,7 +103,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         initializeViews();
         setupFirebase();
         loadBookingDetails();
-        sendReturnReminderNotification();
     }
 
     private void initializeViews() {
@@ -189,23 +186,20 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
     }
 
     private void loadBookingDetails() {
-        Log.d(TAG, "Loading booking details for: " + bookingId);
-
         bookingsRef.child(bookingId).addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (snapshot.exists()) {
                     try {
-                        Log.d(TAG, "Booking snapshot exists");
                         productId = getStringValue(snapshot, "productId");
                         ownerId = getStringValue(snapshot, "ownerId");
                         deliveryOption = getStringValue(snapshot, "deliveryOption");
 
-                        // Store product name and booking number for notifications
+                        // Store product name and booking number
                         productNameStr = getStringValue(snapshot, "productName");
                         bookingNumberStr = getStringValue(snapshot, "bookingNumber");
 
-                        // Load owner name for notifications
+                        // Load owner name
                         loadOwnerInfo(ownerId);
 
                         updateBookingUI(snapshot);
@@ -216,9 +210,7 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
                         checkAndShowRefundCompleted(snapshot);
 
                     } catch (Exception e) {
-                        Log.e(TAG, "Error loading booking details", e);
                         Toast.makeText(activity_rentals_details_borrower.this, "Error loading booking details", Toast.LENGTH_SHORT).show();
-                        e.printStackTrace();
                     }
                 } else {
                     Toast.makeText(activity_rentals_details_borrower.this, "Booking not found", Toast.LENGTH_SHORT).show();
@@ -228,7 +220,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "Failed to load booking: " + error.getMessage());
                 Toast.makeText(activity_rentals_details_borrower.this, "Failed to load booking", Toast.LENGTH_SHORT).show();
             }
         });
@@ -333,8 +324,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         }
     }
 
-    // ============= NOTIFICATION-ENABLED ACTION METHODS =============
-
     private void handleBorrowerPrimaryAction() {
         bookingsRef.child(bookingId).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
@@ -368,30 +357,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Item marked as picked up", Toast.LENGTH_SHORT).show();
-
-                    // AUTO-GENERATE NOTIFICATION TO OWNER
-                    if (ownerId != null && productNameStr != null) {
-                        String title = "Item Picked Up";
-                        String message = currentUserId + " has picked up " + productNameStr;
-
-                        NotificationHelper.sendNotification(
-                                ownerId,
-                                title,
-                                message,
-                                "status",
-                                bookingId
-                        );
-
-                        // Also notify borrower (yourself)
-                        NotificationHelper.sendStatusNotification(
-                                bookingId,
-                                "On Rent",
-                                currentUserId,
-                                "borrower",
-                                productNameStr
-                        );
-                    }
-
                     loadBookingDetails();
                 })
                 .addOnFailureListener(e -> {
@@ -408,30 +373,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Item marked as received", Toast.LENGTH_SHORT).show();
-
-                    // AUTO-GENERATE NOTIFICATION TO OWNER
-                    if (ownerId != null && productNameStr != null) {
-                        String title = "Item Received by Borrower";
-                        String message = "Your item " + productNameStr + " has been received by the borrower";
-
-                        NotificationHelper.sendNotification(
-                                ownerId,
-                                title,
-                                message,
-                                "status",
-                                bookingId
-                        );
-
-                        // Also notify borrower (yourself)
-                        NotificationHelper.sendStatusNotification(
-                                bookingId,
-                                "On Rent",
-                                currentUserId,
-                                "borrower",
-                                productNameStr
-                        );
-                    }
-
                     loadBookingDetails();
                 })
                 .addOnFailureListener(e -> {
@@ -448,29 +389,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Return process started", Toast.LENGTH_SHORT).show();
-
-                    // AUTO-GENERATE NOTIFICATION TO OWNER
-                    if (ownerId != null && productNameStr != null) {
-                        String title = "Return Requested";
-                        String message = "Borrower has requested to return " + productNameStr;
-
-                        NotificationHelper.sendNotification(
-                                ownerId,
-                                title,
-                                message,
-                                "status",
-                                bookingId
-                        );
-
-                        // Also notify borrower (yourself)
-                        NotificationHelper.sendStatusNotification(
-                                bookingId,
-                                "Return Requested",
-                                currentUserId,
-                                "borrower",
-                                productNameStr
-                        );
-                    }
 
                     // Open return activity
                     Intent intent = new Intent(this, activity_arrange_return.class);
@@ -494,13 +412,8 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         startActivity(intent);
     }
 
-    // ============= LATE RETURN NOTIFICATION METHODS =============
-
     private void checkLateReturn(DataSnapshot bookingSnapshot) {
-        Log.d(TAG, "checkLateReturn() called");
-
         String status = getStringValue(bookingSnapshot, "status");
-        Log.d(TAG, "Current status: " + status);
 
         // Check if we should show warning for these statuses:
         boolean shouldCheckLate = "OnRent".equals(status) ||
@@ -508,11 +421,7 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
                 "AwaitingInspection".equals(status) ||
                 "Completed".equals(status);
 
-        Log.d(TAG, "Should check late: " + shouldCheckLate);
-
         if (shouldCheckLate) {
-            Log.d(TAG, "Status requires late check: " + status);
-
             // For Completed status, check if there was a late penalty applied
             if ("Completed".equals(status)) {
                 checkCompletedLatePenalty(bookingSnapshot);
@@ -522,24 +431,15 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
                 if (endDate != null) {
                     calculateAndShowLateWarning(endDate, status);
                 } else {
-                    Log.d(TAG, "End date is null, hiding warning");
                     hideLateReturnWarning();
                 }
             }
         } else {
-            Log.d(TAG, "Status does not require late check: " + status);
             hideLateReturnWarning();
         }
     }
 
     private void calculateAndShowLateWarning(Long endDate, String status) {
-        Log.d(TAG, "calculateAndShowLateWarning() called for status: " + status);
-
-        // Debug: Show dates
-        SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy HH:mm:ss", Locale.getDefault());
-        Log.d(TAG, "End date from DB: " + sdf.format(new Date(endDate)));
-        Log.d(TAG, "Current date: " + sdf.format(new Date()));
-
         // Create calendar for due date (end of rental day)
         Calendar dueDateCal = Calendar.getInstance();
         dueDateCal.setTimeInMillis(endDate);
@@ -550,12 +450,8 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
 
         Calendar now = Calendar.getInstance();
 
-        Log.d(TAG, "Due date (end of day): " + sdf.format(dueDateCal.getTime()));
-
         // Check if current time is AFTER the due date
         if (now.getTimeInMillis() > dueDateCal.getTimeInMillis()) {
-            Log.d(TAG, "Current time is AFTER due date - LATE!");
-
             // Calculate days late based on calendar days
             Calendar dueDateOnly = Calendar.getInstance();
             dueDateOnly.setTimeInMillis(endDate);
@@ -573,29 +469,8 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
             long diffInMillis = nowOnly.getTimeInMillis() - dueDateOnly.getTimeInMillis();
             long daysLate = diffInMillis / (1000 * 60 * 60 * 24);
 
-            Log.d(TAG, "Days late calculated: " + daysLate);
-
             if (daysLate > 0) {
                 double penaltyAmount = Math.min(daysLate * PENALTY_PER_DAY, PENALTY_CAP);
-
-                // AUTO-GENERATE LATE RETURN NOTIFICATION
-                NotificationHelper.sendLateReturnNotification(
-                        bookingId,
-                        (int) daysLate,
-                        penaltyAmount,
-                        currentUserId
-                );
-
-                // Also notify owner about late return
-                NotificationHelper.sendNotification(
-                        ownerId,
-                        "Late Return Alert",
-                        "Borrower is " + daysLate + " days late returning " + productNameStr,
-                        "penalty_alert",
-                        bookingId
-                );
-
-                Log.d(TAG, "Showing warning: " + daysLate + " days late, penalty: RM " + penaltyAmount);
 
                 // Show warning with different message based on status
                 showLateReturnWarning(daysLate, penaltyAmount, status);
@@ -607,49 +482,33 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
                     btnSecondaryAction.setTextColor(Color.WHITE);
                 }
             } else {
-                Log.d(TAG, "Days late is 0 or negative, hiding warning");
                 hideLateReturnWarning();
             }
         } else {
-            Log.d(TAG, "Current time is BEFORE due date - NOT LATE");
             hideLateReturnWarning();
         }
     }
 
     private void checkCompletedLatePenalty(DataSnapshot bookingSnapshot) {
-        Log.d(TAG, "checkCompletedLatePenalty() called");
-
         // For completed rentals, check if late penalty was applied
         Double latePenalty = getDoubleValue(bookingSnapshot, "latePenalty");
         Long daysLate = getLongValue(bookingSnapshot, "daysLate");
         Double refundAmount = getDoubleValue(bookingSnapshot, "refundAmount");
         Double originalDeposit = getDoubleValue(bookingSnapshot, "depositAmount");
 
-        Log.d(TAG, "Completed rental check:");
-        Log.d(TAG, "- latePenalty: " + latePenalty);
-        Log.d(TAG, "- daysLate: " + daysLate);
-        Log.d(TAG, "- refundAmount: " + refundAmount);
-        Log.d(TAG, "- originalDeposit: " + originalDeposit);
-
         // First check: Was a late penalty applied?
         if (latePenalty != null && latePenalty > 0 && daysLate != null && daysLate > 0) {
-            Log.d(TAG, "Completed rental had late penalty: RM " + latePenalty + " for " + daysLate + " days");
-
             // Show final penalty warning for completed rental
             showCompletedLatePenaltyWarning(daysLate, latePenalty, refundAmount, originalDeposit);
         }
         // Second check: Was the rental completed WITHOUT penalty?
         else if ("Completed".equals(getStringValue(bookingSnapshot, "status"))) {
-            Log.d(TAG, "Rental completed without late penalty");
             hideLateReturnWarning();
         }
     }
 
     private void showLateReturnWarning(long daysLate, double penaltyAmount, String status) {
-        Log.d(TAG, "showLateReturnWarning() called - days: " + daysLate + ", penalty: " + penaltyAmount + ", status: " + status);
-
         if (cvLateReturnWarning == null) {
-            Log.e(TAG, "cvLateReturnWarning is null!");
             return;
         }
 
@@ -716,16 +575,11 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
             if (llPenaltyPolicy != null) {
                 llPenaltyPolicy.setBackgroundColor(getColor(R.color.error_very_light));
             }
-
-            Log.d(TAG, "Late warning shown for " + status + ": " + daysLate + " days, RM " + penaltyAmount);
         });
     }
 
     private void showCompletedLatePenaltyWarning(long daysLate, double penaltyAmount, Double refundAmount, Double originalDeposit) {
-        Log.d(TAG, "showCompletedLatePenaltyWarning() called - days: " + daysLate + ", penalty: " + penaltyAmount);
-
         if (cvLateReturnWarning == null) {
-            Log.e(TAG, "cvLateReturnWarning is null!");
             return;
         }
 
@@ -780,14 +634,10 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
             if (llPenaltyPolicy != null) {
                 llPenaltyPolicy.setBackgroundColor(getColor(R.color.warning_very_light));
             }
-
-            Log.d(TAG, "Completed penalty warning shown: " + daysLate + " days, RM " + penaltyAmount + ", " + refundText);
         });
     }
 
     private void hideLateReturnWarning() {
-        Log.d(TAG, "hideLateReturnWarning() called");
-
         runOnUiThread(() -> {
             if (cvLateReturnWarning != null) {
                 cvLateReturnWarning.setVisibility(View.GONE);
@@ -805,8 +655,6 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
                 btnSecondaryAction.setBackgroundColor(getColor(R.color.background));
                 btnSecondaryAction.setTextColor(getColor(R.color.primary));
             }
-
-            Log.d(TAG, "Late warning hidden");
         });
     }
 
@@ -1332,46 +1180,5 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
         } catch (Exception e) {
             return "Pending";
         }
-    }
-
-    private void sendReturnReminderNotification() {
-        bookingsRef.child(bookingId).addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                Long endDate = getLongValue(snapshot, "endDate");
-                String status = getStringValue(snapshot, "status");
-
-                if (endDate != null && "OnRent".equals(status)) {
-                    long now = System.currentTimeMillis();
-                    long timeUntilDue = endDate - now;
-                    long daysUntilDue = timeUntilDue / (1000 * 60 * 60 * 24);
-
-                    if (daysUntilDue <= 2 && daysUntilDue >= 0) {
-                        // Send reminder notification to borrower
-                        NotificationHelper.sendNotification(
-                                currentUserId,
-                                "Return Reminder",
-                                "Your rental period ends in " + daysUntilDue + " day(s). Please prepare to return the item.",
-                                "return_reminder",
-                                bookingId
-                        );
-
-                        // Also notify owner about upcoming return
-                        NotificationHelper.sendNotification(
-                                ownerId,
-                                "Return Reminder",
-                                "Rental for " + productNameStr + " ends in " + daysUntilDue + " day(s)",
-                                "return_reminder",
-                                bookingId
-                        );
-                    }
-                }
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "Failed to check return date");
-            }
-        });
     }
 }

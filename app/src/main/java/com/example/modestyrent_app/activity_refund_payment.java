@@ -2,7 +2,6 @@ package com.example.modestyrent_app;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.util.Log;
 import android.widget.*;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -32,8 +31,6 @@ public class activity_refund_payment extends AppCompatActivity {
     private DatabaseReference bookingsRef;
     private FirebaseAuth mAuth;
 
-    private static final String TAG = "RefundPayment";
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -62,15 +59,6 @@ public class activity_refund_payment extends AppCompatActivity {
 
         mAuth = FirebaseAuth.getInstance();
         bookingsRef = FirebaseDatabase.getInstance().getReference("bookings");
-
-        // Debug logging
-        Log.d(TAG, "Refund Payment Activity Started:");
-        Log.d(TAG, "- Booking ID: " + bookingId);
-        Log.d(TAG, "- Refund Amount: RM " + refundAmount);
-        Log.d(TAG, "- Late Penalty: RM " + latePenalty);
-        Log.d(TAG, "- Days Late: " + daysLate);
-        Log.d(TAG, "- Is Late Return: " + isLateReturn);
-        Log.d(TAG, "- Repair Cost: RM " + repairCost);
 
         initializeViews();
         setupUI();
@@ -174,26 +162,8 @@ public class activity_refund_payment extends AppCompatActivity {
         updates.put("depositReturned", true);
         updates.put("depositReturnDate", System.currentTimeMillis());
 
-        // Debug logging
-        Log.d(TAG, "Saving to Firebase:");
-        Log.d(TAG, "- Status: Completed");
-        Log.d(TAG, "- latePenalty: RM " + latePenalty);
-        Log.d(TAG, "- daysLate: " + daysLate);
-        Log.d(TAG, "- totalDeductions: RM " + totalDeductions);
-        Log.d(TAG, "- refundAmount: RM " + refundAmount);
-        Log.d(TAG, "- isLateReturn: " + isLateReturn);
-
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
-                    String message = "Refund paid and rental completed";
-                    if (isLateReturn && latePenalty > 0) {
-                        message += "\nLate penalty of RM " + String.format("%.2f", latePenalty) +
-                                " applied for " + daysLate + " day(s) late";
-                    }
-                    //Toast.makeText(this, message, Toast.LENGTH_LONG).show();
-
-                    Log.d(TAG, "Firebase updated successfully with penalty data");
-
                     Intent intent = new Intent(this, activity_rentals_details_owner.class);
                     intent.putExtra("bookingId", bookingId);
                     intent.putExtra("productId", productId);
@@ -204,7 +174,6 @@ public class activity_refund_payment extends AppCompatActivity {
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to process refund", Toast.LENGTH_SHORT).show();
-                    Log.e(TAG, "Failed to update Firebase: " + e.getMessage());
                 });
     }
 
