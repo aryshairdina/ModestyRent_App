@@ -360,11 +360,11 @@
                             app:checkedIconVisible="true"/>
 
                         <com.google.android.material.chip.Chip
-                            android:id="@+id/chipCategoryShawl"
+                            android:id="@+id/chipCategoryHijab"
                             style="@style/Widget.MaterialComponents.Chip.Choice"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Shawl"
+                            android:text="Hijab"
                             app:checkedIconVisible="true"/>
 
                         <com.google.android.material.chip.Chip

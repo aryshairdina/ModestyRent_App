@@ -97,7 +97,7 @@ public class NotificationManager {
                     }
                     break;
                 case "completed_refund":
-                    title = "Refund Completed";
+                    title = "Rental Completed";
                     message = "Your refund for " + productName + " has been successfully returned.";
                     break;
             }
