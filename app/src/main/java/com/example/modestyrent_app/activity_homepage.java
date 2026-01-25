@@ -4,7 +4,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -15,7 +14,6 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
-import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
@@ -41,6 +39,7 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
@@ -78,9 +77,11 @@ public class activity_homepage extends AppCompatActivity {
     private float allProductsMinPrice = 0f;
     private float allProductsMaxPrice = 0f;
 
-    // NOTIFICATION - FIXED: Use RelativeLayout.LayoutParams instead of ConstraintLayout
-    private ImageView notificationIcon;
-    private TextView notificationBadge;
+    // NOTIFICATION VARIABLES
+    private ImageView ivNotificationIcon;
+    private TextView tvNotificationBadge;
+    private DatabaseReference notificationsRef;
+    private ValueEventListener notificationListener;
 
     private float filterMinPrice = 0f;
     private float filterMaxPrice = 0f;
@@ -117,16 +118,11 @@ public class activity_homepage extends AppCompatActivity {
         searchBar = findViewById(R.id.searchBar);
         btnFilter = findViewById(R.id.btnFilter);
 
-        // INITIALIZE NOTIFICATION VIEWS - FIXED
-        notificationIcon = findViewById(R.id.notificationIcon);
-        notificationBadge = findViewById(R.id.notificationBadge);
+        // INITIALIZE NOTIFICATION VIEWS - SIMPLIFIED APPROACH
+        initializeNotificationViews();
 
-        if (notificationIcon != null) {
-            notificationIcon.setOnClickListener(v -> {
-                Intent intent = new Intent(this, activity_notifications.class);
-                startActivity(intent);
-            });
-        }
+        // Initialize Firebase notifications reference
+        notificationsRef = FirebaseDatabase.getInstance().getReference("notifications");
 
         mAuth = FirebaseAuth.getInstance();
         FirebaseUser currentUser = mAuth.getCurrentUser();
@@ -134,9 +130,7 @@ public class activity_homepage extends AppCompatActivity {
         if (currentUser != null) {
             welcomeText.setText("Welcome, " + currentUser.getEmail());
 
-            // SETUP NOTIFICATION BADGE
-            setupNotificationBadge(currentUser.getUid());
-
+            // SETUP NOTIFICATION BADGE - moved to onStart
             String uid = currentUser.getUid();
             DatabaseReference userRef = FirebaseDatabase.getInstance()
                     .getReference("users")
@@ -183,6 +177,40 @@ public class activity_homepage extends AppCompatActivity {
         Log.d(TAG, "onCreate completed");
     }
 
+    private void initializeNotificationViews() {
+        // Find views using their IDs
+        ivNotificationIcon = findViewById(R.id.notificationIcon);
+        tvNotificationBadge = findViewById(R.id.tvNotificationBadge);
+
+        Log.d(TAG, "Notification icon found: " + (ivNotificationIcon != null));
+        Log.d(TAG, "Notification badge found: " + (tvNotificationBadge != null));
+
+        if (ivNotificationIcon != null) {
+            ivNotificationIcon.setOnClickListener(v -> {
+                Intent intent = new Intent(this, activity_notifications.class);
+                startActivity(intent);
+            });
+        } else {
+            Log.e(TAG, "Notification icon is null! Check if R.id.notificationIcon exists in layout.");
+        }
+
+        if (tvNotificationBadge == null) {
+            Log.e(TAG, "Notification badge is null! Check if R.id.tvNotificationBadge exists in layout.");
+        }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        Log.d(TAG, "onStart called");
+
+        // Start listening for notifications
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser != null) {
+            setupNotificationBadge(currentUser.getUid());
+        }
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -209,7 +237,24 @@ public class activity_homepage extends AppCompatActivity {
         } catch (Exception e) {
             Log.w(TAG, "onResume refresh failed: " + e.getMessage(), e);
         }
+    }
 
+    @Override
+    protected void onStop() {
+        super.onStop();
+        Log.d(TAG, "onStop called");
+
+        // Remove notification listeners to prevent memory leaks
+        removeNotificationListener();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        Log.d(TAG, "onDestroy called");
+
+        // Clean up
+        removeNotificationListener();
     }
 
     private boolean handleNavItemSelected(@NonNull MenuItem item) {
@@ -235,6 +280,108 @@ public class activity_homepage extends AppCompatActivity {
             return true;
         }
         return true;
+    }
+
+    // ============= NOTIFICATION METHODS =============
+
+    private void setupNotificationBadge(String userId) {
+        if (userId == null || notificationsRef == null) {
+            Log.e(TAG, "Cannot setup notification badge: userId or notificationsRef is null");
+            return;
+        }
+
+        // Remove previous listener if exists
+        removeNotificationListener();
+
+        Log.d(TAG, "Setting up notification badge for user: " + userId);
+
+        // Query notifications where userId matches
+        Query query = notificationsRef.orderByChild("userId").equalTo(userId);
+
+        notificationListener = new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                long unreadCount = 0;
+
+                if (snapshot.exists()) {
+                    for (DataSnapshot notificationSnapshot : snapshot.getChildren()) {
+                        // Check if notification is unread
+                        Boolean read = notificationSnapshot.child("read").getValue(Boolean.class);
+                        if (read == null || !read) {
+                            unreadCount++;
+                        }
+                    }
+                }
+
+                Log.d(TAG, "Unread notifications found: " + unreadCount);
+                updateNotificationBadgeUI(unreadCount);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Failed to load notifications: " + error.getMessage());
+                updateNotificationBadgeUI(0); // Hide badge on error
+            }
+        };
+
+        query.addValueEventListener(notificationListener);
+    }
+
+    private void updateNotificationBadgeUI(long unreadCount) {
+        runOnUiThread(() -> {
+            // Make sure we have the badge reference
+            if (tvNotificationBadge == null) {
+                // Try to find it again
+                tvNotificationBadge = findViewById(R.id.tvNotificationBadge);
+
+                if (tvNotificationBadge == null) {
+                    Log.w(TAG, "Notification badge TextView is still null!");
+                    return;
+                }
+            }
+
+            if (tvNotificationBadge != null) {
+                if (unreadCount > 0) {
+                    tvNotificationBadge.setVisibility(View.VISIBLE);
+
+                    // Set the count text
+                    if (unreadCount > 99) {
+                        tvNotificationBadge.setText("99+");
+                    } else {
+                        tvNotificationBadge.setText(String.valueOf(unreadCount));
+                    }
+
+                    // Update icon to indicate unread notifications
+                    if (ivNotificationIcon != null) {
+                        ivNotificationIcon.setColorFilter(ContextCompat.getColor(
+                                activity_homepage.this, R.color.notification_important));
+                    }
+
+                    Log.d(TAG, "Notification badge updated: " + unreadCount + " unread");
+
+                } else {
+                    tvNotificationBadge.setVisibility(View.GONE);
+
+                    // Reset icon color
+                    if (ivNotificationIcon != null) {
+                        ivNotificationIcon.setColorFilter(ContextCompat.getColor(
+                                activity_homepage.this, R.color.primary));
+                    }
+
+                    Log.d(TAG, "Notification badge hidden: no unread notifications");
+                }
+            } else {
+                Log.e(TAG, "Notification badge TextView is null!");
+            }
+        });
+    }
+
+    private void removeNotificationListener() {
+        if (notificationListener != null && notificationsRef != null) {
+            notificationsRef.removeEventListener(notificationListener);
+            notificationListener = null;
+            Log.d(TAG, "Notification listener removed");
+        }
     }
 
     // ---------------- Search + Filter ----------------
@@ -998,142 +1145,6 @@ public class activity_homepage extends AppCompatActivity {
             Log.e(TAG, "Error loading products: " + e.getMessage());
             Toast.makeText(this, "Error loading products: " + e.getMessage(), Toast.LENGTH_LONG).show();
         });
-    }
-
-    // ============== NOTIFICATION METHODS ==============
-
-    private void setupNotificationBadge(String userId) {
-        if (userId == null) return;
-
-        DatabaseReference notificationsRef = FirebaseDatabase.getInstance()
-                .getReference("notifications")
-                .child(userId);
-
-        notificationsRef.orderByChild("read").equalTo(false)
-                .addValueEventListener(new ValueEventListener() {
-                    @Override
-                    public void onDataChange(@NonNull DataSnapshot snapshot) {
-                        long unreadCount = snapshot.getChildrenCount();
-                        updateNotificationBadge(unreadCount);
-                    }
-
-                    @Override
-                    public void onCancelled(@NonNull DatabaseError error) {
-                        Log.e(TAG, "Failed to load notifications: " + error.getMessage());
-                    }
-                });
-    }
-
-    private void updateNotificationBadge(long unreadCount) {
-        runOnUiThread(() -> {
-            if (notificationBadge == null) {
-                // Try to find it in layout
-                notificationBadge = findViewById(R.id.notificationBadge);
-
-                // If still null, create it programmatically
-                if (notificationBadge == null && notificationIcon != null) {
-                    createNotificationBadgeProgrammatically();
-                }
-            }
-
-            if (notificationBadge != null) {
-                if (unreadCount > 0) {
-                    notificationBadge.setVisibility(View.VISIBLE);
-                    if (unreadCount > 99) {
-                        notificationBadge.setText("99+");
-                    } else {
-                        notificationBadge.setText(String.valueOf(unreadCount));
-                    }
-                } else {
-                    notificationBadge.setVisibility(View.GONE);
-                }
-            }
-
-            // Update icon color
-            if (notificationIcon != null) {
-                if (unreadCount > 0) {
-                    notificationIcon.setColorFilter(ContextCompat.getColor(this, R.color.notification_important));
-                    notificationIcon.setImageResource(R.drawable.ic_notifications); // Active icon
-                } else {
-                    notificationIcon.setColorFilter(ContextCompat.getColor(this, R.color.primary));
-                    notificationIcon.setImageResource(R.drawable.ic_notifications); // Normal icon
-                }
-            }
-        });
-    }
-
-    private void createNotificationBadgeProgrammatically() {
-        if (notificationIcon == null) return;
-
-        // Get parent layout
-        ViewGroup parent = (ViewGroup) notificationIcon.getParent();
-        if (parent == null) return;
-
-        // Create badge
-        notificationBadge = new TextView(this);
-        notificationBadge.setId(View.generateViewId());
-
-        // Create background drawable programmatically
-        GradientDrawable badgeBackground = new GradientDrawable();
-        badgeBackground.setShape(GradientDrawable.OVAL);
-        badgeBackground.setColor(ContextCompat.getColor(this, R.color.notification_important));
-        badgeBackground.setStroke(2, ContextCompat.getColor(this, R.color.background));
-
-        notificationBadge.setBackground(badgeBackground);
-        notificationBadge.setTextColor(Color.WHITE);
-        notificationBadge.setTextSize(10);
-        notificationBadge.setGravity(android.view.Gravity.CENTER);
-        notificationBadge.setPadding(4, 2, 4, 2);
-        notificationBadge.setMinWidth(20);
-        notificationBadge.setMinHeight(20);
-
-        // Position it on top-right of icon using RelativeLayout.LayoutParams
-        RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(
-                RelativeLayout.LayoutParams.WRAP_CONTENT,
-                RelativeLayout.LayoutParams.WRAP_CONTENT
-        );
-
-        // Check if parent is RelativeLayout
-        if (parent instanceof RelativeLayout) {
-            params.addRule(RelativeLayout.ALIGN_TOP, notificationIcon.getId());
-            params.addRule(RelativeLayout.ALIGN_RIGHT, notificationIcon.getId());
-            params.topMargin = -8; // Use topMargin instead of params.topMargin
-            params.rightMargin = -8; // Use rightMargin instead of params.endMargin
-
-            notificationBadge.setLayoutParams(params);
-            notificationBadge.setVisibility(View.GONE);
-
-            // Add to parent
-            parent.addView(notificationBadge);
-        } else {
-            // Fallback: Use simple positioning for other layouts
-            params = new RelativeLayout.LayoutParams(
-                    RelativeLayout.LayoutParams.WRAP_CONTENT,
-                    RelativeLayout.LayoutParams.WRAP_CONTENT
-            );
-            params.setMargins(-8, -8, 0, 0); // Top-left margin
-
-            ViewGroup.MarginLayoutParams marginParams = new ViewGroup.MarginLayoutParams(params);
-            marginParams.setMargins(-8, -8, 0, 0);
-            notificationBadge.setLayoutParams(marginParams);
-            notificationBadge.setVisibility(View.GONE);
-
-            // Wrap icon and badge in a FrameLayout
-            android.widget.FrameLayout container = new android.widget.FrameLayout(this);
-            FrameLayout.LayoutParams containerParams = new FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.WRAP_CONTENT,
-                    FrameLayout.LayoutParams.WRAP_CONTENT
-            );
-
-            // Replace icon with container
-            int index = parent.indexOfChild(notificationIcon);
-            parent.removeView(notificationIcon);
-
-            container.addView(notificationIcon);
-            container.addView(notificationBadge);
-
-            parent.addView(container, index, containerParams);
-        }
     }
 
     // ---------------- Adapter ----------------

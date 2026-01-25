@@ -75,6 +75,7 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
 
     private DatabaseReference bookingsRef, productsRef, usersRef, reviewsRef;
     private FirebaseAuth mAuth;
+    private NotificationManager notificationManager;
 
     // Constants for penalty calculation
     private static final double PENALTY_PER_DAY = 5.0; // RM 5 per day
@@ -84,6 +85,9 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_rentals_details_borrower);
+
+        // Initialize Notification Manager
+        notificationManager = new NotificationManager(this);
 
         // Get intent data
         Intent intent = getIntent();
@@ -390,6 +394,21 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Return process started", Toast.LENGTH_SHORT).show();
 
+                    // Send notification to owner
+                    Map<String, Object> extraData = new HashMap<>();
+                    extraData.put("productName", productNameStr);
+                    extraData.put("bookingNumber", bookingNumberStr);
+                    extraData.put("borrowerName", "You"); // You can replace with actual borrower name if available
+
+                    notificationManager.sendOwnerNotification(
+                            "borrower_return",
+                            bookingId,
+                            productId,
+                            currentUserId, // borrowerId
+                            productNameStr,
+                            extraData
+                    );
+
                     // Open return activity
                     Intent intent = new Intent(this, activity_arrange_return.class);
                     intent.putExtra("bookingId", bookingId);
@@ -430,6 +449,16 @@ public class activity_rentals_details_borrower extends AppCompatActivity {
                 Long endDate = getLongValue(bookingSnapshot, "endDate");
                 if (endDate != null) {
                     calculateAndShowLateWarning(endDate, status);
+
+                    // Send notification if late
+                    long currentTime = System.currentTimeMillis();
+                    if (currentTime > endDate) {
+                        Map<String, Object> extraData = new HashMap<>();
+                        long daysLate = (currentTime - endDate) / (1000 * 60 * 60 * 24);
+                        extraData.put("daysLate", daysLate);
+                        extraData.put("penaltyAmount", Math.min(daysLate * PENALTY_PER_DAY, PENALTY_CAP));
+
+                    }
                 } else {
                     hideLateReturnWarning();
                 }

@@ -324,17 +324,6 @@
                 android:layout_marginBottom="8dp"
                 android:visibility="gone" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnCompleteRental"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:text="Complete Rental"
-                android:textColor="@color/background"
-                android:backgroundTint="@color/primary"
-                app:cornerRadius="24dp"
-                android:layout_marginBottom="8dp"
-                android:visibility="gone" />
-
         </LinearLayout>
 
     </LinearLayout>

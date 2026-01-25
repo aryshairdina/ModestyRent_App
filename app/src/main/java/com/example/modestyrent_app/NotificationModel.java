@@ -1,92 +1,154 @@
 package com.example.modestyrent_app;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class NotificationModel {
-    private String id;
+    private String notificationId;
+    private String userId; // Who receives the notification
+    private String userType; // "borrower" or "owner"
+    private String type; // Booking types: booking_confirmation, ready_pickup, completed_refund, exceed_date, chat
     private String title;
     private String message;
-    private String type; // "booking", "chat", "status", "inspection", "refund", "completed", "penalty_alert", "return_reminder", "review_request", "dispute"
-    private String userId;
-    private String targetUserId;
     private String bookingId;
-    private String chatId;
     private String productId;
-    private String productName;
-    private String status; // For booking status updates
-    private String amount; // For refund/penalty amounts
+    private String otherUserId;
     private long timestamp;
     private boolean read;
-    private boolean isInApp;
-    private boolean isFCM;
-    private String clickAction; // Activity to open
-    private String icon; // Custom icon
+    private Map<String, Object> extraData;
 
     public NotificationModel() {
-        // Default constructor for Firebase
+        // Default constructor required for Firebase
     }
 
-    public NotificationModel(String title, String message, String type, String userId) {
+    public NotificationModel(String notificationId, String userId, String userType, String type,
+                             String title, String message, String bookingId, String productId,
+                             String otherUserId) {
+        this.notificationId = notificationId;
+        this.userId = userId;
+        this.userType = userType;
+        this.type = type;
         this.title = title;
         this.message = message;
-        this.type = type;
-        this.userId = userId;
+        this.bookingId = bookingId;
+        this.productId = productId;
+        this.otherUserId = otherUserId;
         this.timestamp = System.currentTimeMillis();
         this.read = false;
-        this.isInApp = true;
-        this.isFCM = true;
+        this.extraData = new HashMap<>();
     }
 
     // Getters and Setters
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public String getNotificationId() {
+        return notificationId;
+    }
 
-    public String getTitle() { return title; }
-    public void setTitle(String title) { this.title = title; }
+    public void setNotificationId(String notificationId) {
+        this.notificationId = notificationId;
+    }
 
-    public String getMessage() { return message; }
-    public void setMessage(String message) { this.message = message; }
+    public String getUserId() {
+        return userId;
+    }
 
-    public String getType() { return type; }
-    public void setType(String type) { this.type = type; }
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
 
-    public String getUserId() { return userId; }
-    public void setUserId(String userId) { this.userId = userId; }
+    public String getUserType() {
+        return userType;
+    }
 
-    public String getTargetUserId() { return targetUserId; }
-    public void setTargetUserId(String targetUserId) { this.targetUserId = targetUserId; }
+    public void setUserType(String userType) {
+        this.userType = userType;
+    }
 
-    public String getBookingId() { return bookingId; }
-    public void setBookingId(String bookingId) { this.bookingId = bookingId; }
+    public String getType() {
+        return type;
+    }
 
-    public String getChatId() { return chatId; }
-    public void setChatId(String chatId) { this.chatId = chatId; }
+    public void setType(String type) {
+        this.type = type;
+    }
 
-    public String getProductId() { return productId; }
-    public void setProductId(String productId) { this.productId = productId; }
+    public String getTitle() {
+        return title;
+    }
 
-    public String getProductName() { return productName; }
-    public void setProductName(String productName) { this.productName = productName; }
+    public void setTitle(String title) {
+        this.title = title;
+    }
 
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public String getMessage() {
+        return message;
+    }
 
-    public String getAmount() { return amount; }
-    public void setAmount(String amount) { this.amount = amount; }
+    public void setMessage(String message) {
+        this.message = message;
+    }
 
-    public long getTimestamp() { return timestamp; }
-    public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+    public String getBookingId() {
+        return bookingId;
+    }
 
-    public boolean isRead() { return read; }
-    public void setRead(boolean read) { this.read = read; }
+    public void setBookingId(String bookingId) {
+        this.bookingId = bookingId;
+    }
 
-    public boolean isInApp() { return isInApp; }
-    public void setInApp(boolean inApp) { isInApp = inApp; }
+    public String getProductId() {
+        return productId;
+    }
 
-    public boolean isFCM() { return isFCM; }
-    public void setFCM(boolean fcm) { isFCM = fcm; }
+    public void setProductId(String productId) {
+        this.productId = productId;
+    }
 
-    public String getClickAction() { return clickAction; }
-    public void setClickAction(String clickAction) { this.clickAction = clickAction; }
+    public String getOtherUserId() {
+        return otherUserId;
+    }
 
-    public String getIcon() { return icon; }
-    public void setIcon(String icon) { this.icon = icon; }
+    public void setOtherUserId(String otherUserId) {
+        this.otherUserId = otherUserId;
+    }
+
+    public long getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public boolean isRead() {
+        return read;
+    }
+
+    public void setRead(boolean read) {
+        this.read = read;
+    }
+
+    public Map<String, Object> getExtraData() {
+        return extraData;
+    }
+
+    public void setExtraData(Map<String, Object> extraData) {
+        this.extraData = extraData;
+    }
+
+    public Map<String, Object> toMap() {
+        Map<String, Object> map = new HashMap<>();
+        map.put("notificationId", notificationId);
+        map.put("userId", userId);
+        map.put("userType", userType);
+        map.put("type", type);
+        map.put("title", title);
+        map.put("message", message);
+        map.put("bookingId", bookingId);
+        map.put("productId", productId);
+        map.put("otherUserId", otherUserId);
+        map.put("timestamp", timestamp);
+        map.put("read", read);
+        map.put("extraData", extraData);
+        return map;
+    }
 }

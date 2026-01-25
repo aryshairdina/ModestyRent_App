@@ -14,7 +14,9 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.*;
 
 import java.text.SimpleDateFormat;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Random;
 
 public class activity_dummy_payment extends AppCompatActivity {
@@ -34,11 +36,15 @@ public class activity_dummy_payment extends AppCompatActivity {
 
     private DatabaseReference bookingsRef;
     private DatabaseReference productsRef;
+    private NotificationManager notificationManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_dummy_payment);
+
+        // Initialize Notification Manager
+        notificationManager = new NotificationManager(this);
 
         // 🔒 AUTH GUARD (rule-related only)
         FirebaseAuth auth = FirebaseAuth.getInstance();
@@ -182,7 +188,7 @@ public class activity_dummy_payment extends AppCompatActivity {
         booking.setRentalAmount(rentalAmount);
         booking.setDepositAmount(depositAmount);
         booking.setTotalAmount(totalAmount);
-        booking.setStatus("Confirmed");
+        booking.setStatus("Confirmed"); // KEEP as Confirmed - no owner approval needed
         booking.setBookingDate(System.currentTimeMillis());
         booking.setPaymentStatus("paid");
         booking.setPaymentDate(System.currentTimeMillis());
@@ -193,8 +199,44 @@ public class activity_dummy_payment extends AppCompatActivity {
                         productsRef.child(productId).child("status").setValue("Unavailable");
                     }
 
+                    // FIX FOR PROBLEM 3 & 4: Send notifications to BOTH users
+                    // But each gets DIFFERENT notifications based on their role
+
+                    // 1. Send "New Booking Received" notification to OWNER
+                    Map<String, Object> ownerExtraData = new HashMap<>();
+                    ownerExtraData.put("bookingNumber", bookingNumber);
+                    ownerExtraData.put("renterName", renterName);
+                    ownerExtraData.put("productName", productName);
+                    ownerExtraData.put("renterId", currentUserId);
+
+                    notificationManager.sendOwnerNotification(
+                            "booking_confirmation", // This sends "New Booking Received" to owner
+                            bookingId,
+                            productId,
+                            currentUserId, // borrowerId
+                            productName,
+                            ownerExtraData
+                    );
+
+                    // 2. Send "Booking Confirmed" notification to BORROWER
+                    Map<String, Object> borrowerExtraData = new HashMap<>();
+                    borrowerExtraData.put("bookingNumber", bookingNumber);
+                    borrowerExtraData.put("ownerId", ownerId);
+                    borrowerExtraData.put("deliveryOption", deliveryOption);
+
+                    notificationManager.sendBorrowerNotification(
+                            "booking_confirmation", // This sends "Booking Confirmed" to borrower
+                            bookingId,
+                            productId,
+                            ownerId,
+                            productName,
+                            borrowerExtraData
+                    );
+
                     Intent intent = new Intent(activity_dummy_payment.this, activity_booking.class);
                     intent.putExtra("bookingId", bookingId);
+                    intent.putExtra("showToast", true);
+                    intent.putExtra("toastMessage", "Payment successful! Your booking is confirmed.");
                     startActivity(intent);
                     finish();
                 })
@@ -203,5 +245,27 @@ public class activity_dummy_payment extends AppCompatActivity {
                     btnPayNow.setEnabled(true);
                     btnPayNow.setText("Pay Now");
                 });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Re-enable button if user returns
+        if (btnPayNow != null && !btnPayNow.isEnabled()) {
+            btnPayNow.setEnabled(true);
+            btnPayNow.setText("Pay Now");
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // Clean up
+        if (btnPayNow != null) {
+            btnPayNow.setOnClickListener(null);
+        }
+        if (btnCancelPayment != null) {
+            btnCancelPayment.setOnClickListener(null);
+        }
     }
 }

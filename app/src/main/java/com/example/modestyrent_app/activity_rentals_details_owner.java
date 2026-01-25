@@ -42,16 +42,20 @@ public class activity_rentals_details_owner extends AppCompatActivity {
 
     // Owner Action Buttons
     private MaterialButton btnMarkOutForDelivery, btnConfirmReadyPickup;
-    private MaterialButton btnInspectReturn, btnCompleteRental;
+    private MaterialButton btnInspectReturn;
     private LinearLayout ownerActionsLayout;
 
     private DatabaseReference bookingsRef, productsRef, usersRef, disputesRef, chatsRef;
     private FirebaseAuth mAuth;
+    private NotificationManager notificationManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_rentals_details_owner);
+
+        // Initialize Notification Manager
+        notificationManager = new NotificationManager(this);
 
         // Get intent data
         Intent intent = getIntent();
@@ -93,7 +97,7 @@ public class activity_rentals_details_owner extends AppCompatActivity {
         btnMarkOutForDelivery = findViewById(R.id.btnMarkOutForDelivery);
         btnConfirmReadyPickup = findViewById(R.id.btnConfirmReadyPickup);
         btnInspectReturn = findViewById(R.id.btnInspectReturn);
-        btnCompleteRental = findViewById(R.id.btnCompleteRental);
+        //btnCompleteRental = findViewById(R.id.btnCompleteRental);
         ownerActionsLayout = findViewById(R.id.ownerActionsLayout);
 
         // Back button
@@ -119,7 +123,7 @@ public class activity_rentals_details_owner extends AppCompatActivity {
         btnMarkOutForDelivery.setOnClickListener(v -> markOutForDelivery());
         btnConfirmReadyPickup.setOnClickListener(v -> confirmReadyForPickup());
         btnInspectReturn.setOnClickListener(v -> inspectReturnedItem());
-        btnCompleteRental.setOnClickListener(v -> completeRental());
+        //btnCompleteRental.setOnClickListener(v -> completeRental());
     }
 
     private void loadBookingDetails() {
@@ -306,6 +310,24 @@ public class activity_rentals_details_owner extends AppCompatActivity {
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Marked as out for delivery", Toast.LENGTH_SHORT).show();
+
+                    // FIX FOR PROBLEM 7: Send "Ready to Pickup" notification to BORROWER ONLY
+                    Map<String, Object> extraData = new HashMap<>();
+                    extraData.put("deliveryTime", System.currentTimeMillis());
+                    extraData.put("deliveryOption", "Delivery");
+                    extraData.put("productName", productNameStr);
+
+                    notificationManager.sendBorrowerNotification(
+                            "ready_pickup",
+                            bookingId,
+                            productId,
+                            ownerId,
+                            productNameStr,
+                            extraData
+                    );
+
+                    // IMPORTANT: Owner should NOT get notification for their own action
+                    // This fixes Problem 7
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to update delivery status", Toast.LENGTH_SHORT).show();
@@ -321,6 +343,25 @@ public class activity_rentals_details_owner extends AppCompatActivity {
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Item ready for pickup", Toast.LENGTH_SHORT).show();
+
+                    // FIX FOR PROBLEM 7: Send "Ready to Pickup" notification to BORROWER ONLY
+                    Map<String, Object> extraData = new HashMap<>();
+                    extraData.put("readyTime", System.currentTimeMillis());
+                    extraData.put("deliveryOption", "Pickup");
+                    extraData.put("ownerAddress", deliveryAddress.getText().toString());
+                    extraData.put("productName", productNameStr);
+
+                    notificationManager.sendBorrowerNotification(
+                            "ready_pickup",
+                            bookingId,
+                            productId,
+                            ownerId,
+                            productNameStr,
+                            extraData
+                    );
+
+                    // IMPORTANT: Owner should NOT get notification for their own action
+                    // This fixes Problem 7
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to update status", Toast.LENGTH_SHORT).show();
@@ -391,23 +432,97 @@ public class activity_rentals_details_owner extends AppCompatActivity {
     }
 
     private void completeRental() {
-        Map<String, Object> updates = new HashMap<>();
-        updates.put("status", "Completed");
-        updates.put("depositReturned", true);
-        updates.put("completionTime", System.currentTimeMillis());
+        // First check if inspection is completed
+        bookingsRef.child(bookingId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                String status = getStringValue(snapshot, "status");
 
-        // Also update deliveryStatus if needed
-        if ("Delivery".equals(deliveryOption)) {
-            updates.put("deliveryStatus", "CompletedDelivery");
-        }
+                if ("AwaitingInspection".equals(status)) {
+                    Toast.makeText(activity_rentals_details_owner.this,
+                            "Please complete inspection first", Toast.LENGTH_SHORT).show();
+                    return;
+                }
 
-        bookingsRef.child(bookingId).updateChildren(updates)
-                .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(this, "Rental completed successfully", Toast.LENGTH_SHORT).show();
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Failed to complete rental", Toast.LENGTH_SHORT).show();
-                });
+                // Get refund details if available
+                Double refundAmount = getDoubleValue(snapshot, "refundAmount");
+                Double repairCost = getDoubleValue(snapshot, "repairCost");
+                Double latePenalty = getDoubleValue(snapshot, "latePenalty");
+
+                Map<String, Object> updates = new HashMap<>();
+                updates.put("status", "Completed");
+                updates.put("depositReturned", true);
+                updates.put("completionTime", System.currentTimeMillis());
+
+                // If refund amount exists, save it
+                if (refundAmount != null) {
+                    updates.put("refundAmount", refundAmount);
+                    updates.put("refundStatus", "completed");
+                }
+
+                // If repair cost exists, save it
+                if (repairCost != null) {
+                    updates.put("repairCost", repairCost);
+                }
+
+                // If late penalty exists, save it
+                if (latePenalty != null) {
+                    updates.put("latePenalty", latePenalty);
+                }
+
+                // Also update deliveryStatus if needed
+                if ("Delivery".equals(deliveryOption)) {
+                    updates.put("deliveryStatus", "CompletedDelivery");
+                }
+
+                bookingsRef.child(bookingId).updateChildren(updates)
+                        .addOnSuccessListener(aVoid -> {
+                            Toast.makeText(activity_rentals_details_owner.this, "Rental completed successfully", Toast.LENGTH_SHORT).show();
+
+                            // FIX FOR PROBLEM 9: Send "Refund Completed" notification to BORROWER
+                            Map<String, Object> extraData = new HashMap<>();
+                            extraData.put("completionTime", System.currentTimeMillis());
+                            extraData.put("refundStatus", "completed");
+                            extraData.put("productName", productNameStr);
+
+                            // Include refund amount if available
+                            if (refundAmount != null) {
+                                extraData.put("refundAmount", refundAmount);
+                            }
+
+                            // Include repair cost if deducted
+                            if (repairCost != null && repairCost > 0) {
+                                extraData.put("repairCost", repairCost);
+                            }
+
+                            // Include late penalty if applied
+                            if (latePenalty != null && latePenalty > 0) {
+                                extraData.put("latePenalty", latePenalty);
+                            }
+
+                            notificationManager.sendBorrowerNotification(
+                                    "completed_refund",
+                                    bookingId,
+                                    productId,
+                                    ownerId,
+                                    productNameStr,
+                                    extraData
+                            );
+
+                            // IMPORTANT: Owner should NOT get notification for completion
+                            // Only borrower gets the "Refund Completed" notification
+                            // This fixes Problem 9
+                        })
+                        .addOnFailureListener(e -> {
+                            Toast.makeText(activity_rentals_details_owner.this, "Failed to complete rental", Toast.LENGTH_SHORT).show();
+                        });
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Toast.makeText(activity_rentals_details_owner.this, "Failed to check booking status", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     // ============= HELPER METHODS =============
@@ -416,7 +531,7 @@ public class activity_rentals_details_owner extends AppCompatActivity {
         btnMarkOutForDelivery.setVisibility(View.GONE);
         btnConfirmReadyPickup.setVisibility(View.GONE);
         btnInspectReturn.setVisibility(View.GONE);
-        btnCompleteRental.setVisibility(View.GONE);
+        //btnCompleteRental.setVisibility(View.GONE);
         ownerActionsLayout.setVisibility(View.GONE);
 
         if (status == null) return;
@@ -427,39 +542,47 @@ public class activity_rentals_details_owner extends AppCompatActivity {
         boolean hasAction = false;
 
         if ("Delivery".equals(deliveryOption)) {
-            if (statusLower.contains("preparingdelivery")) {
+            if (statusLower.contains("preparingdelivery") || "preparingdelivery".equals(status)) {
                 if (!deliveryStatusLower.contains("outfordelivery")) {
                     btnMarkOutForDelivery.setVisibility(View.VISIBLE);
                     hasAction = true;
                 }
-            } else if (statusLower.contains("returnrequested")) {
+            } else if (statusLower.contains("returnrequested") || "returnrequested".equals(status)) {
                 btnInspectReturn.setText("Mark as Received");
                 btnInspectReturn.setVisibility(View.VISIBLE);
                 hasAction = true;
-            } else if (statusLower.contains("awaitinginspection")) {
+            } else if (statusLower.contains("awaitinginspection") || "awaitinginspection".equals(status)) {
                 btnInspectReturn.setText("Inspect Return");
                 btnInspectReturn.setVisibility(View.VISIBLE);
                 hasAction = true;
-            } else if (statusLower.contains("complete") || statusLower.contains("finished") || statusLower.contains("done")) {
-                hasAction = true;
+            } else if ("completed".equals(statusLower)) {
+                // No action buttons for completed rentals
+                hasAction = false;
             }
         } else {
-            if (statusLower.contains("preparingpickup")) {
+            if (statusLower.contains("preparingpickup") || "preparingpickup".equals(status)) {
                 if (!deliveryStatusLower.contains("readyforpickup")) {
                     btnConfirmReadyPickup.setVisibility(View.VISIBLE);
                     hasAction = true;
                 }
-            } else if (statusLower.contains("returnrequested")) {
+            } else if (statusLower.contains("returnrequested") || "returnrequested".equals(status)) {
                 btnInspectReturn.setText("Mark as Received");
                 btnInspectReturn.setVisibility(View.VISIBLE);
                 hasAction = true;
-            } else if (statusLower.contains("awaitinginspection")) {
+            } else if (statusLower.contains("awaitinginspection") || "awaitinginspection".equals(status)) {
                 btnInspectReturn.setText("Inspect Return");
                 btnInspectReturn.setVisibility(View.VISIBLE);
                 hasAction = true;
-            } else if (statusLower.contains("complete") || statusLower.contains("finished") || statusLower.contains("done")) {
-                hasAction = true;
+            } else if ("completed".equals(statusLower)) {
+                // No action buttons for completed rentals
+                hasAction = false;
             }
+        }
+
+        // Show Complete Rental button for AwaitingInspection status
+        if ("awaitinginspection".equals(statusLower) || "awaitinginspection".equals(status)) {
+            //btnCompleteRental.setVisibility(View.VISIBLE);
+            hasAction = true;
         }
 
         if (hasAction) {

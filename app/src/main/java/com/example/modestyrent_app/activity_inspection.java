@@ -556,6 +556,7 @@ public class activity_inspection extends AppCompatActivity {
         intent.putExtra("daysLate", daysLate);
         intent.putExtra("isLateReturn", isLateReturn); // Add this flag
         intent.putExtra("refundAmount", refundAmount);
+
         startActivity(intent);
     }
 

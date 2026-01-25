@@ -48,7 +48,7 @@
                 android:contentDescription="Notifications" />
 
             <TextView
-                android:id="@+id/notificationBadge"
+                android:id="@+id/tvNotificationBadge"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:layout_alignTop="@id/notificationIcon"

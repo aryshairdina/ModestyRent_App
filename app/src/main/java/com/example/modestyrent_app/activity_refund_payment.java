@@ -2,6 +2,7 @@ package com.example.modestyrent_app;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.*;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -28,13 +29,19 @@ public class activity_refund_payment extends AppCompatActivity {
     private RadioButton rbOnlineBanking, rbCard, rbEwallet;
     private MaterialButton btnConfirmPayment;
 
-    private DatabaseReference bookingsRef;
+    private DatabaseReference bookingsRef, productsRef;
     private FirebaseAuth mAuth;
+    private NotificationManager notificationManager;
+
+    private static final String TAG = "RefundPayment";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_refund_payment);
+
+        // Initialize Notification Manager
+        notificationManager = new NotificationManager(this);
 
         // Get data from inspection screen
         Intent intent = getIntent();
@@ -59,6 +66,18 @@ public class activity_refund_payment extends AppCompatActivity {
 
         mAuth = FirebaseAuth.getInstance();
         bookingsRef = FirebaseDatabase.getInstance().getReference("bookings");
+        productsRef = FirebaseDatabase.getInstance().getReference("products");
+
+        // Debug logging
+        Log.d(TAG, "Refund Payment Activity Started:");
+        Log.d(TAG, "- Booking ID: " + bookingId);
+        Log.d(TAG, "- Product ID: " + productId);
+        Log.d(TAG, "- Renter ID: " + renterId);
+        Log.d(TAG, "- Refund Amount: RM " + refundAmount);
+        Log.d(TAG, "- Late Penalty: RM " + latePenalty);
+        Log.d(TAG, "- Days Late: " + daysLate);
+        Log.d(TAG, "- Is Late Return: " + isLateReturn);
+        Log.d(TAG, "- Repair Cost: RM " + repairCost);
 
         initializeViews();
         setupUI();
@@ -109,7 +128,7 @@ public class activity_refund_payment extends AppCompatActivity {
     }
 
     private void setupListeners() {
-        // 🔒 Make sure ONLY ONE payment method can be selected at a time
+        // Make sure ONLY ONE payment method can be selected at a time
         CompoundButton.OnCheckedChangeListener paymentListener = (buttonView, isChecked) -> {
             if (!isChecked) return;
 
@@ -142,6 +161,103 @@ public class activity_refund_payment extends AppCompatActivity {
     }
 
     private void processRefundPayment() {
+        // Disable button to prevent double-click
+        btnConfirmPayment.setEnabled(false);
+        btnConfirmPayment.setText("Processing...");
+
+        // Calculate total deductions
+        double totalDeductions = repairCost + latePenalty;
+
+        // Get current user ID (owner)
+        String currentUserId = mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : "";
+
+        // FIRST: Get product name from products collection using productId
+        if (productId != null && !productId.isEmpty()) {
+            productsRef.child(productId).addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot productSnapshot) {
+                    String productName = "the item"; // Default value
+
+                    if (productSnapshot.exists()) {
+                        // Try different field names for product name
+                        if (productSnapshot.child("name").exists()) {
+                            productName = productSnapshot.child("name").getValue(String.class);
+                            Log.d(TAG, "Got product name from 'name' field: " + productName);
+                        } else if (productSnapshot.child("productName").exists()) {
+                            productName = productSnapshot.child("productName").getValue(String.class);
+                            Log.d(TAG, "Got product name from 'productName' field: " + productName);
+                        } else if (productSnapshot.child("title").exists()) {
+                            productName = productSnapshot.child("title").getValue(String.class);
+                            Log.d(TAG, "Got product name from 'title' field: " + productName);
+                        }
+
+                        if (productName == null || productName.isEmpty()) {
+                            productName = "the item";
+                            Log.d(TAG, "Product name empty, using default");
+                        }
+
+                        Log.d(TAG, "Final product name: " + productName);
+                    } else {
+                        Log.w(TAG, "Product not found in products collection with ID: " + productId);
+
+                        // Fallback: Try to get from bookings collection
+                        getProductNameFromBooking(productName);
+                        return;
+                    }
+
+                    // Continue with refund processing
+                    completeRefundProcessing(productName, currentUserId);
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    Toast.makeText(activity_refund_payment.this,
+                            "Failed to load product details", Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Database error loading product: " + error.getMessage());
+                    btnConfirmPayment.setEnabled(true);
+                    btnConfirmPayment.setText("Confirm Payment");
+                }
+            });
+        } else {
+            Toast.makeText(this, "Product ID not available", Toast.LENGTH_SHORT).show();
+            btnConfirmPayment.setEnabled(true);
+            btnConfirmPayment.setText("Confirm Payment");
+        }
+    }
+
+    private void getProductNameFromBooking(String fallbackName) {
+        // Fallback method: Get product name from booking data
+        bookingsRef.child(bookingId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot bookingSnapshot) {
+                String productName = fallbackName;
+
+                if (bookingSnapshot.exists()) {
+                    // Try to get product name from booking
+                    String bookingProductName = bookingSnapshot.child("productName").getValue(String.class);
+                    if (bookingProductName != null && !bookingProductName.isEmpty()) {
+                        productName = bookingProductName;
+                        Log.d(TAG, "Got product name from booking: " + productName);
+                    }
+                }
+
+                // Get current user ID (owner)
+                String currentUserId = mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : "";
+
+                // Continue with refund processing
+                completeRefundProcessing(productName, currentUserId);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                // Use fallback name if booking also fails
+                String currentUserId = mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : "";
+                completeRefundProcessing(fallbackName, currentUserId);
+            }
+        });
+    }
+
+    private void completeRefundProcessing(String productName, String currentUserId) {
         // Calculate total deductions
         double totalDeductions = repairCost + latePenalty;
 
@@ -161,19 +277,70 @@ public class activity_refund_payment extends AppCompatActivity {
         updates.put("refundAmount", refundAmount);
         updates.put("depositReturned", true);
         updates.put("depositReturnDate", System.currentTimeMillis());
+        updates.put("refundStatus", "completed");
+        updates.put("refundDate", System.currentTimeMillis());
+
+        // Debug logging
+        Log.d(TAG, "Processing refund with:");
+        Log.d(TAG, "- Product Name: " + productName);
+        Log.d(TAG, "- Current User ID (owner): " + currentUserId);
+        Log.d(TAG, "- Renter ID (notification receiver): " + renterId);
+        Log.d(TAG, "- Refund Amount: RM " + refundAmount);
 
         bookingsRef.child(bookingId).updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
-                    Intent intent = new Intent(this, activity_rentals_details_owner.class);
+                    // SEND NOTIFICATION TO RENTER
+                    if (renterId != null && !renterId.isEmpty()) {
+                        Map<String, Object> extraData = new HashMap<>();
+                        extraData.put("refundAmount", refundAmount);
+                        extraData.put("repairCost", repairCost);
+                        extraData.put("latePenalty", latePenalty);
+                        extraData.put("daysLate", daysLate);
+                        extraData.put("totalDeductions", totalDeductions);
+                        extraData.put("refundDate", System.currentTimeMillis());
+                        extraData.put("productName", productName);
+
+                        Log.d(TAG, "Sending notification to renter ID: " + renterId);
+
+                        // Send notification to renter (borrower)
+                        notificationManager.sendBorrowerNotification(
+                                "completed_refund",
+                                bookingId,
+                                productId,
+                                renterId,        // Renter receives the notification
+                                productName,     // Product name for the message
+                                extraData
+                        );
+
+                        Log.d(TAG, "Notification sent successfully");
+                    } else {
+                        Log.w(TAG, "Cannot send notification: renterId is null or empty");
+                    }
+
+                    String message = "Refund paid and rental completed";
+                    if (isLateReturn && latePenalty > 0) {
+                        message += "\nLate penalty of RM " + String.format("%.2f", latePenalty) +
+                                " applied for " + daysLate + " day(s) late";
+                    }
+                    Toast.makeText(activity_refund_payment.this, message, Toast.LENGTH_LONG).show();
+
+                    Log.d(TAG, "Firebase updated successfully with refund data");
+
+                    // Navigate back to owner's rental details
+                    Intent intent = new Intent(activity_refund_payment.this,
+                            activity_rentals_details_owner.class);
                     intent.putExtra("bookingId", bookingId);
                     intent.putExtra("productId", productId);
-                    intent.putExtra("ownerId",
-                            mAuth.getCurrentUser() != null ? mAuth.getCurrentUser().getUid() : null);
+                    intent.putExtra("ownerId", currentUserId);
                     startActivity(intent);
                     finish();
                 })
                 .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Failed to process refund", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(activity_refund_payment.this,
+                            "Failed to process refund: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Failed to update Firebase: " + e.getMessage());
+                    btnConfirmPayment.setEnabled(true);
+                    btnConfirmPayment.setText("Confirm Payment");
                 });
     }
 
