@@ -460,6 +460,7 @@ public class activity_profile extends AppCompatActivity {
 
         if (id == R.id.nav_live) {
             Intent intent = new Intent(activity_profile.this, activity_product_reels.class);
+            startActivity(intent);
             return true;
         }
 
