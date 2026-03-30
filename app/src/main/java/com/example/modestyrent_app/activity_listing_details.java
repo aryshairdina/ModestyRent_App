@@ -61,7 +61,7 @@ public class activity_listing_details extends AppCompatActivity {
     private TextInputEditText ld_etName, ld_etSize, ld_etPrice, ld_etDescription;
     private ChipGroup ld_chipGroupStatus, ld_chipGroupCategory, ld_chipGroupColor;
     private Chip ld_chipAvailable, ld_chipReserved, ld_chipUnavailable;
-    private Chip ld_chipCategoryKurung, ld_chipCategoryJubah, ld_chipCategoryKebaya;
+    private Chip ld_chipCategoryKurung, ld_chipCategoryJubah, ld_chipCategoryDress, ld_chipCategoryHijab, ld_chipCategoryOther;
     private ProgressBar ld_progress;
 
     // Color selection (EXACTLY like add product)
@@ -118,7 +118,9 @@ public class activity_listing_details extends AppCompatActivity {
 
         ld_chipCategoryKurung = findViewById(R.id.ld_chipCategoryKurung);
         ld_chipCategoryJubah = findViewById(R.id.ld_chipCategoryJubah);
-        ld_chipCategoryKebaya = findViewById(R.id.ld_chipCategoryKebaya);
+        ld_chipCategoryDress = findViewById(R.id.ld_chipCategoryDress);
+        ld_chipCategoryHijab = findViewById(R.id.ld_chipCategoryHijab);
+        ld_chipCategoryOther = findViewById(R.id.ld_chipCategoryOther);
 
         // Color selection views (EXACTLY like add product)
         ld_chipColorWhite = findViewById(R.id.ld_chipColorWhite);
@@ -336,7 +338,9 @@ public class activity_listing_details extends AppCompatActivity {
                     String cat = category.toLowerCase().trim();
                     if (cat.contains("kurung")) ld_chipGroupCategory.check(ld_chipCategoryKurung.getId());
                     else if (cat.contains("jubah")) ld_chipGroupCategory.check(ld_chipCategoryJubah.getId());
-                    else if (cat.contains("kebaya")) ld_chipGroupCategory.check(ld_chipCategoryKebaya.getId());
+                    else if (cat.contains("dress")) ld_chipGroupCategory.check(ld_chipCategoryDress.getId());
+                    else if (cat.contains("hijab")) ld_chipGroupCategory.check(ld_chipCategoryHijab.getId());
+                    else if (cat.contains("other")) ld_chipGroupCategory.check(ld_chipCategoryOther.getId());
                     else ld_chipGroupCategory.clearCheck();
                 }
 
@@ -462,7 +466,9 @@ public class activity_listing_details extends AppCompatActivity {
         int checkedCatId = ld_chipGroupCategory.getCheckedChipId();
         if (checkedCatId == ld_chipCategoryKurung.getId()) category = "Kurung";
         else if (checkedCatId == ld_chipCategoryJubah.getId()) category = "Jubah";
-        else if (checkedCatId == ld_chipCategoryKebaya.getId()) category = "Kebaya";
+        else if (checkedCatId == ld_chipCategoryDress.getId()) category = "Dress";
+        else if (checkedCatId == ld_chipCategoryHijab.getId()) category = "Hijab";
+        else if (checkedCatId == ld_chipCategoryOther.getId()) category = "Other";
 
         // colors (EXACTLY like add product logic)
         List<String> colors = new ArrayList<>();

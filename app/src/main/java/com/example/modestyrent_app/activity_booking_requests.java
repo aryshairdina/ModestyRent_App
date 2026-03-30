@@ -59,16 +59,12 @@ public class activity_booking_requests extends AppCompatActivity {
         }
 
         initViews();
-        forceFilterCardsClickable();   // ⭐ IMPORTANT FIX
+        forceFilterCardsClickable();
         initFirebase();
         setupRecycler();
         setupListeners();
         loadProductsAndUsers();
     }
-
-    // ----------------------------------------------------
-    // INIT
-    // ----------------------------------------------------
 
     private void initViews() {
         bookingsRecyclerView = findViewById(R.id.bookingsRecyclerView);
@@ -83,10 +79,6 @@ public class activity_booking_requests extends AppCompatActivity {
         findViewById(R.id.backButton).setOnClickListener(v -> finish());
     }
 
-    /**
-     * ⭐ CRITICAL FIX:
-     * Force MaterialCardView to receive touch events
-     */
     private void forceFilterCardsClickable() {
         statusFilterCard.setClickable(true);
         statusFilterCard.setFocusable(true);
